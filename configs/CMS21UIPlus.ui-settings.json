@@ -1,0 +1,275 @@
+{
+  "modId": "CMS21UIPlus",
+  "displayName": "CMS21 UI+",
+  "config": {
+    "path": "CMS21UIPlus.cfg",
+    "format": "toml",
+    "section": "CMS21UIPlus.Settings"
+  },
+  "groups": [
+    {
+      "id": "inventory",
+      "order": 10,
+      "nameKey": "LOC_GroupInventoryName"
+    },
+    {
+      "id": "inventoryFilters",
+      "order": 15,
+      "nameKey": "LOC_GroupInventoryFiltersName"
+    },
+    {
+      "id": "shopping",
+      "order": 20,
+      "nameKey": "LOC_GroupShoppingName"
+    },
+    {
+      "id": "jobs",
+      "order": 30,
+      "nameKey": "LOC_GroupJobsName"
+    },
+    {
+      "id": "interface",
+      "order": 40,
+      "nameKey": "LOC_GroupInterfaceName"
+    },
+    {
+      "id": "startup",
+      "order": 70,
+      "nameKey": "LOC_GroupStartupName"
+    }
+  ],
+  "settings": [
+    {
+      "id": "FID_ShowPartRepairabilityIndicators",
+      "key": "showPartRepairabilityIndicators",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 10,
+      "nameKey": "LOC_SettingShowPartRepairabilityIndicatorsName",
+      "descriptionKey": "LOC_SettingShowPartRepairabilityIndicatorsDescription"
+    },
+    {
+      "id": "FID_ShowOwnedPartCountIndicators",
+      "key": "showOwnedPartCountIndicators",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 11,
+      "nameKey": "LOC_SettingShowOwnedPartCountIndicatorsName",
+      "descriptionKey": "LOC_SettingShowOwnedPartCountIndicatorsDescription"
+    },
+    {
+      "id": "FID_HideBodyPartPaintColorBadges",
+      "key": "hideBodyPartPaintColorBadges",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 15,
+      "nameKey": "LOC_SettingHideBodyPartPaintColorBadgesName",
+      "descriptionKey": "LOC_SettingHideBodyPartPaintColorBadgesDescription"
+    },
+    {
+      "id": "FID_AddInventoryQuickFilters",
+      "key": "addInventoryQuickFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 20,
+      "nameKey": "LOC_SettingAddInventoryQuickFiltersName",
+      "descriptionKey": "LOC_SettingAddInventoryQuickFiltersDescription"
+    },
+    {
+      "id": "FID_AddScrapInventoryFilters",
+      "key": "addScrapInventoryFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 21,
+      "nameKey": "LOC_SettingAddScrapInventoryFiltersName",
+      "descriptionKey": "LOC_SettingAddScrapInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_AddRepairInventoryFilters",
+      "key": "addRepairInventoryFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 22,
+      "nameKey": "LOC_SettingAddRepairInventoryFiltersName",
+      "descriptionKey": "LOC_SettingAddRepairInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_AddSpringClampInventoryFilters",
+      "key": "addSpringClampInventoryFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 23,
+      "nameKey": "LOC_SettingAddSpringClampInventoryFiltersName",
+      "descriptionKey": "LOC_SettingAddSpringClampInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_MoveFilteredPartsBetweenInventoryAndWarehouse",
+      "key": "moveFilteredPartsBetweenInventoryAndWarehouse",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 25,
+      "nameKey": "LOC_SettingMoveFilteredPartsBetweenInventoryAndWarehouseName",
+      "descriptionKey": "LOC_SettingMoveFilteredPartsBetweenInventoryAndWarehouseDescription"
+    },
+    {
+      "id": "FID_AddBulkScrapShortcut",
+      "key": "addBulkScrapShortcut",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 26,
+      "nameKey": "LOC_SettingAddBulkScrapShortcutName",
+      "descriptionKey": "LOC_SettingAddBulkScrapShortcutDescription"
+    },
+    {
+      "id": "FID_RememberInventorySorting",
+      "key": "rememberInventorySorting",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 60,
+      "nameKey": "LOC_SettingRememberInventorySortingName",
+      "descriptionKey": "LOC_SettingRememberInventorySortingDescription"
+    },
+    {
+      "id": "FID_RemovePartsFromShoppingList",
+      "key": "removePartsFromShoppingList",
+      "group": "shopping",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 10,
+      "nameKey": "LOC_SettingRemovePartsFromShoppingListName",
+      "descriptionKey": "LOC_SettingRemovePartsFromShoppingListDescription"
+    },
+    {
+      "id": "FID_WheelShopListPurchaseHelper",
+      "key": "wheelShopListPurchaseHelper",
+      "group": "shopping",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 20,
+      "nameKey": "LOC_SettingWheelShopListPurchaseHelperName",
+      "descriptionKey": "LOC_SettingWheelShopListPurchaseHelperDescription"
+    },
+    {
+      "id": "FID_UnmarkFinishedParts",
+      "key": "unmarkFinishedParts",
+      "group": "jobs",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 10,
+      "nameKey": "LOC_SettingUnmarkFinishedPartsName",
+      "descriptionKey": "LOC_SettingUnmarkFinishedPartsDescription"
+    },
+    {
+      "id": "FID_MarkBodyParts",
+      "key": "markBodyParts",
+      "group": "jobs",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 20,
+      "nameKey": "LOC_SettingMarkBodyPartsName",
+      "descriptionKey": "LOC_SettingMarkBodyPartsDescription"
+    },
+    {
+      "id": "FID_QuickSwitchMountModes",
+      "key": "quickSwitchMountModes",
+      "group": "jobs",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 30,
+      "nameKey": "LOC_SettingQuickSwitchMountModesName",
+      "descriptionKey": "LOC_SettingQuickSwitchMountModesDescription"
+    },
+    {
+      "id": "FID_ShowLiveryFileNames",
+      "key": "showLiveryFileNames",
+      "group": "interface",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 20,
+      "nameKey": "LOC_SettingShowLiveryFileNamesName",
+      "descriptionKey": "LOC_SettingShowLiveryFileNamesDescription"
+    },
+    {
+      "id": "FID_ShowCarConditionOnMap",
+      "key": "showCarConditionOnMap",
+      "group": "interface",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 30,
+      "nameKey": "LOC_SettingShowCarConditionOnMapName",
+      "descriptionKey": "LOC_SettingShowCarConditionOnMapDescription"
+    },
+    {
+      "id": "FID_AutoConfirmDynoStart",
+      "key": "autoConfirmDynoStart",
+      "group": "interface",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 40,
+      "nameKey": "LOC_SettingAutoConfirmDynoStartName",
+      "descriptionKey": "LOC_SettingAutoConfirmDynoStartDescription"
+    },
+    {
+      "id": "FID_AddExitGameToGaragePauseMenu",
+      "key": "addExitGameToGaragePauseMenu",
+      "group": "interface",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 50,
+      "nameKey": "LOC_SettingAddExitGameToGaragePauseMenuName",
+      "descriptionKey": "LOC_SettingAddExitGameToGaragePauseMenuDescription"
+    },
+    {
+      "id": "FID_SkipStartupVideosTotally",
+      "key": "skipStartupVideosTotally",
+      "group": "startup",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 10,
+      "nameKey": "LOC_SettingSkipStartupVideosTotallyName",
+      "descriptionKey": "LOC_SettingSkipStartupVideosTotallyDescription"
+    },
+    {
+      "id": "FID_AutoContinueStartupPrompt",
+      "key": "autoContinueStartupPrompt",
+      "group": "startup",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 20,
+      "nameKey": "LOC_SettingAutoContinueStartupPromptName",
+      "descriptionKey": "LOC_SettingAutoContinueStartupPromptDescription"
+    }
+  ],
+  "displayNameKey": "LOC_ModDisplayName"
+}

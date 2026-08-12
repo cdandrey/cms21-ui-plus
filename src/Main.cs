@@ -87,7 +87,9 @@ namespace Cms21UiPlus
             FilteredWarehouseTransferFeature.Reset();
             ScrapInventoryFilterFeature.ResetAll();
             RepairInventoryFilterFeature.ResetAll();
+            MountPartSelectionFilterFeature.ResetAll();
             SpringClampInventoryFilterFeature.ResetAll();
+            TireChangerInventoryFilterFeature.ResetAll();
             if (sceneName == "Menu")
                 ModSettingsMenuFeature.ResetAll();
             GaragePauseExitFeature.OnGarageSceneUnloaded();

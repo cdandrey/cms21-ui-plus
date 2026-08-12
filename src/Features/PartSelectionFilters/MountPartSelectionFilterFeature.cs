@@ -8,60 +8,34 @@ using UnityEngine.UI;
 using Il2CppCMS.Containers;
 using Il2CppCMS.UI.Logic;
 using Il2CppCMS.UI.Logic.ChoosePartDown;
-using Il2CppCMS.UI.Logic.Paging;
 using Il2CppCMS.UI.Windows;
 #else
 using CMS.Containers;
 using CMS.UI.Logic;
 using CMS.UI.Logic.ChoosePartDown;
-using CMS.UI.Logic.Paging;
 using CMS.UI.Windows;
 #endif
 
 namespace Cms21UiPlus
 {
-    internal static class SpringClampInventoryFilterFeature
+    internal static class MountPartSelectionFilterFeature
     {
         internal struct DownWindowShowState
         {
-            internal bool IsSpringWindow;
+            internal bool IsMountWindow;
             internal bool NeedsEmptyRefresh;
         }
 
-        private const string WindowId = "SpringClamp";
-        private const string ResetHintId = "Hint_ResetSpringClampFilters";
+        private const string WindowId = "MountPartSelection";
+        private const string ResetHintId = "Hint_ResetMountPartFilters";
         private const float PanelVerticalOffset = 8f;
 
         private static readonly List<ChoosePartDownItem> OriginalItems =
             new List<ChoosePartDownItem>();
         private static readonly PartFilterPanelController Panel =
-            new PartFilterPanelController("QSpringClampFilter");
-
-        private static ChoosePartUpWindow activeUpWindow;
-        private static ChoosePartUpWindow knownUpWindow;
-        private static ChoosePartDownWindow activeDownWindow;
-        private static GarageConditionFilterMode conditionMode =
-            GarageConditionFilterMode.Off;
-        private static QualityQuickFilterMode qualityMode =
-            QualityQuickFilterMode.Off;
-        private static string searchText = string.Empty;
-        private static bool applyingFilteredList;
-        private static NativeUiFactory.FooterHintHandle resetHint;
-        private static GameObject emptyStateRoot;
-        private static GameObject separateItemsDetailRoot;
-        private static bool separateItemsDetailWasActive;
-        private static GameObject nativeDownEmptyStateRoot;
-        private static bool nativeDownEmptyStateWasActive;
-        private static GameObject separateWindowEmptyStateRoot;
+            new PartFilterPanelController("QMountPartFilter");
         private static readonly List<CurrentDetailObjectState>
-            HiddenCurrentDetailObjects =
-                new List<CurrentDetailObjectState>(5);
-        private static int hiddenCurrentSegment = -1;
-        private struct CurrentDetailObjectState
-        {
-            internal GameObject Target;
-            internal bool WasActive;
-        }
+            HiddenCurrentDetailObjects = new List<CurrentDetailObjectState>(5);
         private static readonly FieldInfo CurrentItemField =
             typeof(ChoosePartUpWindow).GetField("currentItem",
                 BindingFlags.Instance | BindingFlags.Public |
@@ -79,11 +53,28 @@ namespace Cms21UiPlus
                 BindingFlags.Instance | BindingFlags.Public |
                 BindingFlags.NonPublic);
 
-        internal static void OnUpWindowShowPrefix(ChoosePartUpWindow window,
-            ChoosePartUpWindowType type)
+        private struct CurrentDetailObjectState
         {
-            knownUpWindow = window;
-            if (!IsSpringType(type)) {
+            internal GameObject Target;
+            internal bool WasActive;
+        }
+
+        private static ChoosePartUpWindow activeUpWindow;
+        private static ChoosePartDownWindow activeDownWindow;
+        private static GarageConditionFilterMode conditionMode =
+            GarageConditionFilterMode.Off;
+        private static QualityQuickFilterMode qualityMode =
+            QualityQuickFilterMode.Off;
+        private static string searchText = string.Empty;
+        private static bool applyingFilteredList;
+        private static NativeUiFactory.FooterHintHandle resetHint;
+        private static GameObject emptyStateRoot;
+        private static int hiddenCurrentSegment = -1;
+
+        internal static void OnUpWindowShowPrefix(ChoosePartUpWindow window,
+            ChoosePartUpWindowType type, string overload)
+        {
+            if (type != ChoosePartUpWindowType.Mount) {
                 if (IsActiveUpWindow(window))
                     DeactivateWindow();
                 return;
@@ -100,13 +91,13 @@ namespace Cms21UiPlus
         }
 
         internal static void OnUpWindowShowPostfix(ChoosePartUpWindow window,
-            ChoosePartUpWindowType type, bool result)
+            ChoosePartUpWindowType type, bool result, string overload)
         {
-            if (!IsSpringType(type))
+            if (type != ChoosePartUpWindowType.Mount)
                 return;
-            if (!result) {
-                if (IsActiveUpWindow(window))
-                    DeactivateWindow();
+
+            if (!result && IsActiveUpWindow(window)) {
+                DeactivateWindow();
                 return;
             }
 
@@ -116,8 +107,10 @@ namespace Cms21UiPlus
 
         internal static void OnUpWindowHidden(ChoosePartUpWindow window)
         {
-            if (IsActiveUpWindow(window))
-                DeactivateWindow();
+            if (!IsActiveUpWindow(window))
+                return;
+
+            DeactivateWindow();
         }
 
         internal static DownWindowShowState PrepareNativeListForShow(
@@ -126,11 +119,11 @@ namespace Cms21UiPlus
             ref int selectedIndex)
         {
             DownWindowShowState state = new DownWindowShowState();
-            if (!EnsureActiveSpringDownWindow(window) || applyingFilteredList ||
+            if (!IsActiveMountDownWindow(window) || applyingFilteredList ||
                 items == null)
                 return state;
 
-            state.IsSpringWindow = true;
+            state.IsMountWindow = true;
             activeDownWindow = window;
             CaptureNativeItems(items);
 
@@ -153,13 +146,14 @@ namespace Cms21UiPlus
         internal static void OnWindowShown(ChoosePartDownWindow window,
             DownWindowShowState state)
         {
-            if (!state.IsSpringWindow || !IsActiveSpringDownWindow(window))
+            if (!state.IsMountWindow || !IsActiveMountDownWindow(window))
                 return;
 
             activeDownWindow = window;
-            if (!Panel.AttachWithButtons(window.transform,
-                    CycleConditionFilter, null, CycleQualityFilter,
-                    OnSearchChanged, true, false, true)) {
+            bool attached = Panel.AttachWithButtons(window.transform,
+                CycleConditionFilter, null, CycleQualityFilter,
+                OnSearchChanged, true, false, true);
+            if (!attached) {
                 RestoreOriginalList();
                 DeactivateWindow();
                 return;
@@ -179,7 +173,7 @@ namespace Cms21UiPlus
             ChoosePartPageManager pageManager,
             ref Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> items)
         {
-            if (!IsActiveSpringDownWindow(pageManager) ||
+            if (!IsActiveMountDownWindow(pageManager) ||
                 applyingFilteredList || items == null)
                 return;
 
@@ -198,11 +192,12 @@ namespace Cms21UiPlus
             ChoosePartPageManager pageManager,
             Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> items)
         {
-            if (!IsActiveSpringDownWindow(pageManager) ||
-                applyingFilteredList || !HasActiveFilters())
+            if (!IsActiveMountDownWindow(pageManager) || applyingFilteredList)
                 return;
 
-            ApplyFilteredEmptyState(items == null || items.Count == 0);
+            bool empty = items == null || items.Count == 0;
+            if (HasActiveFilters())
+                ApplyFilteredEmptyState(empty);
         }
 
         internal static void OnInputFieldKeyPressed(InputField inputField)
@@ -212,26 +207,16 @@ namespace Cms21UiPlus
             Panel.HandleKeyPressed(inputField);
         }
 
-        internal static void Update()
-        {
-            if (activeDownWindow == null ||
-                activeDownWindow.gameObject == null ||
-                !activeDownWindow.gameObject.activeInHierarchy)
-                return;
-
-            if (Input.GetKeyDown(KeyCode.LeftAlt))
-                ResetFilters();
-        }
-
         internal static bool ShouldSuppressNativeSelection(
             ChoosePartUpWindow window, ChoosePartDownItem item)
         {
             if (!IsEnabled() || !IsActiveUpWindow(window) ||
-                !IsSpringType(window.choosePartUpWindowType) ||
+                window.choosePartUpWindowType != ChoosePartUpWindowType.Mount ||
                 !HasActiveFilters() || item == null)
                 return false;
 
-            bool suppress = !MatchesActiveFilter(item.BaseItem);
+            bool suppress = item.BaseItem == null ||
+                !PartFilterRules.Matches(item.BaseItem, CreateCriteria());
             if (suppress)
                 ClearCurrentPreviewItem();
             return suppress;
@@ -240,7 +225,7 @@ namespace Cms21UiPlus
         internal static bool ShouldSuppressSubmit(ChoosePartUpWindow window)
         {
             if (!IsEnabled() || !IsActiveUpWindow(window) ||
-                !IsSpringType(window.choosePartUpWindowType) ||
+                window.choosePartUpWindowType != ChoosePartUpWindowType.Mount ||
                 !HasActiveFilters())
                 return false;
             if (activeDownWindow == null)
@@ -249,7 +234,8 @@ namespace Cms21UiPlus
             int selectedIndex;
             ChoosePartDownItem item =
                 activeDownWindow.GetCurrentItem(out selectedIndex);
-            return item == null || !MatchesActiveFilter(item.BaseItem);
+            return item == null || item.BaseItem == null ||
+                !PartFilterRules.Matches(item.BaseItem, CreateCriteria());
         }
 
         internal static void ResetAll()
@@ -259,8 +245,26 @@ namespace Cms21UiPlus
             qualityMode = QualityQuickFilterMode.Off;
             searchText = string.Empty;
             OriginalItems.Clear();
-            knownUpWindow = null;
             applyingFilteredList = false;
+        }
+
+        internal static bool TryResetFromKeyboardShortcut()
+        {
+            if (!IsEnabled() || activeUpWindow == null ||
+                activeDownWindow == null || activeUpWindow.gameObject == null ||
+                !activeUpWindow.gameObject.activeInHierarchy ||
+                activeUpWindow.choosePartUpWindowType !=
+                    ChoosePartUpWindowType.Mount)
+                return false;
+
+            ResetFilters();
+            return true;
+        }
+
+        private static bool IsEnabled()
+        {
+            return Main.SettingsEntry != null &&
+                Main.SettingsEntry.Value.addMountPartSelectionFilters;
         }
 
         private static bool HasActiveFilters()
@@ -270,70 +274,26 @@ namespace Cms21UiPlus
                 !string.IsNullOrEmpty(searchText);
         }
 
-        private static bool IsEnabled()
-        {
-            return Main.SettingsEntry != null &&
-                Main.SettingsEntry.Value.addSpringClampInventoryFilters;
-        }
-
-        private static bool IsSpringType(ChoosePartUpWindowType type)
-        {
-            return type == ChoosePartUpWindowType.SpringConnect ||
-                type == ChoosePartUpWindowType.SpringSeparate;
-        }
-
         private static bool IsActiveUpWindow(ChoosePartUpWindow window)
         {
             return window != null && activeUpWindow != null &&
                 window.GetInstanceID() == activeUpWindow.GetInstanceID();
         }
 
-        private static bool EnsureActiveSpringDownWindow(
-            ChoosePartDownWindow window)
-        {
-            if (!IsEnabled() || window == null)
-                return false;
-
-            if (IsMatchingSpringUpWindow(activeUpWindow, window)) {
-                activeDownWindow = window;
-                return true;
-            }
-
-            ChoosePartUpWindow candidate = knownUpWindow;
-            if (candidate == null) {
-                candidate = UnityEngine.Object
-                    .FindObjectOfType<ChoosePartUpWindow>();
-                knownUpWindow = candidate;
-            }
-            if (!IsMatchingSpringUpWindow(candidate, window))
-                return false;
-
-            activeUpWindow = candidate;
-            activeDownWindow = window;
-            return true;
-        }
-
-        private static bool IsMatchingSpringUpWindow(
-            ChoosePartUpWindow upWindow, ChoosePartDownWindow downWindow)
-        {
-            return upWindow != null && downWindow != null &&
-                upWindow.gameObject != null &&
-                upWindow.gameObject.activeInHierarchy &&
-                IsSpringType(upWindow.choosePartUpWindowType) &&
-                upWindow.choosePartDownWindow != null &&
-                upWindow.choosePartDownWindow.GetInstanceID() ==
-                    downWindow.GetInstanceID();
-        }
-
-        private static bool IsActiveSpringDownWindow(
+        private static bool IsActiveMountDownWindow(
             ChoosePartPageManager window)
         {
             if (!IsEnabled() || window == null || activeUpWindow == null ||
-                activeDownWindow == null)
+                activeDownWindow == null || activeUpWindow.gameObject == null ||
+                !activeUpWindow.gameObject.activeInHierarchy ||
+                activeUpWindow.choosePartUpWindowType !=
+                    ChoosePartUpWindowType.Mount)
                 return false;
 
             return window.GetInstanceID() == activeDownWindow.GetInstanceID() &&
-                IsMatchingSpringUpWindow(activeUpWindow, activeDownWindow);
+                activeUpWindow.choosePartDownWindow != null &&
+                activeUpWindow.choosePartDownWindow.GetInstanceID() ==
+                    activeDownWindow.GetInstanceID();
         }
 
         private static void CaptureNativeItems(
@@ -353,7 +313,8 @@ namespace Cms21UiPlus
         {
             switch (conditionMode) {
                 case GarageConditionFilterMode.Off:
-                    conditionMode = GarageConditionFilterMode.RepairThresholdToPerfect;
+                    conditionMode =
+                        GarageConditionFilterMode.RepairThresholdToPerfect;
                     break;
                 case GarageConditionFilterMode.RepairThresholdToPerfect:
                     conditionMode = GarageConditionFilterMode.Perfect;
@@ -407,6 +368,36 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
+        private static void CreateResetHint()
+        {
+            if (resetHint != null && resetHint.Root != null)
+                return;
+            if (activeUpWindow == null || activeUpWindow.uiDescription == null)
+                return;
+
+            resetHint = WindowFooterHintController.RequestNativeHint(
+                new WindowFooterHintController.NativeHintRequest {
+                    WindowId = WindowId,
+                    WindowRoot = activeUpWindow.transform,
+                    HintRoot = activeUpWindow.uiDescription.transform,
+                    HintId = ResetHintId,
+                    Keys = new string[] { "LeftAlt" },
+                    Text = ModLocalization.Get("LOC_ResetFiltersAction"),
+                    Action = new Action(ResetFilters),
+                    Row = 0,
+                    Order = 10,
+                    Profile = WindowFooterHintController.NativeFooterProfile
+                        .Automatic,
+                    ItemCount = OriginalItems.Count,
+                });
+        }
+
+        private static void DestroyResetHint()
+        {
+            WindowFooterHintController.RemoveHint(WindowId, ResetHintId);
+            resetHint = null;
+        }
+
         private static PartFilterCriteria CreateCriteria()
         {
             PartFilterCriteria criteria = new PartFilterCriteria();
@@ -430,66 +421,12 @@ namespace Cms21UiPlus
         {
             Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> filtered =
                 new Il2CppSystem.Collections.Generic.List<ChoosePartDownItem>();
-            PartFilterCriteria groupCriteria = null;
-            PartFilterCriteria qualityCriteria = null;
-            if (criteria != null && criteria.UsesQualityFilter) {
-                groupCriteria = CreateCriteria();
-                groupCriteria.QualityMode = QualityQuickFilterMode.Off;
-                qualityCriteria = new PartFilterCriteria {
-                    Context = PartFilterContext.Garage,
-                    QualityMode = criteria.QualityMode,
-                };
-            }
-
             foreach (ChoosePartDownItem item in OriginalItems) {
                 if (item != null && item.BaseItem != null &&
-                    MatchesSpringClampItem(item.BaseItem, criteria,
-                        groupCriteria, qualityCriteria))
+                    PartFilterRules.Matches(item.BaseItem, criteria))
                     filtered.Add(item);
             }
-
             return filtered;
-        }
-
-        private static bool MatchesSpringClampItem(BaseItem baseItem,
-            PartFilterCriteria criteria, PartFilterCriteria groupCriteria,
-            PartFilterCriteria qualityCriteria)
-        {
-            if (baseItem == null || criteria == null)
-                return false;
-
-            GroupItem group = baseItem.TryCast<GroupItem>();
-            if (group == null || !criteria.UsesQualityFilter)
-                return PartFilterRules.Matches(baseItem, criteria);
-
-            if (!PartFilterRules.Matches(group, groupCriteria) ||
-                group.ItemList == null)
-                return false;
-
-            foreach (Item groupItem in group.ItemList) {
-                if (groupItem != null &&
-                    PartFilterRules.Matches(groupItem, qualityCriteria))
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool MatchesActiveFilter(BaseItem baseItem)
-        {
-            PartFilterCriteria criteria = CreateCriteria();
-            PartFilterCriteria groupCriteria = null;
-            PartFilterCriteria qualityCriteria = null;
-            if (criteria.UsesQualityFilter) {
-                groupCriteria = CreateCriteria();
-                groupCriteria.QualityMode = QualityQuickFilterMode.Off;
-                qualityCriteria = new PartFilterCriteria {
-                    Context = PartFilterContext.Garage,
-                    QualityMode = criteria.QualityMode,
-                };
-            }
-
-            return MatchesSpringClampItem(baseItem, criteria, groupCriteria,
-                qualityCriteria);
         }
 
         private static void ApplyCurrentFilters(bool resetPage)
@@ -509,8 +446,8 @@ namespace Cms21UiPlus
                         activeDownWindow.PreviousPage(true);
                 }
             } catch (Exception exception) {
-                ModLogger.Log("[SpringClampInventoryFilter] Failed to refresh the " +
-                    "filtered spring-clamp list." + Environment.NewLine +
+                ModLogger.Log("[MountPartSelectionFilter] Failed to refresh the " +
+                    "filtered mount-part list." + Environment.NewLine +
                     exception, Types.LoggingLevels.Warning);
             } finally {
                 applyingFilteredList = false;
@@ -532,8 +469,8 @@ namespace Cms21UiPlus
                 PreparePageManagerForRefresh(activeDownWindow, original);
                 activeDownWindow.Refresh(original);
             } catch (Exception exception) {
-                ModLogger.Log("[SpringClampInventoryFilter] Failed to restore the " +
-                    "native spring-clamp list." + Environment.NewLine +
+                ModLogger.Log("[MountPartSelectionFilter] Failed to restore the " +
+                    "native mount-part list." + Environment.NewLine +
                     exception, Types.LoggingLevels.Warning);
             } finally {
                 applyingFilteredList = false;
@@ -568,132 +505,17 @@ namespace Cms21UiPlus
         {
             if (!isEmpty) {
                 RestoreCurrentDetail();
-                RestoreSeparateEmptyState();
                 if (emptyStateRoot != null && emptyStateRoot.activeSelf)
                     emptyStateRoot.SetActive(false);
                 return;
             }
 
             ClearCurrentPreviewItem();
-            if (activeUpWindow != null &&
-                activeUpWindow.choosePartUpWindowType ==
-                    ChoosePartUpWindowType.SpringSeparate) {
-                RestoreCurrentDetail();
-                if (emptyStateRoot != null && emptyStateRoot.activeSelf)
-                    emptyStateRoot.SetActive(false);
-                ApplySeparateEmptyState();
-                return;
-            }
-
-            RestoreSeparateEmptyState();
             Transform currentDetail = GetCurrentDetail();
             HideCurrentDetail(currentDetail);
             EnsureEmptyState(currentDetail);
             if (emptyStateRoot != null && !emptyStateRoot.activeSelf)
                 emptyStateRoot.SetActive(true);
-        }
-
-        private static void ApplySeparateEmptyState()
-        {
-            if (activeUpWindow == null || activeDownWindow == null ||
-                activeUpWindow.transform == null ||
-                activeDownWindow.transform == null)
-                return;
-
-            Transform itemsDetail = activeUpWindow.transform.Find("ItemsDetail");
-            Transform noItemsPage =
-                activeDownWindow.transform.Find("NoItemsPage");
-            if (itemsDetail == null || itemsDetail.gameObject == null)
-                return;
-
-            if (separateItemsDetailRoot != itemsDetail.gameObject) {
-                RestoreSeparateItemsDetail();
-                separateItemsDetailRoot = itemsDetail.gameObject;
-                separateItemsDetailWasActive =
-                    separateItemsDetailRoot.activeSelf;
-            }
-            if (separateItemsDetailRoot.activeSelf)
-                separateItemsDetailRoot.SetActive(false);
-
-            if (noItemsPage != null && noItemsPage.gameObject != null) {
-                if (nativeDownEmptyStateRoot != noItemsPage.gameObject) {
-                    RestoreNativeDownEmptyState();
-                    nativeDownEmptyStateRoot = noItemsPage.gameObject;
-                    nativeDownEmptyStateWasActive =
-                        nativeDownEmptyStateRoot.activeSelf;
-                }
-                if (nativeDownEmptyStateRoot.activeSelf)
-                    nativeDownEmptyStateRoot.SetActive(false);
-            }
-
-            EnsureSeparateWindowEmptyState();
-            if (separateWindowEmptyStateRoot != null &&
-                !separateWindowEmptyStateRoot.activeSelf)
-                separateWindowEmptyStateRoot.SetActive(true);
-        }
-
-        private static void RestoreSeparateEmptyState()
-        {
-            RestoreSeparateItemsDetail();
-            RestoreNativeDownEmptyState();
-            RestoreSeparateWindowEmptyState();
-        }
-
-        private static void RestoreSeparateItemsDetail()
-        {
-            if (separateItemsDetailRoot != null &&
-                separateItemsDetailRoot.activeSelf !=
-                    separateItemsDetailWasActive)
-                separateItemsDetailRoot.SetActive(
-                    separateItemsDetailWasActive);
-            separateItemsDetailRoot = null;
-            separateItemsDetailWasActive = false;
-        }
-
-        private static void RestoreNativeDownEmptyState()
-        {
-            if (nativeDownEmptyStateRoot != null &&
-                nativeDownEmptyStateRoot.activeSelf !=
-                    nativeDownEmptyStateWasActive)
-                nativeDownEmptyStateRoot.SetActive(
-                    nativeDownEmptyStateWasActive);
-            nativeDownEmptyStateRoot = null;
-            nativeDownEmptyStateWasActive = false;
-        }
-
-        private static void EnsureSeparateWindowEmptyState()
-        {
-            if (activeUpWindow == null || activeUpWindow.transform == null)
-                return;
-
-            if (separateWindowEmptyStateRoot != null &&
-                separateWindowEmptyStateRoot.transform.parent !=
-                    activeUpWindow.transform) {
-                UnityEngine.Object.Destroy(separateWindowEmptyStateRoot);
-                separateWindowEmptyStateRoot = null;
-            }
-            if (separateWindowEmptyStateRoot != null)
-                return;
-
-            separateWindowEmptyStateRoot =
-                NativeUiFactory.CreateNativeNoItemsPage(
-                    activeUpWindow.transform);
-            if (separateWindowEmptyStateRoot == null)
-                return;
-
-            separateWindowEmptyStateRoot.name =
-                "QSpringClampSeparateEmptyState";
-            RectTransform rect =
-                separateWindowEmptyStateRoot.GetComponent<RectTransform>();
-            NativeUiFactory.Stretch(rect, 0f, 0f, 0f, 0f);
-            separateWindowEmptyStateRoot.transform.SetAsLastSibling();
-        }
-
-        private static void RestoreSeparateWindowEmptyState()
-        {
-            if (separateWindowEmptyStateRoot != null &&
-                separateWindowEmptyStateRoot.activeSelf)
-                separateWindowEmptyStateRoot.SetActive(false);
         }
 
         private static void EnsureEmptyState(Transform currentDetail)
@@ -711,10 +533,11 @@ namespace Cms21UiPlus
 
             emptyStateRoot = NativeUiFactory.CreateNativeNoItemsPage(
                 currentDetail);
-            if (emptyStateRoot == null)
+            if (emptyStateRoot == null) {
                 return;
+            }
 
-            emptyStateRoot.name = "QSpringClampEmptyState";
+            emptyStateRoot.name = "QMountPartEmptyState";
             RectTransform emptyRect =
                 emptyStateRoot.GetComponent<RectTransform>();
             NativeUiFactory.Stretch(emptyRect, 0f, 0f, 0f, 0f);
@@ -728,8 +551,7 @@ namespace Cms21UiPlus
 
             if (CurrentItemField != null)
                 CurrentItemField.SetValue(activeUpWindow, null);
-            else if (CurrentItemProperty != null &&
-                CurrentItemProperty.CanWrite)
+            else if (CurrentItemProperty != null && CurrentItemProperty.CanWrite)
                 CurrentItemProperty.SetValue(activeUpWindow, null, null);
         }
 
@@ -770,8 +592,7 @@ namespace Cms21UiPlus
                 Transform child = detail.GetChild(i);
                 if (child == null || child.gameObject == null ||
                     IsCurrentDetailBackground(child) ||
-                    (emptyStateRoot != null &&
-                     child.gameObject == emptyStateRoot))
+                    (emptyStateRoot != null && child.gameObject == emptyStateRoot))
                     continue;
                 RememberAndHideCurrentDetail(child);
             }
@@ -848,50 +669,14 @@ namespace Cms21UiPlus
             hiddenCurrentSegment = -1;
         }
 
-        private static void CreateResetHint()
-        {
-            if (resetHint != null && resetHint.Root != null)
-                return;
-            if (Panel.SearchField == null || activeUpWindow == null ||
-                activeUpWindow.uiDescription == null || activeDownWindow == null)
-                return;
-
-            resetHint = WindowFooterHintController.RequestNativeHint(
-                new WindowFooterHintController.NativeHintRequest {
-                    WindowId = WindowId,
-                    WindowRoot = activeUpWindow.transform,
-                    HintRoot = activeUpWindow.uiDescription.transform,
-                    HintId = ResetHintId,
-                    Keys = new string[] { "LeftAlt" },
-                    Text = ModLocalization.Get("LOC_ResetFiltersAction"),
-                    Action = new Action(ResetFilters),
-                    Row = 0,
-                    Order = 10,
-                    Profile = WindowFooterHintController.NativeFooterProfile
-                        .Automatic,
-                    ItemCount = OriginalItems.Count,
-                });
-        }
-
-        private static void DestroyResetHint()
-        {
-            WindowFooterHintController.RemoveHint(WindowId, ResetHintId);
-            resetHint = null;
-        }
-
         private static void DeactivateWindow()
         {
+            DestroyResetHint();
             RestoreCurrentDetail();
-            RestoreSeparateEmptyState();
             if (emptyStateRoot != null) {
                 UnityEngine.Object.Destroy(emptyStateRoot);
                 emptyStateRoot = null;
             }
-            if (separateWindowEmptyStateRoot != null) {
-                UnityEngine.Object.Destroy(separateWindowEmptyStateRoot);
-                separateWindowEmptyStateRoot = null;
-            }
-            DestroyResetHint();
             Panel.Detach();
             OriginalItems.Clear();
             activeDownWindow = null;

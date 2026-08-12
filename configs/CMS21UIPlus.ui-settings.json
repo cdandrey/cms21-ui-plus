@@ -117,6 +117,28 @@
       "descriptionKey": "LOC_SettingAddSpringClampInventoryFiltersDescription"
     },
     {
+      "id": "FID_AddTireChangerInventoryFilters",
+      "key": "addTireChangerInventoryFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 24,
+      "nameKey": "LOC_SettingAddTireChangerInventoryFiltersName",
+      "descriptionKey": "LOC_SettingAddTireChangerInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_AddMountPartSelectionFilters",
+      "key": "addMountPartSelectionFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 25,
+      "nameKey": "LOC_SettingAddMountPartSelectionFiltersName",
+      "descriptionKey": "LOC_SettingAddMountPartSelectionFiltersDescription"
+    },
+    {
       "id": "FID_MoveFilteredPartsBetweenInventoryAndWarehouse",
       "key": "moveFilteredPartsBetweenInventoryAndWarehouse",
       "group": "inventory",

@@ -45,13 +45,15 @@ switches use `restartGame`.
 | **Bulk scrap shortcut** | `addBulkScrapShortcut` | `true` | Adds a native hold-`Space` action and matching footer mouse action for scrapping all unlocked loose parts in the current Scrap result across every page. The bulk-scrap hint is shown only on the Scrap tab, not on Upgrade. Releasing before the hold completes cancels without selecting a part; the confirmation reports the exact quantity and the game's own bulk-scrap calculation performs the final update. This switch works independently from `addScrapInventoryFilters`. |
 | **Repair inventory filters** | `addRepairInventoryFilters` | `true` | Adds an immediate localized-name search plus condition and quality filters to both the mechanical-part repair inventory and the body-panel repair inventory. The filtered result is rebuilt after a repair animation completes, and its state is independent from the scrap filters. |
 | **Spring clamp quick filters** | `addSpringClampInventoryFilters` | `true` | Adds condition, quality and localized-name search to spring-clamp assembly and disassembly selection. Filter state is preserved when the selection window closes and can be reset with `LeftAlt`. This switch is independent from the normal inventory, scrap and repair quick filters. |
+| **Tire changer quick filters** | `addTireChangerInventoryFilters` | `true` | Adds condition, quality and localized-name search to tire-changer assembly and disassembly selection. Complete wheels are filtered by aggregate condition, while quality matching uses their contained rim/tire parts. Filtered-out entries cannot remain selected, empty results keep the chooser open, and `LeftAlt` resets the filters. |
+| **Mount part-selection quick filters** | `addMountPartSelectionFilters` | `true` | Adds condition, quality and localized-name search to the inventory chooser opened while mounting a part. The native chooser receives only matching entries, so filtered-out parts cannot remain selected. `LeftAlt` resets all mount-selection filters. |
 
 #### Filter cycles and condition ranges
 
 Condition filtering uses the game's current repair/junk threshold instead of duplicating it as a fixed mod value.
 
 - Garage inventory and both warehouse tabs: off → red (below the repair threshold) → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%) → green (100%).
-- Spring clamp: off → **white** (repair threshold through 100%) → green (100%) → green ring (80–99%) → yellow (50–79%) → orange (normally 15–49%) → red (below the repair threshold).
+- Spring clamp, tire changer and mount part selection: off → **white** (repair threshold through 100%) → green (100%) → green ring (80–99%) → yellow (50–79%) → orange (normally 15–49%) → red (below the repair threshold).
 - Repair inventories: off → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%). Their native lists already exclude parts below the repair threshold.
 - Scrap: off → red (below the repair threshold) → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%). Upgrade has no condition quick filter.
 - Barn and junkyard: off → **white** (repair threshold through 100%) → red (normally 0–14%) → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%).
@@ -59,13 +61,13 @@ Condition filtering uses the game's current repair/junk threshold instead of dup
 - Quality in every window that exposes this control: off → upgraded (1–3 stars) → 1 star → 2 stars → 3 stars → not upgraded (0 stars).
 - Barn and junkyard ownership: off → owned → missing. A matching copy at 50% condition or better counts as owned for this filter.
 
-The additional search fields in scrap, repair and spring-clamp inventories match the localized displayed part name immediately and combine with the active quick filters. The game's existing inventory and warehouse search fields are not replaced.
+The additional search fields in scrap, repair, spring-clamp, tire-changer and mount part-selection inventories match the localized displayed part name immediately and combine with the active quick filters. The game's existing inventory and warehouse search fields are not replaced.
 
 Garage inventory and warehouse lists treat complete assemblies separately from loose parts. Complete wheels, assembled shock absorbers and other `GroupItem` entries have aggregate condition and therefore participate in the condition filter, but they have no independent repairability or quality value; when a repairability or quality filter is active in these garage-style lists, such assemblies are excluded. In barn and junkyard lists, group entries remain eligible when at least one contained part matches the active filters.
 
 Special map/case inventory objects are never removed by quick filters in barn and junkyard. In garage-style inventory contexts they remain visible only while no quick filter is active because they do not expose normal part condition, repairability or quality properties.
 
-On the spring clamp, `LeftAlt` resets condition, quality and text filters, while closing the selection window keeps the current filter state for the next opening. If a spring-clamp filter leaves the current selection stage empty, the chooser stays open. During assembly, only the active part card shows the native no-items state; during disassembly, the stale part preview is hidden and a centered native no-items state is shown instead.
+On the spring clamp, `LeftAlt` resets condition, quality and text filters, while closing the selection window keeps the current filter state for the next opening. If a spring-clamp filter leaves the current selection stage empty, the chooser stays open. During assembly, only the active part card shows the native no-items state; during disassembly, the stale part preview is hidden and a centered native no-items state is shown instead. The tire changer follows the same assembly/disassembly empty-state behavior and preserves its own filter state between openings; filtered complete wheels are matched by aggregate condition and by the quality of their contained parts. Mount part selection uses the same native no-items presentation when its filtered result is empty, and `LeftAlt` resets its condition, quality and text filters.
 
 The bulk warehouse transfer and bulk scrap features do not require their corresponding quick-filter switches. They operate on the current native result, and when quick filters are enabled they additionally respect the filtered result produced by those controls.
 

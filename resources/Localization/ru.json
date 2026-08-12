@@ -86,6 +86,10 @@
   "LOC_SettingAddBulkScrapShortcutDescription": "Удерживать пробел или кнопку в нижней подсказке для утилизации всех незаблокированных обычных деталей текущего результата; досрочное отпускание отменяет действие.",
   "LOC_SettingAddSpringClampInventoryFiltersName": "Быстрые фильтры съемщика пружин",
   "LOC_SettingAddSpringClampInventoryFiltersDescription": "Добавить фильтры состояния, качества и поиск в окно выбора деталей съёмщика пружин.",
+  "LOC_SettingAddTireChangerInventoryFiltersName": "Быстрые фильтры шиномонтажного станка",
+  "LOC_SettingAddTireChangerInventoryFiltersDescription": "Добавить фильтры состояния, качества и поиск в окна выбора деталей шиномонтажного станка.",
+  "LOC_SettingAddMountPartSelectionFiltersName": "Быстрые фильтры выбора деталей при монтаже",
+  "LOC_SettingAddMountPartSelectionFiltersDescription": "Добавить фильтры состояния, качества и поиск в окно выбора деталей при монтаже.",
   "LOC_ModDisplayName": "CMS21 UI+",
   "LOC_SettingAutoConfirmDynoStartName": "Пропуск подтверждения запуска диностенда",
   "LOC_SettingAutoConfirmDynoStartDescription": "Автоматически принимать только лишнее подтверждение запуска диностенда и отключать звук этого подтверждения."

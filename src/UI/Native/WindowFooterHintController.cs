@@ -1310,4 +1310,16 @@ namespace Cms21UiPlus
                 __instance);
         }
     }
+
+    [HarmonyPatch(typeof(ControlDescription),
+        nameof(ControlDescription.RefreshLayout))]
+    internal static class NativeFooterRefreshLayoutPatch
+    {
+        [HarmonyPostfix]
+        private static void RefreshLayoutPostfix(ControlDescription __instance)
+        {
+            WindowFooterHintController.OnNativeDescriptionLayoutChanged(
+                __instance);
+        }
+    }
 }

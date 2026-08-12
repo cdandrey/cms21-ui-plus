@@ -20,22 +20,22 @@ using CMS.UI.Windows;
 
 namespace Cms21UiPlus
 {
-    internal static class SpringClampInventoryFilterFeature
+    internal static class TireChangerInventoryFilterFeature
     {
         internal struct DownWindowShowState
         {
-            internal bool IsSpringWindow;
+            internal bool IsTireChangerWindow;
             internal bool NeedsEmptyRefresh;
         }
 
-        private const string WindowId = "SpringClamp";
-        private const string ResetHintId = "Hint_ResetSpringClampFilters";
+        private const string WindowId = "TireChanger";
+        private const string ResetHintId = "Hint_ResetTireChangerFilters";
         private const float PanelVerticalOffset = 8f;
 
         private static readonly List<ChoosePartDownItem> OriginalItems =
             new List<ChoosePartDownItem>();
         private static readonly PartFilterPanelController Panel =
-            new PartFilterPanelController("QSpringClampFilter");
+            new PartFilterPanelController("QTireChangerFilter");
 
         private static ChoosePartUpWindow activeUpWindow;
         private static ChoosePartUpWindow knownUpWindow;
@@ -83,7 +83,7 @@ namespace Cms21UiPlus
             ChoosePartUpWindowType type)
         {
             knownUpWindow = window;
-            if (!IsSpringType(type)) {
+            if (!IsTireChangerType(type)) {
                 if (IsActiveUpWindow(window))
                     DeactivateWindow();
                 return;
@@ -102,7 +102,7 @@ namespace Cms21UiPlus
         internal static void OnUpWindowShowPostfix(ChoosePartUpWindow window,
             ChoosePartUpWindowType type, bool result)
         {
-            if (!IsSpringType(type))
+            if (!IsTireChangerType(type))
                 return;
             if (!result) {
                 if (IsActiveUpWindow(window))
@@ -126,11 +126,11 @@ namespace Cms21UiPlus
             ref int selectedIndex)
         {
             DownWindowShowState state = new DownWindowShowState();
-            if (!EnsureActiveSpringDownWindow(window) || applyingFilteredList ||
-                items == null)
+            if (!EnsureActiveTireChangerDownWindow(window) ||
+                applyingFilteredList || items == null)
                 return state;
 
-            state.IsSpringWindow = true;
+            state.IsTireChangerWindow = true;
             activeDownWindow = window;
             CaptureNativeItems(items);
 
@@ -153,7 +153,8 @@ namespace Cms21UiPlus
         internal static void OnWindowShown(ChoosePartDownWindow window,
             DownWindowShowState state)
         {
-            if (!state.IsSpringWindow || !IsActiveSpringDownWindow(window))
+            if (!state.IsTireChangerWindow ||
+                !IsActiveTireChangerDownWindow(window))
                 return;
 
             activeDownWindow = window;
@@ -179,7 +180,7 @@ namespace Cms21UiPlus
             ChoosePartPageManager pageManager,
             ref Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> items)
         {
-            if (!IsActiveSpringDownWindow(pageManager) ||
+            if (!IsActiveTireChangerDownWindow(pageManager) ||
                 applyingFilteredList || items == null)
                 return;
 
@@ -198,7 +199,7 @@ namespace Cms21UiPlus
             ChoosePartPageManager pageManager,
             Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> items)
         {
-            if (!IsActiveSpringDownWindow(pageManager) ||
+            if (!IsActiveTireChangerDownWindow(pageManager) ||
                 applyingFilteredList || !HasActiveFilters())
                 return;
 
@@ -212,22 +213,11 @@ namespace Cms21UiPlus
             Panel.HandleKeyPressed(inputField);
         }
 
-        internal static void Update()
-        {
-            if (activeDownWindow == null ||
-                activeDownWindow.gameObject == null ||
-                !activeDownWindow.gameObject.activeInHierarchy)
-                return;
-
-            if (Input.GetKeyDown(KeyCode.LeftAlt))
-                ResetFilters();
-        }
-
         internal static bool ShouldSuppressNativeSelection(
             ChoosePartUpWindow window, ChoosePartDownItem item)
         {
             if (!IsEnabled() || !IsActiveUpWindow(window) ||
-                !IsSpringType(window.choosePartUpWindowType) ||
+                !IsTireChangerType(window.choosePartUpWindowType) ||
                 !HasActiveFilters() || item == null)
                 return false;
 
@@ -240,7 +230,7 @@ namespace Cms21UiPlus
         internal static bool ShouldSuppressSubmit(ChoosePartUpWindow window)
         {
             if (!IsEnabled() || !IsActiveUpWindow(window) ||
-                !IsSpringType(window.choosePartUpWindowType) ||
+                !IsTireChangerType(window.choosePartUpWindowType) ||
                 !HasActiveFilters())
                 return false;
             if (activeDownWindow == null)
@@ -263,6 +253,18 @@ namespace Cms21UiPlus
             applyingFilteredList = false;
         }
 
+        internal static bool TryResetFromKeyboardShortcut()
+        {
+            if (!IsEnabled() || activeUpWindow == null ||
+                activeDownWindow == null || activeUpWindow.gameObject == null ||
+                !activeUpWindow.gameObject.activeInHierarchy ||
+                !IsTireChangerType(activeUpWindow.choosePartUpWindowType))
+                return false;
+
+            ResetFilters();
+            return true;
+        }
+
         private static bool HasActiveFilters()
         {
             return conditionMode != GarageConditionFilterMode.Off ||
@@ -273,13 +275,13 @@ namespace Cms21UiPlus
         private static bool IsEnabled()
         {
             return Main.SettingsEntry != null &&
-                Main.SettingsEntry.Value.addSpringClampInventoryFilters;
+                Main.SettingsEntry.Value.addTireChangerInventoryFilters;
         }
 
-        private static bool IsSpringType(ChoosePartUpWindowType type)
+        private static bool IsTireChangerType(ChoosePartUpWindowType type)
         {
-            return type == ChoosePartUpWindowType.SpringConnect ||
-                type == ChoosePartUpWindowType.SpringSeparate;
+            return type == ChoosePartUpWindowType.WheelConnect ||
+                type == ChoosePartUpWindowType.WheelSeparate;
         }
 
         private static bool IsActiveUpWindow(ChoosePartUpWindow window)
@@ -288,13 +290,13 @@ namespace Cms21UiPlus
                 window.GetInstanceID() == activeUpWindow.GetInstanceID();
         }
 
-        private static bool EnsureActiveSpringDownWindow(
+        private static bool EnsureActiveTireChangerDownWindow(
             ChoosePartDownWindow window)
         {
             if (!IsEnabled() || window == null)
                 return false;
 
-            if (IsMatchingSpringUpWindow(activeUpWindow, window)) {
+            if (IsMatchingTireChangerUpWindow(activeUpWindow, window)) {
                 activeDownWindow = window;
                 return true;
             }
@@ -305,7 +307,7 @@ namespace Cms21UiPlus
                     .FindObjectOfType<ChoosePartUpWindow>();
                 knownUpWindow = candidate;
             }
-            if (!IsMatchingSpringUpWindow(candidate, window))
+            if (!IsMatchingTireChangerUpWindow(candidate, window))
                 return false;
 
             activeUpWindow = candidate;
@@ -313,19 +315,19 @@ namespace Cms21UiPlus
             return true;
         }
 
-        private static bool IsMatchingSpringUpWindow(
+        private static bool IsMatchingTireChangerUpWindow(
             ChoosePartUpWindow upWindow, ChoosePartDownWindow downWindow)
         {
             return upWindow != null && downWindow != null &&
                 upWindow.gameObject != null &&
                 upWindow.gameObject.activeInHierarchy &&
-                IsSpringType(upWindow.choosePartUpWindowType) &&
+                IsTireChangerType(upWindow.choosePartUpWindowType) &&
                 upWindow.choosePartDownWindow != null &&
                 upWindow.choosePartDownWindow.GetInstanceID() ==
                     downWindow.GetInstanceID();
         }
 
-        private static bool IsActiveSpringDownWindow(
+        private static bool IsActiveTireChangerDownWindow(
             ChoosePartPageManager window)
         {
             if (!IsEnabled() || window == null || activeUpWindow == null ||
@@ -333,7 +335,7 @@ namespace Cms21UiPlus
                 return false;
 
             return window.GetInstanceID() == activeDownWindow.GetInstanceID() &&
-                IsMatchingSpringUpWindow(activeUpWindow, activeDownWindow);
+                IsMatchingTireChangerUpWindow(activeUpWindow, activeDownWindow);
         }
 
         private static void CaptureNativeItems(
@@ -443,7 +445,7 @@ namespace Cms21UiPlus
 
             foreach (ChoosePartDownItem item in OriginalItems) {
                 if (item != null && item.BaseItem != null &&
-                    MatchesSpringClampItem(item.BaseItem, criteria,
+                    MatchesTireChangerItem(item.BaseItem, criteria,
                         groupCriteria, qualityCriteria))
                     filtered.Add(item);
             }
@@ -451,7 +453,7 @@ namespace Cms21UiPlus
             return filtered;
         }
 
-        private static bool MatchesSpringClampItem(BaseItem baseItem,
+        private static bool MatchesTireChangerItem(BaseItem baseItem,
             PartFilterCriteria criteria, PartFilterCriteria groupCriteria,
             PartFilterCriteria qualityCriteria)
         {
@@ -488,7 +490,7 @@ namespace Cms21UiPlus
                 };
             }
 
-            return MatchesSpringClampItem(baseItem, criteria, groupCriteria,
+            return MatchesTireChangerItem(baseItem, criteria, groupCriteria,
                 qualityCriteria);
         }
 
@@ -509,8 +511,8 @@ namespace Cms21UiPlus
                         activeDownWindow.PreviousPage(true);
                 }
             } catch (Exception exception) {
-                ModLogger.Log("[SpringClampInventoryFilter] Failed to refresh the " +
-                    "filtered spring-clamp list." + Environment.NewLine +
+                ModLogger.Log("[TireChangerInventoryFilter] Failed to refresh the " +
+                    "filtered tire-changer list." + Environment.NewLine +
                     exception, Types.LoggingLevels.Warning);
             } finally {
                 applyingFilteredList = false;
@@ -532,8 +534,8 @@ namespace Cms21UiPlus
                 PreparePageManagerForRefresh(activeDownWindow, original);
                 activeDownWindow.Refresh(original);
             } catch (Exception exception) {
-                ModLogger.Log("[SpringClampInventoryFilter] Failed to restore the " +
-                    "native spring-clamp list." + Environment.NewLine +
+                ModLogger.Log("[TireChangerInventoryFilter] Failed to restore the " +
+                    "native tire-changer list." + Environment.NewLine +
                     exception, Types.LoggingLevels.Warning);
             } finally {
                 applyingFilteredList = false;
@@ -577,7 +579,7 @@ namespace Cms21UiPlus
             ClearCurrentPreviewItem();
             if (activeUpWindow != null &&
                 activeUpWindow.choosePartUpWindowType ==
-                    ChoosePartUpWindowType.SpringSeparate) {
+                    ChoosePartUpWindowType.WheelSeparate) {
                 RestoreCurrentDetail();
                 if (emptyStateRoot != null && emptyStateRoot.activeSelf)
                     emptyStateRoot.SetActive(false);
@@ -682,7 +684,7 @@ namespace Cms21UiPlus
                 return;
 
             separateWindowEmptyStateRoot.name =
-                "QSpringClampSeparateEmptyState";
+                "QTireChangerSeparateEmptyState";
             RectTransform rect =
                 separateWindowEmptyStateRoot.GetComponent<RectTransform>();
             NativeUiFactory.Stretch(rect, 0f, 0f, 0f, 0f);
@@ -714,7 +716,7 @@ namespace Cms21UiPlus
             if (emptyStateRoot == null)
                 return;
 
-            emptyStateRoot.name = "QSpringClampEmptyState";
+            emptyStateRoot.name = "QTireChangerEmptyState";
             RectTransform emptyRect =
                 emptyStateRoot.GetComponent<RectTransform>();
             NativeUiFactory.Stretch(emptyRect, 0f, 0f, 0f, 0f);

@@ -86,6 +86,10 @@
   "LOC_SettingAddBulkScrapShortcutDescription": "Hold Space or the footer action to scrap all unlocked loose parts in the current scrap result; releasing early cancels the action.",
   "LOC_SettingAddSpringClampInventoryFiltersName": "Spring clamp quick filters",
   "LOC_SettingAddSpringClampInventoryFiltersDescription": "Add condition, quality and search filters to the spring-clamp part selection window.",
+  "LOC_SettingAddTireChangerInventoryFiltersName": "Tire changer quick filters",
+  "LOC_SettingAddTireChangerInventoryFiltersDescription": "Add condition, quality and search filters to the tire-changer part selection windows.",
+  "LOC_SettingAddMountPartSelectionFiltersName": "Mount part-selection quick filters",
+  "LOC_SettingAddMountPartSelectionFiltersDescription": "Add condition, quality and search filters to the part-selection window used while mounting parts.",
   "LOC_ModDisplayName": "CMS21 UI+",
   "LOC_SettingAutoConfirmDynoStartName": "Skip dyno start confirmation",
   "LOC_SettingAutoConfirmDynoStartDescription": "Automatically accept only the redundant dyno-start confirmation and suppress its confirmation sound."

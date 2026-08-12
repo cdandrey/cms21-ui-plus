@@ -27,13 +27,23 @@ namespace Cms21UiPlus
     [HarmonyPatch]
     internal static class PartSelectionFilterPatches
     {
+        private struct DownWindowShowState
+        {
+            internal MountPartSelectionFilterFeature.DownWindowShowState Mount;
+            internal SpringClampInventoryFilterFeature.DownWindowShowState Spring;
+            internal TireChangerInventoryFilterFeature.DownWindowShowState TireChanger;
+        }
         [HarmonyPatch(typeof(ChoosePartUpWindow), nameof(ChoosePartUpWindow.Show),
             new Type[] { typeof(string), typeof(ChoosePartUpWindowType) })]
         [HarmonyPrefix]
         private static void ChoosePartUpWindowShowByModePrefix(
             ChoosePartUpWindow __instance, ChoosePartUpWindowType __1)
         {
+            MountPartSelectionFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1, "mode");
             SpringClampInventoryFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1);
+            TireChangerInventoryFilterFeature.OnUpWindowShowPrefix(
                 __instance, __1);
         }
 
@@ -46,7 +56,11 @@ namespace Cms21UiPlus
         private static void ChoosePartUpWindowShowByItemsPrefix(
             ChoosePartUpWindow __instance, ChoosePartUpWindowType __1)
         {
+            MountPartSelectionFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1, "items");
             SpringClampInventoryFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1);
+            TireChangerInventoryFilterFeature.OnUpWindowShowPrefix(
                 __instance, __1);
         }
 
@@ -57,7 +71,11 @@ namespace Cms21UiPlus
             ChoosePartUpWindow __instance, ChoosePartUpWindowType __1,
             bool __result)
         {
+            MountPartSelectionFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result, "mode");
             SpringClampInventoryFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result);
+            TireChangerInventoryFilterFeature.OnUpWindowShowPostfix(
                 __instance, __1, __result);
         }
 
@@ -71,7 +89,11 @@ namespace Cms21UiPlus
             ChoosePartUpWindow __instance, ChoosePartUpWindowType __1,
             bool __result)
         {
+            MountPartSelectionFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result, "items");
             SpringClampInventoryFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result);
+            TireChangerInventoryFilterFeature.OnUpWindowShowPostfix(
                 __instance, __1, __result);
         }
 
@@ -81,7 +103,36 @@ namespace Cms21UiPlus
         private static void ChoosePartUpWindowHidePostfix(
             ChoosePartUpWindow __instance)
         {
+            MountPartSelectionFilterFeature.OnUpWindowHidden(__instance);
             SpringClampInventoryFilterFeature.OnUpWindowHidden(__instance);
+            TireChangerInventoryFilterFeature.OnUpWindowHidden(__instance);
+        }
+
+        [HarmonyPatch(typeof(ChoosePartUpWindow),
+            "OnDownWindowItemChange", new Type[] { typeof(ChoosePartDownItem) })]
+        [HarmonyPrefix]
+        private static bool ChoosePartUpWindowItemChangePrefix(
+            ChoosePartUpWindow __instance, ChoosePartDownItem __0)
+        {
+            return !MountPartSelectionFilterFeature
+                    .ShouldSuppressNativeSelection(__instance, __0) &&
+                !SpringClampInventoryFilterFeature
+                    .ShouldSuppressNativeSelection(__instance, __0) &&
+                !TireChangerInventoryFilterFeature
+                    .ShouldSuppressNativeSelection(__instance, __0);
+        }
+
+        [HarmonyPatch(typeof(ChoosePartUpWindow), "SubmitAction")]
+        [HarmonyPrefix]
+        private static bool ChoosePartUpWindowSubmitActionPrefix(
+            ChoosePartUpWindow __instance)
+        {
+            return !MountPartSelectionFilterFeature
+                    .ShouldSuppressSubmit(__instance) &&
+                !SpringClampInventoryFilterFeature
+                    .ShouldSuppressSubmit(__instance) &&
+                !TireChangerInventoryFilterFeature
+                    .ShouldSuppressSubmit(__instance);
         }
 
         [HarmonyPatch(typeof(ChoosePartDownWindow),
@@ -93,10 +144,14 @@ namespace Cms21UiPlus
         private static void ChoosePartDownWindowShowPrefix(
             ChoosePartDownWindow __instance,
             ref Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> __0,
-            ref int __1,
-            out SpringClampInventoryFilterFeature.DownWindowShowState __state)
+            ref int __1, out DownWindowShowState __state)
         {
-            __state = SpringClampInventoryFilterFeature
+            __state = new DownWindowShowState();
+            __state.Mount = MountPartSelectionFilterFeature
+                .PrepareNativeListForShow(__instance, ref __0, ref __1);
+            __state.Spring = SpringClampInventoryFilterFeature
+                .PrepareNativeListForShow(__instance, ref __0, ref __1);
+            __state.TireChanger = TireChangerInventoryFilterFeature
                 .PrepareNativeListForShow(__instance, ref __0, ref __1);
         }
 
@@ -109,12 +164,16 @@ namespace Cms21UiPlus
         private static void ChoosePartDownWindowShowPostfix(
             ChoosePartDownWindow __instance,
             Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> __0,
-            SpringClampInventoryFilterFeature.DownWindowShowState __state)
+            DownWindowShowState __state)
         {
             ScrapInventoryFilterFeature.OnWindowShown(__instance, __0);
             RepairInventoryFilterFeature.OnWindowShown(__instance, __0);
+            MountPartSelectionFilterFeature.OnWindowShown(__instance,
+                __state.Mount);
             SpringClampInventoryFilterFeature.OnWindowShown(__instance,
-                __state);
+                __state.Spring);
+            TireChangerInventoryFilterFeature.OnWindowShown(__instance,
+                __state.TireChanger);
         }
 
         [HarmonyPatch(typeof(RepairPartWindow),
@@ -145,7 +204,11 @@ namespace Cms21UiPlus
                 __instance, ref __0);
             RepairInventoryFilterFeature.FilterNativeListBeforeRefresh(
                 __instance, ref __0);
+            MountPartSelectionFilterFeature.FilterNativeListBeforeRefresh(
+                __instance, ref __0);
             SpringClampInventoryFilterFeature.FilterNativeListBeforeRefresh(
+                __instance, ref __0);
+            TireChangerInventoryFilterFeature.FilterNativeListBeforeRefresh(
                 __instance, ref __0);
         }
 
@@ -159,7 +222,11 @@ namespace Cms21UiPlus
             ScrapInventoryFilterFeature.OnNativeListRefreshed(
                 __instance, __0);
             RepairInventoryFilterFeature.OnNativeListRefreshed(__0);
+            MountPartSelectionFilterFeature.OnNativeListRefreshed(
+                __instance, __0);
             SpringClampInventoryFilterFeature.OnNativeListRefreshed(
+                __instance, __0);
+            TireChangerInventoryFilterFeature.OnNativeListRefreshed(
                 __instance, __0);
         }
 
@@ -170,7 +237,9 @@ namespace Cms21UiPlus
         {
             ScrapInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
             RepairInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
+            MountPartSelectionFilterFeature.OnInputFieldKeyPressed(__instance);
             SpringClampInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
+            TireChangerInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
         }
 
         [HarmonyPatch(typeof(ScrapUpgrade), "GetItemsForUpgrade")]

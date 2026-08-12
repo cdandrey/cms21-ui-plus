@@ -49,6 +49,10 @@ namespace Cms21UiPlus
         public bool addInventoryQuickFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Enable spring-clamp quick filters")]
         public bool addSpringClampInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Enable tire-changer quick filters")]
+        public bool addTireChangerInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Enable mount part-selection quick filters")]
+        public bool addMountPartSelectionFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Move all filtered parts between inventory and warehouse with the configured shortcut")]
         public bool moveFilteredPartsBetweenInventoryAndWarehouse = true;
         [Tomlet.Attributes.TomlInlineComment("Add search, condition and repairability filters to the scrap inventory")]

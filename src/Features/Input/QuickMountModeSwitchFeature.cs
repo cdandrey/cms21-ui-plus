@@ -12,10 +12,15 @@ namespace Cms21UiPlus
     {
         public static void Update()
         {
-            if (!IsEnabled || !GlobalState.IsGarageSceneActive)
+            if (!GlobalState.IsGarageSceneActive)
                 return;
 
-            if (!WasBindingReleased())
+            if (Input.GetKeyUp(KeyCode.LeftAlt) &&
+                (MountPartSelectionFilterFeature.TryResetFromKeyboardShortcut() ||
+                 TireChangerInventoryFilterFeature.TryResetFromKeyboardShortcut()))
+                return;
+
+            if (!IsEnabled || !WasBindingReleased())
                 return;
 
             GameMode gameModeManager = GameMode.Get();

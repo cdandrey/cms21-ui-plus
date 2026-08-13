@@ -38,6 +38,12 @@ namespace Cms21UiPlus
 {
     internal static class ModSettingsMenuFeature
     {
+        static ModSettingsMenuFeature()
+        {
+            ModSettingDependencyRegistry.Changed +=
+                RefreshDependencyWarnings;
+        }
+
         private const string LaunchButtonName =
             "CMS21UIPlus.ModSettingsButton";
         private const string WindowName = "CMS21UIPlus.ModsWindow";
@@ -115,16 +121,16 @@ namespace Cms21UiPlus
             new List<InstalledModEntry>();
         private static readonly List<NativeUiFactory.ModCardHandle> cards =
             new List<NativeUiFactory.ModCardHandle>();
-        private static readonly List<ToggleBinding> toggleBindings =
-            new List<ToggleBinding>();
+        private static readonly List<SettingBinding> settingBindings =
+            new List<SettingBinding>();
         private static readonly Dictionary<string,
-            Dictionary<string, bool>> sessionEffectiveValues =
-            new Dictionary<string, Dictionary<string, bool>>(
+            Dictionary<string, ModSettingValue>> sessionEffectiveValues =
+            new Dictionary<string, Dictionary<string, ModSettingValue>>(
                 StringComparer.OrdinalIgnoreCase);
 
         private static IModSettingsProvider activeProvider;
         private static object draft;
-        private static ToggleBinding editingBinding;
+        private static SettingBinding editingBinding;
         private static int suppressSettingsRowClickUntilFrame = -1;
         private static Action pendingDiscardAction;
         private static Selectable firstSelectable;
@@ -156,26 +162,28 @@ namespace Cms21UiPlus
             }
         }
 
-        private sealed class ToggleBinding
+        private sealed class SettingBinding
         {
-            public ToggleBinding(NativeUiFactory.SettingsRowHandle row,
-                string key, bool value, bool savedValue,
-                bool effectiveValue, ModSettingApplyMode applyMode)
+            public SettingBinding(NativeUiFactory.SettingsRowHandle row,
+                ModSettingOption option, ModSettingValue value,
+                ModSettingValue savedValue, ModSettingValue effectiveValue)
             {
                 Row = row;
-                Key = key;
+                Option = option;
                 Value = value;
                 SavedValue = savedValue;
                 EffectiveValue = effectiveValue;
-                ApplyMode = applyMode;
             }
 
             public NativeUiFactory.SettingsRowHandle Row;
-            public string Key;
-            public bool Value;
-            public bool SavedValue;
-            public bool EffectiveValue;
-            public ModSettingApplyMode ApplyMode;
+            public ModSettingOption Option;
+            public ModSettingValue Value;
+            public ModSettingValue SavedValue;
+            public ModSettingValue EffectiveValue;
+            public string Key
+            {
+                get { return Option != null ? Option.Key : string.Empty; }
+            }
         }
 
         public static bool IsOverlayOpen
@@ -301,9 +309,17 @@ namespace Cms21UiPlus
         {
             HandleSettingsArrowPointerInput();
 
+            bool editingString = editingBinding != null &&
+                editingBinding.Option != null &&
+                editingBinding.Option.Type == ModSettingType.String;
+
             if (Input.GetKeyDown(KeyCode.Escape) ||
-                Input.GetKeyDown(KeyCode.Backspace) ||
                 Input.GetKeyDown(KeyCode.JoystickButton1)) {
+                RequestBackFromProvider();
+                return true;
+            }
+
+            if (!editingString && Input.GetKeyDown(KeyCode.Backspace)) {
                 RequestBackFromProvider();
                 return true;
             }
@@ -314,6 +330,11 @@ namespace Cms21UiPlus
                 return true;
             }
 
+            if (editingString) {
+                HandleStringEditingInput();
+                return true;
+            }
+
             if (Input.GetKeyDown(KeyCode.R)) {
                 EndSettingsEditing();
                 ResetAllCategories();
@@ -321,14 +342,12 @@ namespace Cms21UiPlus
             }
 
             if (editingBinding != null) {
-                if (Input.GetKeyDown(KeyCode.LeftArrow) &&
-                    editingBinding.Value) {
-                    SetBindingValue(editingBinding, false);
+                if (Input.GetKeyDown(KeyCode.LeftArrow)) {
+                    StepBindingValue(editingBinding, -1);
                     return true;
                 }
-                if (Input.GetKeyDown(KeyCode.RightArrow) &&
-                    !editingBinding.Value) {
-                    SetBindingValue(editingBinding, true);
+                if (Input.GetKeyDown(KeyCode.RightArrow)) {
+                    StepBindingValue(editingBinding, 1);
                     return true;
                 }
             } else {
@@ -460,7 +479,7 @@ namespace Cms21UiPlus
             firstSelectable = null;
             installedMods.Clear();
             cards.Clear();
-            toggleBindings.Clear();
+            settingBindings.Clear();
             currentPage = 0;
             selectedVisibleCard = -1;
             lastCardPointerPosition = Vector3.zero;
@@ -1131,7 +1150,7 @@ namespace Cms21UiPlus
         private static void BuildProviderSettings()
         {
             DestroyChildren(settingsContent);
-            toggleBindings.Clear();
+            settingBindings.Clear();
             editingBinding = null;
             firstSelectable = null;
             RefreshSettingsEnterHint();
@@ -1139,7 +1158,7 @@ namespace Cms21UiPlus
                 return;
 
             object currentValues = activeProvider.CreateDraft();
-            Dictionary<string, bool> effectiveValues =
+            Dictionary<string, ModSettingValue> effectiveValues =
                 GetOrCreateEffectiveValues(activeProvider, currentValues);
             for (int categoryIndex = 0;
                 categoryIndex < activeProvider.Categories.Count;
@@ -1155,24 +1174,31 @@ namespace Cms21UiPlus
                     ModSettingOption option =
                         category.Options[optionIndex];
                     string key = option.Key;
-                    bool value = activeProvider.GetValue(draft, key);
-                    bool savedValue = currentValues != null
+                    ModSettingValue value = activeProvider.GetValue(
+                        draft, key);
+                    ModSettingValue savedValue = currentValues != null
                         ? activeProvider.GetValue(currentValues, key) : value;
-                    NativeUiFactory.SettingsRowHandle row = null;
-                    row = NativeUiFactory.CreateSettingsRow(
-                        settingsContent, option.Name, value,
-                        new Action(delegate {
-                            OnSettingsRowClicked(key);
-                        }));
-                    bool effectiveValue;
+                    NativeUiFactory.SettingsRowHandle row =
+                        NativeUiFactory.CreateSettingsRow(
+                            settingsContent, option.Name,
+                            option.GetDisplayValue(value),
+                            option.Type == ModSettingType.Boolean,
+                            value != null && value.Type ==
+                                ModSettingValueType.Boolean &&
+                                value.BooleanValue,
+                            new Action(delegate {
+                                OnSettingsRowClicked(key);
+                            }));
+                    ModSettingValue effectiveValue;
                     if (effectiveValues == null ||
-                        !effectiveValues.TryGetValue(key, out effectiveValue))
+                        !effectiveValues.TryGetValue(key,
+                            out effectiveValue))
                         effectiveValue = savedValue;
-                    ToggleBinding created = new ToggleBinding(row, key,
-                        value, savedValue, effectiveValue, option.ApplyMode);
-                    toggleBindings.Add(created);
-                    UpdateBindingRestartWarning(created);
-                    if (firstSelectable == null)
+                    SettingBinding created = new SettingBinding(row, option,
+                        value, savedValue, effectiveValue);
+                    settingBindings.Add(created);
+                    UpdateBindingWarning(created);
+                    if (firstSelectable == null && row != null)
                         firstSelectable = row.Button;
                 }
             }
@@ -1181,18 +1207,19 @@ namespace Cms21UiPlus
             UpdateDirtyStatus();
         }
 
-        private static Dictionary<string, bool> GetOrCreateEffectiveValues(
-            IModSettingsProvider provider, object currentValues)
+        private static Dictionary<string, ModSettingValue>
+            GetOrCreateEffectiveValues(IModSettingsProvider provider,
+            object currentValues)
         {
             if (provider == null)
                 return null;
 
             string providerId = provider.Id ?? string.Empty;
-            Dictionary<string, bool> values;
+            Dictionary<string, ModSettingValue> values;
             if (sessionEffectiveValues.TryGetValue(providerId, out values))
                 return values;
 
-            values = new Dictionary<string, bool>(
+            values = new Dictionary<string, ModSettingValue>(
                 StringComparer.OrdinalIgnoreCase);
             for (int categoryIndex = 0;
                 categoryIndex < provider.Categories.Count;
@@ -1212,20 +1239,81 @@ namespace Cms21UiPlus
             return values;
         }
 
-        private static bool RequiresRestart(ToggleBinding binding)
+        private static bool RequiresRestart(SettingBinding binding)
         {
-            return binding != null &&
-                binding.ApplyMode != ModSettingApplyMode.Immediate &&
-                binding.Value != binding.EffectiveValue;
+            return binding != null && binding.Option != null &&
+                binding.Option.ApplyMode != ModSettingApplyMode.Immediate &&
+                !SettingValuesEqual(binding.Value,
+                    binding.EffectiveValue);
         }
 
-        private static void UpdateBindingRestartWarning(
-            ToggleBinding binding)
+        private static void UpdateBindingWarning(SettingBinding binding)
         {
-            if (binding == null)
+            if (binding == null || binding.Option == null)
                 return;
-            NativeUiFactory.SetSettingsRowRestartRequired(binding.Row,
-                RequiresRestart(binding));
+
+            if (binding.Value != null &&
+                binding.Value.Type == ModSettingValueType.Boolean &&
+                binding.Value.BooleanValue &&
+                !string.IsNullOrEmpty(binding.Option.DependencyId) &&
+                activeProvider != null) {
+                string dependencyId = binding.Option.DependencyId;
+                if (!string.IsNullOrEmpty(
+                    binding.Option.DependencySwitchKey) &&
+                    !string.IsNullOrEmpty(
+                        binding.Option.DependencyWhenFalseId)) {
+                    SettingBinding switchBinding = FindBinding(
+                        binding.Option.DependencySwitchKey);
+                    if (switchBinding != null &&
+                        switchBinding.Value != null &&
+                        switchBinding.Value.Type ==
+                            ModSettingValueType.Boolean &&
+                        !switchBinding.Value.BooleanValue) {
+                        dependencyId =
+                            binding.Option.DependencyWhenFalseId;
+                    }
+                }
+                string dependencyStatus =
+                    ModSettingDependencyRegistry.GetStatus(
+                        activeProvider.Id, dependencyId);
+                string dependencyWarning = string.Empty;
+                if (string.Equals(dependencyStatus,
+                    ModSettingDependencyRegistry.Partial,
+                    StringComparison.OrdinalIgnoreCase))
+                    dependencyWarning =
+                        binding.Option.DependencyPartialWarning;
+                else if (string.Equals(dependencyStatus,
+                    ModSettingDependencyRegistry.UnavailableByDefault,
+                    StringComparison.OrdinalIgnoreCase))
+                    dependencyWarning =
+                        !string.IsNullOrEmpty(
+                            binding.Option.DependencyDefaultWarning)
+                            ? binding.Option.DependencyDefaultWarning
+                            : binding.Option.DependencyWarning;
+                else if (string.Equals(dependencyStatus,
+                    ModSettingDependencyRegistry.Unavailable,
+                    StringComparison.OrdinalIgnoreCase))
+                    dependencyWarning = binding.Option.DependencyWarning;
+
+                if (!string.IsNullOrEmpty(dependencyWarning)) {
+                    NativeUiFactory.SetSettingsRowWarning(binding.Row,
+                        dependencyWarning, string.Equals(dependencyStatus,
+                            ModSettingDependencyRegistry.Partial,
+                            StringComparison.OrdinalIgnoreCase));
+                    return;
+                }
+            }
+
+            NativeUiFactory.SetSettingsRowWarning(binding.Row,
+                RequiresRestart(binding)
+                    ? ModLocalization.Get("LOC_RestartRequired")
+                    : string.Empty);
+        }
+
+        private static void RefreshDependencyWarnings()
+        {
+            for (int i = 0; i < settingBindings.Count; i++)
+                UpdateBindingWarning(settingBindings[i]);
         }
 
         private static void UpdateSettingsRowVisuals()
@@ -1233,9 +1321,9 @@ namespace Cms21UiPlus
             GameObject selected = EventSystem.current != null
                 ? EventSystem.current.currentSelectedGameObject : null;
             Vector3 pointerPosition = Input.mousePosition;
-            for (int i = 0; i < toggleBindings.Count; i++) {
+            for (int i = 0; i < settingBindings.Count; i++) {
                 NativeUiFactory.SettingsRowHandle row =
-                    toggleBindings[i].Row;
+                    settingBindings[i].Row;
                 if (row == null || row.Root == null)
                     continue;
                 RectTransform rect =
@@ -1245,37 +1333,99 @@ namespace Cms21UiPlus
                         rect, pointerPosition);
                 NativeUiFactory.SetSettingsRowVisualState(row,
                     hovered, row.Root == selected);
-                ToggleBinding binding = toggleBindings[i];
+                SettingBinding binding = settingBindings[i];
                 bool editing = binding == editingBinding;
-                bool leftHovered = editing && binding.Value &&
+                bool showLeft = editing && binding.Option != null &&
+                    binding.Option.CanMoveValue(binding.Value, -1);
+                bool showRight = editing && binding.Option != null &&
+                    binding.Option.CanMoveValue(binding.Value, 1);
+                bool leftHovered = showLeft &&
                     IsPointerInside(row.LeftArrowRect, pointerPosition);
-                bool rightHovered = editing && !binding.Value &&
+                bool rightHovered = showRight &&
                     IsPointerInside(row.RightArrowRect, pointerPosition);
                 NativeUiFactory.SetSettingsRowEditing(row, editing,
-                    binding.Value, leftHovered, rightHovered);
+                    showLeft, showRight, leftHovered, rightHovered);
             }
         }
 
-        private static ToggleBinding FindBinding(string key)
+        private static SettingBinding FindBinding(string key)
         {
-            for (int i = 0; i < toggleBindings.Count; i++) {
-                if (string.Equals(toggleBindings[i].Key, key,
+            for (int i = 0; i < settingBindings.Count; i++) {
+                if (string.Equals(settingBindings[i].Key, key,
                     StringComparison.Ordinal))
-                    return toggleBindings[i];
+                    return settingBindings[i];
             }
             return null;
         }
 
-        private static void SetBindingValue(ToggleBinding binding,
-            bool value)
+        private static void SetBindingValue(SettingBinding binding,
+            ModSettingValue value)
         {
-            if (binding == null || activeProvider == null || draft == null)
+            if (binding == null || binding.Option == null ||
+                activeProvider == null || draft == null ||
+                !binding.Option.IsValueAllowed(value))
                 return;
             binding.Value = value;
             activeProvider.SetValue(draft, binding.Key, value);
-            NativeUiFactory.UpdateSettingsRow(binding.Row, value);
-            UpdateBindingRestartWarning(binding);
+            UpdateBindingRow(binding);
+            RefreshDependencyWarnings();
             UpdateDirtyStatus();
+        }
+
+        private static void UpdateBindingRow(SettingBinding binding)
+        {
+            if (binding == null || binding.Option == null)
+                return;
+            bool isBoolean = binding.Option.Type == ModSettingType.Boolean;
+            bool booleanValue = isBoolean && binding.Value != null &&
+                binding.Value.Type == ModSettingValueType.Boolean &&
+                binding.Value.BooleanValue;
+            NativeUiFactory.UpdateSettingsRow(binding.Row,
+                binding.Option.GetDisplayValue(binding.Value),
+                isBoolean, booleanValue);
+        }
+
+        private static bool StepBindingValue(SettingBinding binding,
+            int direction)
+        {
+            if (binding == null || binding.Option == null)
+                return false;
+            ModSettingValue next;
+            if (!binding.Option.TryMoveValue(binding.Value, direction,
+                out next))
+                return false;
+            SetBindingValue(binding, next);
+            UpdateSettingsRowVisuals();
+            return true;
+        }
+
+        private static void HandleStringEditingInput()
+        {
+            SettingBinding binding = editingBinding;
+            if (binding == null || binding.Option == null ||
+                binding.Option.Type != ModSettingType.String)
+                return;
+
+            string value = binding.Value != null
+                ? binding.Value.StringValue : string.Empty;
+            bool changed = false;
+            if (Input.GetKeyDown(KeyCode.Backspace) && value.Length > 0) {
+                value = value.Substring(0, value.Length - 1);
+                changed = true;
+            }
+
+            string input = Input.inputString;
+            for (int i = 0; i < input.Length; i++) {
+                char character = input[i];
+                if (character == '\b' || character == '\n' ||
+                    character == '\r' || char.IsControl(character))
+                    continue;
+                value += character;
+                changed = true;
+            }
+            if (changed)
+                SetBindingValue(binding,
+                    ModSettingValue.FromString(value));
         }
 
         private static void OnSettingsRowClicked(string key)
@@ -1297,7 +1447,7 @@ namespace Cms21UiPlus
             ApplyEditingBinding();
         }
 
-        private static void BeginSettingsEditing(ToggleBinding binding)
+        private static void BeginSettingsEditing(SettingBinding binding)
         {
             if (binding == null || binding.Row == null)
                 return;
@@ -1314,12 +1464,12 @@ namespace Cms21UiPlus
             UpdateSettingsRowVisuals();
         }
 
-        private static ToggleBinding FindSelectedBinding()
+        private static SettingBinding FindSelectedBinding()
         {
             GameObject selected = EventSystem.current != null
                 ? EventSystem.current.currentSelectedGameObject : null;
-            for (int i = 0; i < toggleBindings.Count; i++) {
-                ToggleBinding binding = toggleBindings[i];
+            for (int i = 0; i < settingBindings.Count; i++) {
+                SettingBinding binding = settingBindings[i];
                 if (binding.Row != null && binding.Row.Root == selected)
                     return binding;
             }
@@ -1332,12 +1482,11 @@ namespace Cms21UiPlus
                 !Input.GetMouseButtonDown(0))
                 return;
             Vector3 pointer = Input.mousePosition;
-            if (editingBinding.Value &&
-                IsPointerInside(editingBinding.Row.LeftArrowRect, pointer)) {
-                SetBindingValue(editingBinding, false);
-            } else if (!editingBinding.Value &&
-                IsPointerInside(editingBinding.Row.RightArrowRect, pointer)) {
-                SetBindingValue(editingBinding, true);
+            if (IsPointerInside(editingBinding.Row.LeftArrowRect, pointer)) {
+                StepBindingValue(editingBinding, -1);
+            } else if (IsPointerInside(
+                editingBinding.Row.RightArrowRect, pointer)) {
+                StepBindingValue(editingBinding, 1);
             }
         }
 
@@ -1361,10 +1510,10 @@ namespace Cms21UiPlus
 
         private static void ApplyEditingBinding()
         {
-            ToggleBinding binding = editingBinding;
+            SettingBinding binding = editingBinding;
             if (binding == null || activeProvider == null || draft == null)
                 return;
-            if (binding.Value == binding.SavedValue) {
+            if (SettingValuesEqual(binding.Value, binding.SavedValue)) {
                 EndSettingsEditing();
                 UpdateDirtyStatus();
                 return;
@@ -1372,16 +1521,24 @@ namespace Cms21UiPlus
             ApplyDraft();
         }
 
+        private static bool SettingValuesEqual(ModSettingValue left,
+            ModSettingValue right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            return left != null && left.Equals(right);
+        }
+
         private static void MoveSettingsSelection(int direction)
         {
-            if (toggleBindings.Count == 0)
+            if (settingBindings.Count == 0)
                 return;
             int current = -1;
             GameObject selected = EventSystem.current != null
                 ? EventSystem.current.currentSelectedGameObject : null;
-            for (int i = 0; i < toggleBindings.Count; i++) {
-                if (toggleBindings[i].Row != null &&
-                    toggleBindings[i].Row.Root == selected) {
+            for (int i = 0; i < settingBindings.Count; i++) {
+                if (settingBindings[i].Row != null &&
+                    settingBindings[i].Row.Root == selected) {
                     current = i;
                     break;
                 }
@@ -1390,11 +1547,11 @@ namespace Cms21UiPlus
                 current = 0;
             else
                 current = Mathf.Clamp(current + direction, 0,
-                    toggleBindings.Count - 1);
-            SetSelected(toggleBindings[current].Row.Button);
-            if (settingsScroll != null && toggleBindings.Count > 1) {
+                    settingBindings.Count - 1);
+            SetSelected(settingBindings[current].Row.Button);
+            if (settingsScroll != null && settingBindings.Count > 1) {
                 float ratio = (float)current /
-                    (toggleBindings.Count - 1);
+                    (settingBindings.Count - 1);
                 settingsScroll.verticalNormalizedPosition =
                     Mathf.Clamp01(1f - ratio);
             }
@@ -1415,17 +1572,17 @@ namespace Cms21UiPlus
                 object refreshedDraft = activeProvider.CreateDraft();
                 if (refreshedDraft != null)
                     draft = refreshedDraft;
-                for (int i = 0; i < toggleBindings.Count; i++) {
-                    ToggleBinding binding = toggleBindings[i];
+                for (int i = 0; i < settingBindings.Count; i++) {
+                    SettingBinding binding = settingBindings[i];
                     if (binding == null)
                         continue;
-                    bool value = activeProvider.GetValue(draft,
+                    ModSettingValue value = activeProvider.GetValue(draft,
                         binding.Key);
                     binding.Value = value;
                     binding.SavedValue = value;
-                    NativeUiFactory.UpdateSettingsRow(binding.Row, value);
-                    UpdateBindingRestartWarning(binding);
+                    UpdateBindingRow(binding);
                 }
+                RefreshDependencyWarnings();
                 EndSettingsEditing();
                 ShowNativeSavePopup();
             }
@@ -1500,7 +1657,7 @@ namespace Cms21UiPlus
             activeProvider = null;
             draft = null;
             editingBinding = null;
-            toggleBindings.Clear();
+            settingBindings.Clear();
             RefreshSettingsEnterHint();
             settingsPageObject.SetActive(false);
             cardsPageObject.SetActive(true);
@@ -1760,7 +1917,7 @@ namespace Cms21UiPlus
             activeProvider = null;
             draft = null;
             editingBinding = null;
-            toggleBindings.Clear();
+            settingBindings.Clear();
             RefreshSettingsEnterHint();
             SetCardsFooterVisible(false);
             if (windowObject != null)

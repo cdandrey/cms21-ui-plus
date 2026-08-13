@@ -18,6 +18,24 @@ namespace Cms21UiPlus
         [DataMember(Name = "config")] public UiSettingsConfigData config;
         [DataMember(Name = "groups")] public UiSettingsGroupData[] groups;
         [DataMember(Name = "settings")] public UiSettingData[] settings;
+        [DataMember(Name = "enums")] public UiSettingsEnumData[] enums;
+    }
+
+    [DataContract]
+    internal sealed class UiSettingsEnumData
+    {
+        [DataMember(Name = "id")] public string id;
+        [DataMember(Name = "ids")] public string[] ids;
+        [DataMember(Name = "en")] public string[] en;
+        [DataMember(Name = "ru")] public string[] ru;
+    }
+
+    [DataContract]
+    internal sealed class UiSettingsInlineEnumData
+    {
+        [DataMember(Name = "ids")] public string[] ids;
+        [DataMember(Name = "en")] public string[] en;
+        [DataMember(Name = "ru")] public string[] ru;
     }
 
     [DataContract]
@@ -46,8 +64,17 @@ namespace Cms21UiPlus
         [DataMember(Name = "nameKey")] public string nameKey;
         [DataMember(Name = "descriptionKey")] public string descriptionKey;
         [DataMember(Name = "type")] public string type;
-        [DataMember(Name = "default")] public bool @default;
+        [DataMember(Name = "default")] public object @default;
+        [DataMember(Name = "enum")] public string enumName;
+        [DataMember(Name = "enumValues")] public UiSettingsInlineEnumData enumValues;
+        [DataMember(Name = "step")] public object step;
         [DataMember(Name = "applyMode")] public string applyMode;
+        [DataMember(Name = "dependency")] public string dependency;
+        [DataMember(Name = "dependencyWarningKey")] public string dependencyWarningKey;
+        [DataMember(Name = "dependencyPartialWarningKey")] public string dependencyPartialWarningKey;
+        [DataMember(Name = "dependencyDefaultWarningKey")] public string dependencyDefaultWarningKey;
+        [DataMember(Name = "dependencySwitchKey")] public string dependencySwitchKey;
+        [DataMember(Name = "dependencyWhenFalse")] public string dependencyWhenFalse;
         [DataMember(Name = "order")] public int order;
     }
 
@@ -96,11 +123,12 @@ namespace Cms21UiPlus
             manifestFound = true;
 
             UiSettingsManifestData manifest;
+            string json;
             ModLocalizationCatalog localization;
             ModLocalizationCatalog builtInLocalization =
                 ModLocalization.BuiltInCatalog;
             try {
-                string json = File.ReadAllText(manifestPath);
+                json = File.ReadAllText(manifestPath);
                 if (string.IsNullOrWhiteSpace(json)) {
                     status = "manifest is empty";
                     return false;
@@ -147,8 +175,15 @@ namespace Cms21UiPlus
 
             List<ModSettingsCategory> categories;
             List<ModSettingOption> options;
+            Dictionary<string, List<ModSettingEnumState>> enumDefinitions;
+            if (!TryBuildEnumDefinitions(manifest.enums,
+                out enumDefinitions, out error)) {
+                status = error;
+                return false;
+            }
             if (!TryBuildModel(manifest, localization,
-                builtInLocalization, out categories, out options,
+                builtInLocalization, enumDefinitions,
+                out categories, out options,
                 out error)) {
                 status = error;
                 return false;
@@ -286,6 +321,7 @@ namespace Cms21UiPlus
         private static bool TryBuildModel(UiSettingsManifestData manifest,
             ModLocalizationCatalog localization,
             ModLocalizationCatalog builtInLocalization,
+            IDictionary<string, List<ModSettingEnumState>> enumDefinitions,
             out List<ModSettingsCategory> categories,
             out List<ModSettingOption> options, out string error)
         {
@@ -376,12 +412,35 @@ namespace Cms21UiPlus
                         (setting.group ?? "<null>");
                     return false;
                 }
-                if (!string.Equals(setting.type, "boolean",
-                    StringComparison.OrdinalIgnoreCase)) {
+                ModSettingType settingType;
+                if (!TryParseSettingType(setting.type, out settingType)) {
                     error = "setting " + setting.id +
                         " uses unsupported type " +
                         (setting.type ?? "<null>") +
-                        "; only boolean is supported";
+                        "; supported types are boolean, number, string, enum";
+                    return false;
+                }
+                if (settingType == ModSettingType.Enum) {
+                    bool hasEnumReference =
+                        !string.IsNullOrWhiteSpace(setting.enumName);
+                    bool hasInlineEnum = setting.enumValues != null;
+                    if (hasEnumReference == hasInlineEnum) {
+                        error = "setting " + setting.id +
+                            " must declare exactly one enum source";
+                        return false;
+                    }
+                    if (hasEnumReference &&
+                        (enumDefinitions == null ||
+                         !enumDefinitions.ContainsKey(setting.enumName))) {
+                        error = "setting " + setting.id +
+                            " references an unknown enum: " +
+                            setting.enumName;
+                        return false;
+                    }
+                } else if (!string.IsNullOrWhiteSpace(setting.enumName) ||
+                    setting.enumValues != null) {
+                    error = "setting " + setting.id +
+                        " declares enum values but its type is not enum";
                     return false;
                 }
                 if (string.IsNullOrWhiteSpace(setting.nameKey)) {
@@ -393,13 +452,98 @@ namespace Cms21UiPlus
                         " has no descriptionKey";
                     return false;
                 }
+                bool hasDependency =
+                    !string.IsNullOrWhiteSpace(setting.dependency);
+                bool hasDependencyWarning =
+                    !string.IsNullOrWhiteSpace(setting.dependencyWarningKey);
+                bool hasDependencyPartialWarning =
+                    !string.IsNullOrWhiteSpace(
+                        setting.dependencyPartialWarningKey);
+                bool hasDependencyDefaultWarning =
+                    !string.IsNullOrWhiteSpace(
+                        setting.dependencyDefaultWarningKey);
+                bool hasDependencySwitch =
+                    !string.IsNullOrWhiteSpace(setting.dependencySwitchKey);
+                bool hasDependencyWhenFalse =
+                    !string.IsNullOrWhiteSpace(setting.dependencyWhenFalse);
+                if (hasDependency != hasDependencyWarning) {
+                    error = "setting " + setting.id +
+                        " must declare dependency and dependencyWarningKey together";
+                    return false;
+                }
+                if (!hasDependency && (hasDependencyPartialWarning ||
+                    hasDependencyDefaultWarning || hasDependencySwitch ||
+                    hasDependencyWhenFalse)) {
+                    error = "setting " + setting.id +
+                        " declares dependency options without dependency";
+                    return false;
+                }
+                if (hasDependencySwitch != hasDependencyWhenFalse) {
+                    error = "setting " + setting.id +
+                        " must declare dependencySwitchKey and dependencyWhenFalse together";
+                    return false;
+                }
+                if (hasDependency && !IdRegex.IsMatch(setting.dependency)) {
+                    error = "setting " + setting.id +
+                        " has an invalid dependency id";
+                    return false;
+                }
+                if (hasDependency &&
+                    settingType != ModSettingType.Boolean) {
+                    error = "setting " + setting.id +
+                        " declares dependency but is not boolean";
+                    return false;
+                }
+                if (hasDependencySwitch) {
+                    if (!TomlKeyRegex.IsMatch(setting.dependencySwitchKey) ||
+                        !IdRegex.IsMatch(setting.dependencyWhenFalse)) {
+                        error = "setting " + setting.id +
+                            " has an invalid dependency switch";
+                        return false;
+                    }
+                    UiSettingData switchSetting = null;
+                    for (int switchIndex = 0;
+                        switchIndex < manifest.settings.Length; switchIndex++) {
+                        UiSettingData candidate = manifest.settings[switchIndex];
+                        if (candidate != null && string.Equals(candidate.key,
+                            setting.dependencySwitchKey,
+                            StringComparison.OrdinalIgnoreCase)) {
+                            switchSetting = candidate;
+                            break;
+                        }
+                    }
+                    ModSettingType switchType;
+                    if (switchSetting == null ||
+                        !TryParseSettingType(switchSetting.type,
+                            out switchType) ||
+                        switchType != ModSettingType.Boolean) {
+                        error = "setting " + setting.id +
+                            " dependencySwitchKey must reference a boolean setting";
+                        return false;
+                    }
+                }
                 if ((!HasLocalizationKey(localization, setting.nameKey) &&
                      !HasLocalizationKey(builtInLocalization,
                          setting.nameKey)) ||
                     (!HasLocalizationKey(localization,
                          setting.descriptionKey) &&
                      !HasLocalizationKey(builtInLocalization,
-                         setting.descriptionKey))) {
+                         setting.descriptionKey)) ||
+                    (hasDependency &&
+                     !HasLocalizationKey(localization,
+                         setting.dependencyWarningKey) &&
+                     !HasLocalizationKey(builtInLocalization,
+                         setting.dependencyWarningKey)) ||
+                    (hasDependencyPartialWarning &&
+                     !HasLocalizationKey(localization,
+                         setting.dependencyPartialWarningKey) &&
+                     !HasLocalizationKey(builtInLocalization,
+                         setting.dependencyPartialWarningKey)) ||
+                    (hasDependencyDefaultWarning &&
+                     !HasLocalizationKey(localization,
+                         setting.dependencyDefaultWarningKey) &&
+                     !HasLocalizationKey(builtInLocalization,
+                         setting.dependencyDefaultWarningKey))) {
                     error = "setting " + setting.id +
                         " localization key is missing from localization.en " +
                         "or localization.ru";
@@ -433,21 +577,251 @@ namespace Cms21UiPlus
 
             for (int i = 0; i < orderedSettings.Count; i++) {
                 UiSettingData setting = orderedSettings[i].Data;
+                bool hasDependency =
+                    !string.IsNullOrWhiteSpace(setting.dependency);
                 ModSettingApplyMode applyMode;
                 TryParseApplyMode(setting.applyMode, out applyMode);
+                ModSettingType settingType;
+                TryParseSettingType(setting.type, out settingType);
+                IList<ModSettingEnumState> enumStates =
+                    new List<ModSettingEnumState>();
+                if (settingType == ModSettingType.Enum) {
+                    if (setting.enumValues != null) {
+                        List<ModSettingEnumState> inlineStates;
+                        if (!TryBuildEnumStates(setting.id,
+                            setting.enumValues.ids, setting.enumValues.en,
+                            setting.enumValues.ru, out inlineStates,
+                            out error))
+                            return false;
+                        enumStates = inlineStates;
+                    } else {
+                        enumStates = enumDefinitions[setting.enumName];
+                    }
+                }
+                ModSettingValue defaultValue;
+                if (!ModSettingValue.TryCreate(setting.@default,
+                    out defaultValue)) {
+                    error = "setting " + setting.id +
+                        " has an invalid default value";
+                    return false;
+                }
+                ModSettingValueType expectedValueType =
+                    GetSettingValueType(settingType, enumStates);
+                if (defaultValue.Type != expectedValueType) {
+                    error = "setting " + setting.id +
+                        " default value does not match type " +
+                        setting.type;
+                    return false;
+                }
+                double numberStep = 1d;
+                if (settingType == ModSettingType.Number &&
+                    setting.step != null) {
+                    ModSettingValue stepValue;
+                    if (!ModSettingValue.TryCreate(setting.step,
+                        out stepValue) ||
+                        stepValue.Type != ModSettingValueType.Number ||
+                        stepValue.NumberValue <= 0d) {
+                        error = "setting " + setting.id +
+                            " has an invalid number step";
+                        return false;
+                    }
+                    numberStep = stepValue.NumberValue;
+                } else if (settingType != ModSettingType.Number &&
+                    setting.step != null) {
+                    error = "setting " + setting.id +
+                        " declares step but its type is not number";
+                    return false;
+                }
                 ModSettingOption option = new ModSettingOption(setting.key,
-                    setting.group, setting.@default,
+                    setting.group, settingType, defaultValue, enumStates,
+                    numberStep,
                     ResolveSettingText(localization, builtInLocalization,
                         setting.nameKey),
                     ResolveSettingText(localization, builtInLocalization,
                         setting.descriptionKey),
                     ResolveEnglishSettingText(localization,
                         builtInLocalization, setting.descriptionKey),
+                    setting.dependency,
+                    hasDependency
+                        ? ResolveSettingText(localization,
+                            builtInLocalization,
+                            setting.dependencyWarningKey)
+                        : string.Empty,
+                    hasDependency &&
+                        !string.IsNullOrWhiteSpace(
+                            setting.dependencyPartialWarningKey)
+                        ? ResolveSettingText(localization,
+                            builtInLocalization,
+                            setting.dependencyPartialWarningKey)
+                        : string.Empty,
+                    hasDependency &&
+                        !string.IsNullOrWhiteSpace(
+                            setting.dependencyDefaultWarningKey)
+                        ? ResolveSettingText(localization,
+                            builtInLocalization,
+                            setting.dependencyDefaultWarningKey)
+                        : string.Empty,
+                    hasDependency ? setting.dependencySwitchKey : string.Empty,
+                    hasDependency ? setting.dependencyWhenFalse : string.Empty,
                     applyMode);
+                if (!option.IsValueAllowed(defaultValue)) {
+                    error = "setting " + setting.id +
+                        " default value is not present in enum " +
+                        setting.enumName;
+                    return false;
+                }
                 categoriesById[setting.group].Options.Add(option);
                 options.Add(option);
             }
             return true;
+        }
+
+        private static bool TryParseSettingType(string value,
+            out ModSettingType type)
+        {
+            type = ModSettingType.Boolean;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            if (string.Equals(value, "boolean",
+                StringComparison.OrdinalIgnoreCase)) {
+                type = ModSettingType.Boolean;
+                return true;
+            }
+            if (string.Equals(value, "number",
+                StringComparison.OrdinalIgnoreCase)) {
+                type = ModSettingType.Number;
+                return true;
+            }
+            if (string.Equals(value, "string",
+                StringComparison.OrdinalIgnoreCase)) {
+                type = ModSettingType.String;
+                return true;
+            }
+            if (string.Equals(value, "enum",
+                StringComparison.OrdinalIgnoreCase)) {
+                type = ModSettingType.Enum;
+                return true;
+            }
+            return false;
+        }
+
+        private static ModSettingValueType GetSettingValueType(
+            ModSettingType settingType,
+            IList<ModSettingEnumState> enumStates)
+        {
+            if (settingType == ModSettingType.Boolean)
+                return ModSettingValueType.Boolean;
+            if (settingType == ModSettingType.String)
+                return ModSettingValueType.String;
+            if (settingType == ModSettingType.Enum)
+                return ModSettingValueType.String;
+            return ModSettingValueType.Number;
+        }
+
+        private static bool TryBuildEnumDefinitions(
+            UiSettingsEnumData[] source,
+            out Dictionary<string, List<ModSettingEnumState>> definitions,
+            out string error)
+        {
+            definitions = new Dictionary<string, List<ModSettingEnumState>>(
+                StringComparer.OrdinalIgnoreCase);
+            error = string.Empty;
+            if (source == null)
+                return true;
+
+            for (int i = 0; i < source.Length; i++) {
+                UiSettingsEnumData enumData = source[i];
+                if (enumData == null ||
+                    string.IsNullOrWhiteSpace(enumData.id) ||
+                    !IdRegex.IsMatch(enumData.id)) {
+                    error = "enum at index " + i + " has an invalid id";
+                    return false;
+                }
+                if (definitions.ContainsKey(enumData.id)) {
+                    error = "duplicate enum id: " + enumData.id;
+                    return false;
+                }
+
+                List<ModSettingEnumState> states;
+                if (!TryBuildEnumStates(enumData.id, enumData.ids,
+                    enumData.en, enumData.ru, out states, out error))
+                    return false;
+                definitions.Add(enumData.id, states);
+            }
+            return true;
+        }
+
+        private static bool TryBuildEnumStates(string context, string[] ids,
+            string[] english, string[] russian,
+            out List<ModSettingEnumState> states, out string error)
+        {
+            states = new List<ModSettingEnumState>();
+            error = string.Empty;
+            if (ids == null || ids.Length == 0) {
+                error = "enum " + context + " has no ids";
+                return false;
+            }
+            if (english == null && russian == null) {
+                error = "enum " + context +
+                    " must declare en or ru localization";
+                return false;
+            }
+            if (english != null && english.Length != ids.Length) {
+                error = "enum " + context +
+                    " en localization count does not match ids";
+                return false;
+            }
+            if (russian != null && russian.Length != ids.Length) {
+                error = "enum " + context +
+                    " ru localization count does not match ids";
+                return false;
+            }
+
+            HashSet<string> uniqueIds = new HashSet<string>(
+                StringComparer.Ordinal);
+            for (int i = 0; i < ids.Length; i++) {
+                string stateId = ids[i];
+                if (string.IsNullOrWhiteSpace(stateId) ||
+                    !IdRegex.IsMatch(stateId)) {
+                    error = "enum " + context +
+                        " has an invalid id at index " + i;
+                    return false;
+                }
+                if (!uniqueIds.Add(stateId)) {
+                    error = "enum " + context +
+                        " has duplicate id: " + stateId;
+                    return false;
+                }
+
+                string displayName = ResolveEnumDisplayName(stateId, i,
+                    english, russian);
+                states.Add(new ModSettingEnumState(displayName,
+                    ModSettingValue.FromString(stateId)));
+            }
+            return true;
+        }
+
+        private static string ResolveEnumDisplayName(string stateId,
+            int index, string[] english, string[] russian)
+        {
+            string preferred = ModLocalization.IsRussian
+                ? GetEnumLocalization(russian, index)
+                : GetEnumLocalization(english, index);
+            if (!string.IsNullOrWhiteSpace(preferred))
+                return preferred;
+
+            string fallback = ModLocalization.IsRussian
+                ? GetEnumLocalization(english, index)
+                : GetEnumLocalization(russian, index);
+            return !string.IsNullOrWhiteSpace(fallback)
+                ? fallback : stateId;
+        }
+
+        private static string GetEnumLocalization(string[] values, int index)
+        {
+            if (values == null || index < 0 || index >= values.Length)
+                return null;
+            return values[index];
         }
 
         private static bool HasLocalizationKey(

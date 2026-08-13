@@ -7,12 +7,12 @@ namespace Cms21UiPlus
     {
         private sealed class Draft
         {
-            public Draft(Dictionary<string, bool> values)
+            public Draft(Dictionary<string, ModSettingValue> values)
             {
                 Values = values;
             }
 
-            public Dictionary<string, bool> Values;
+            public Dictionary<string, ModSettingValue> Values;
         }
 
         private readonly string id;
@@ -23,7 +23,7 @@ namespace Cms21UiPlus
         private readonly List<ModSettingsCategory> categories;
         private readonly List<ModSettingOption> options;
         private readonly Dictionary<string, ModSettingOption> optionsByKey;
-        private Dictionary<string, bool> savedValues;
+        private Dictionary<string, ModSettingValue> savedValues;
 
         public ManifestModSettingsProvider(string id,
             string displayName,
@@ -76,24 +76,27 @@ namespace Cms21UiPlus
             return new Draft(CloneValues(savedValues));
         }
 
-        public bool GetValue(object draft, string key)
+        public ModSettingValue GetValue(object draft, string key)
         {
             Draft candidate = draft as Draft;
-            bool value;
+            ModSettingValue value;
             if (candidate != null && candidate.Values != null &&
                 candidate.Values.TryGetValue(key, out value))
                 return value;
 
             ModSettingOption option;
-            return optionsByKey.TryGetValue(key, out option) &&
-                option.DefaultValue;
+            return optionsByKey.TryGetValue(key, out option)
+                ? option.DefaultValue : null;
         }
 
-        public void SetValue(object draft, string key, bool value)
+        public void SetValue(object draft, string key,
+            ModSettingValue value)
         {
             Draft candidate = draft as Draft;
+            ModSettingOption option;
             if (candidate == null || candidate.Values == null ||
-                !optionsByKey.ContainsKey(key))
+                !optionsByKey.TryGetValue(key, out option) ||
+                !option.IsValueAllowed(value))
                 return;
             candidate.Values[key] = value;
         }
@@ -121,8 +124,8 @@ namespace Cms21UiPlus
 
             for (int i = 0; i < options.Count; i++) {
                 ModSettingOption option = options[i];
-                if (GetDictionaryValue(candidate.Values, option) !=
-                    GetDictionaryValue(savedValues, option))
+                if (!ValuesEqual(GetDictionaryValue(candidate.Values, option),
+                    GetDictionaryValue(savedValues, option)))
                     return true;
             }
             return false;
@@ -146,13 +149,14 @@ namespace Cms21UiPlus
             }
 
             applyMode = option.ApplyMode;
-            bool value = GetDictionaryValue(candidate.Values, option);
-            if (value == GetDictionaryValue(savedValues, option)) {
+            ModSettingValue value = GetDictionaryValue(candidate.Values, option);
+            if (ValuesEqual(value, GetDictionaryValue(savedValues, option))) {
                 status = ModLocalization.Get("LOC_NoChangesToApply");
                 return true;
             }
 
-            Dictionary<string, bool> merged = CloneValues(savedValues);
+            Dictionary<string, ModSettingValue> merged =
+                CloneValues(savedValues);
             merged[option.Key] = value;
             string error;
             if (!ModSettingsConfigStore.Save(configPath, configSection,
@@ -185,8 +189,8 @@ namespace Cms21UiPlus
             bool changed = false;
             for (int i = 0; i < options.Count; i++) {
                 ModSettingOption option = options[i];
-                if (GetDictionaryValue(candidate.Values, option) ==
-                    GetDictionaryValue(savedValues, option))
+                if (ValuesEqual(GetDictionaryValue(candidate.Values, option),
+                    GetDictionaryValue(savedValues, option)))
                     continue;
                 changed = true;
                 if ((int)option.ApplyMode > (int)highestApplyMode)
@@ -216,7 +220,7 @@ namespace Cms21UiPlus
 
         private bool ReloadSavedValues(out string error)
         {
-            Dictionary<string, bool> loaded;
+            Dictionary<string, ModSettingValue> loaded;
             if (!ModSettingsConfigStore.Load(configPath, configSection,
                 options, out loaded, out error))
                 return false;
@@ -224,26 +228,37 @@ namespace Cms21UiPlus
             return true;
         }
 
-        private static Dictionary<string, bool> CloneValues(
-            Dictionary<string, bool> source)
+        private static Dictionary<string, ModSettingValue> CloneValues(
+            Dictionary<string, ModSettingValue> source)
         {
-            Dictionary<string, bool> clone = new Dictionary<string, bool>(
-                StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ModSettingValue> clone =
+                new Dictionary<string, ModSettingValue>(
+                    StringComparer.OrdinalIgnoreCase);
             if (source == null)
                 return clone;
-            foreach (KeyValuePair<string, bool> pair in source)
+            foreach (KeyValuePair<string, ModSettingValue> pair in source)
                 clone[pair.Key] = pair.Value;
             return clone;
         }
 
-        private static bool GetDictionaryValue(
-            Dictionary<string, bool> values, ModSettingOption option)
+        private static ModSettingValue GetDictionaryValue(
+            Dictionary<string, ModSettingValue> values,
+            ModSettingOption option)
         {
-            bool value;
+            ModSettingValue value;
             if (values != null && option != null &&
-                values.TryGetValue(option.Key, out value))
+                values.TryGetValue(option.Key, out value) &&
+                option.IsValueAllowed(value))
                 return value;
-            return option != null && option.DefaultValue;
+            return option != null ? option.DefaultValue : null;
+        }
+
+        private static bool ValuesEqual(ModSettingValue left,
+            ModSettingValue right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            return left != null && left.Equals(right);
         }
     }
 }

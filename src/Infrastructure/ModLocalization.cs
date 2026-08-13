@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using HarmonyLib;
 using UnityEngine;
 
 namespace Cms21UiPlus
@@ -378,8 +379,8 @@ namespace Cms21UiPlus
         {
             try {
                 string language = GameSettings.LanguageSettings;
-                if (IsRussianLanguageName(language))
-                    return true;
+                if (!string.IsNullOrWhiteSpace(language))
+                    return IsRussianLanguageName(language);
             } catch {
             }
             return Application.systemLanguage == SystemLanguage.Russian;
@@ -431,6 +432,14 @@ namespace Cms21UiPlus
             isRussian = null;
         }
 
+        internal static void SetGameLanguage(string language)
+        {
+            catalog = null;
+            isRussian = string.IsNullOrWhiteSpace(language)
+                ? (bool?)null
+                : IsRussianLanguageName(language);
+        }
+
         public static string GetApplyModeText(ModSettingApplyMode mode)
         {
             switch (mode) {
@@ -457,6 +466,16 @@ namespace Cms21UiPlus
                 default:
                     return Get("LOC_ApplyStatusImmediate");
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(Localization), nameof(Localization.SetLanguage))]
+    internal static class ModLocalizationLanguagePatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(string __0)
+        {
+            ModLocalization.SetGameLanguage(__0);
         }
     }
 }

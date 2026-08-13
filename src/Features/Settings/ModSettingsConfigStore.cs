@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -9,18 +10,24 @@ namespace Cms21UiPlus
 {
     internal static class ModSettingsConfigStore
     {
-        private static readonly Regex SettingLineRegex = new Regex(
-            @"^(\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)(true|false)(.*)$",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex AnySettingLineRegex = new Regex(
-            @"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=",
+        private static readonly Regex SettingPrefixRegex = new Regex(
+            @"^(\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*=\s*)(.*)$",
             RegexOptions.Compiled);
         private static readonly HashSet<string> SessionBackupPaths =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        private sealed class ParsedSettingLine
+        {
+            public string Indent;
+            public string Key;
+            public string Assignment;
+            public string Value;
+            public string Suffix;
+        }
+
         public static bool Load(string targetPath, string section,
             IList<ModSettingOption> options,
-            out Dictionary<string, bool> values, out string error)
+            out Dictionary<string, ModSettingValue> values, out string error)
         {
             values = CreateDefaultValues(options);
             error = string.Empty;
@@ -49,25 +56,23 @@ namespace Cms21UiPlus
                     if (!insideTarget)
                         continue;
 
-                    Match match = SettingLineRegex.Match(lines[i]);
-                    if (match.Success) {
-                        string key = match.Groups[2].Value;
-                        if (!values.ContainsKey(key))
-                            continue;
-                        bool parsed;
-                        if (!bool.TryParse(match.Groups[4].Value, out parsed))
-                            continue;
-                        values[key] = parsed;
+                    ParsedSettingLine line;
+                    if (!TryParseSettingLine(lines[i], out line))
                         continue;
-                    }
 
-                    Match anySetting = AnySettingLineRegex.Match(lines[i]);
-                    if (anySetting.Success &&
-                        values.ContainsKey(anySetting.Groups[1].Value)) {
+                    ModSettingOption option = FindOption(options, line.Key);
+                    if (option == null)
+                        continue;
+
+                    ModSettingValue parsed;
+                    if (!TryParseValue(line.Value, option.ValueType,
+                        out parsed) || !option.IsValueAllowed(parsed)) {
                         throw new InvalidOperationException(
-                            "Setting " + anySetting.Groups[1].Value +
-                            " is not a boolean value in " + targetPath + ".");
+                            "Setting " + line.Key + " has an invalid " +
+                            GetTypeName(option) + " value in " +
+                            targetPath + ".");
                     }
+                    values[option.Key] = parsed;
                 }
                 return true;
             } catch (Exception exception) {
@@ -81,7 +86,7 @@ namespace Cms21UiPlus
 
         public static bool Save(string targetPath, string section,
             IList<ModSettingOption> options,
-            IDictionary<string, bool> values, out string error)
+            IDictionary<string, ModSettingValue> values, out string error)
         {
             error = string.Empty;
             string tempPath = targetPath + ".tmp";
@@ -142,27 +147,26 @@ namespace Cms21UiPlus
                     if (!insideTarget)
                         continue;
 
-                    Match match = SettingLineRegex.Match(lines[i]);
-                    if (match.Success) {
-                        string key = match.Groups[2].Value;
-                        ModSettingOption option;
-                        if (!byKey.TryGetValue(key, out option))
-                            continue;
-                        lines[i] = match.Groups[1].Value + key +
-                            match.Groups[3].Value +
-                            (GetValue(values, option) ? "true" : "false") +
-                            match.Groups[5].Value;
-                        written.Add(key);
+                    ParsedSettingLine line;
+                    if (!TryParseSettingLine(lines[i], out line))
                         continue;
+
+                    ModSettingOption option;
+                    if (!byKey.TryGetValue(line.Key, out option))
+                        continue;
+
+                    ModSettingValue existing;
+                    if (!TryParseValue(line.Value, option.ValueType,
+                        out existing) || !option.IsValueAllowed(existing)) {
+                        throw new InvalidOperationException(
+                            "Setting " + line.Key + " has an invalid " +
+                            GetTypeName(option) + " value in " +
+                            targetPath + ".");
                     }
 
-                    Match anySetting = AnySettingLineRegex.Match(lines[i]);
-                    if (anySetting.Success &&
-                        byKey.ContainsKey(anySetting.Groups[1].Value)) {
-                        throw new InvalidOperationException(
-                            "Setting " + anySetting.Groups[1].Value +
-                            " is not a boolean value in " + targetPath + ".");
-                    }
+                    lines[i] = line.Indent + line.Key + line.Assignment +
+                        FormatValue(GetValue(values, option)) + line.Suffix;
+                    written.Add(option.Key);
                 }
 
                 if (!sectionFound) {
@@ -179,7 +183,7 @@ namespace Cms21UiPlus
                     if (written.Contains(option.Key))
                         continue;
                     string line = option.Key + " = " +
-                        (GetValue(values, option) ? "true" : "false");
+                        FormatValue(GetValue(values, option));
                     if (!string.IsNullOrWhiteSpace(option.ConfigDescription))
                         line += " # " + option.ConfigDescription;
                     missingLines.Add(line);
@@ -235,20 +239,21 @@ namespace Cms21UiPlus
                 try {
                     if (File.Exists(path))
                         File.Delete(path);
-                    SessionBackupPaths.Remove(path);
                 } catch (Exception exception) {
-                    ModLogger.Log("[ModSettings] Failed to remove backup " +
+                    ModLogger.Log("[ModSettings] Failed to delete backup " +
                         path + "." + Environment.NewLine + exception,
                         Types.LoggingLevels.Warning);
                 }
             }
+            SessionBackupPaths.Clear();
         }
 
-        private static Dictionary<string, bool> CreateDefaultValues(
+        private static Dictionary<string, ModSettingValue> CreateDefaultValues(
             IList<ModSettingOption> options)
         {
-            Dictionary<string, bool> values = new Dictionary<string, bool>(
-                StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ModSettingValue> values =
+                new Dictionary<string, ModSettingValue>(
+                    StringComparer.OrdinalIgnoreCase);
             if (options == null)
                 return values;
             for (int i = 0; i < options.Count; i++)
@@ -256,14 +261,205 @@ namespace Cms21UiPlus
             return values;
         }
 
-        private static bool GetValue(IDictionary<string, bool> values,
+        private static ModSettingValue GetValue(
+            IDictionary<string, ModSettingValue> values,
             ModSettingOption option)
         {
-            bool value;
+            ModSettingValue value;
             if (values != null && option != null &&
-                values.TryGetValue(option.Key, out value))
+                values.TryGetValue(option.Key, out value) &&
+                option.IsValueAllowed(value))
                 return value;
-            return option != null && option.DefaultValue;
+            return option != null ? option.DefaultValue : null;
+        }
+
+        private static ModSettingOption FindOption(
+            IList<ModSettingOption> options, string key)
+        {
+            if (options == null || string.IsNullOrEmpty(key))
+                return null;
+            for (int i = 0; i < options.Count; i++) {
+                if (string.Equals(options[i].Key, key,
+                    StringComparison.OrdinalIgnoreCase))
+                    return options[i];
+            }
+            return null;
+        }
+
+        private static bool TryParseSettingLine(string source,
+            out ParsedSettingLine result)
+        {
+            result = null;
+            Match match = SettingPrefixRegex.Match(source ?? string.Empty);
+            if (!match.Success)
+                return false;
+
+            string remainder = match.Groups[4].Value;
+            int commentIndex = FindCommentIndex(remainder);
+            string valueAndSpacing = commentIndex >= 0
+                ? remainder.Substring(0, commentIndex) : remainder;
+            int valueEnd = valueAndSpacing.Length;
+            while (valueEnd > 0 && char.IsWhiteSpace(
+                valueAndSpacing[valueEnd - 1]))
+                valueEnd--;
+
+            string value = valueAndSpacing.Substring(0, valueEnd).TrimStart();
+            if (value.Length == 0)
+                return false;
+
+            string suffix = valueAndSpacing.Substring(valueEnd);
+            if (commentIndex >= 0)
+                suffix += remainder.Substring(commentIndex);
+
+            result = new ParsedSettingLine {
+                Indent = match.Groups[1].Value,
+                Key = match.Groups[2].Value,
+                Assignment = match.Groups[3].Value,
+                Value = value,
+                Suffix = suffix,
+            };
+            return true;
+        }
+
+        private static int FindCommentIndex(string source)
+        {
+            bool inDouble = false;
+            bool inSingle = false;
+            bool escaped = false;
+            for (int i = 0; i < source.Length; i++) {
+                char current = source[i];
+                if (inDouble) {
+                    if (escaped) {
+                        escaped = false;
+                        continue;
+                    }
+                    if (current == '\\') {
+                        escaped = true;
+                        continue;
+                    }
+                    if (current == '"')
+                        inDouble = false;
+                    continue;
+                }
+                if (inSingle) {
+                    if (current == '\'')
+                        inSingle = false;
+                    continue;
+                }
+                if (current == '"')
+                    inDouble = true;
+                else if (current == '\'')
+                    inSingle = true;
+                else if (current == '#')
+                    return i;
+            }
+            return -1;
+        }
+
+        private static bool TryParseValue(string raw,
+            ModSettingValueType type, out ModSettingValue value)
+        {
+            value = null;
+            if (type == ModSettingValueType.Boolean) {
+                bool parsed;
+                if (!bool.TryParse(raw, out parsed))
+                    return false;
+                value = ModSettingValue.FromBoolean(parsed);
+                return true;
+            }
+            if (type == ModSettingValueType.Number) {
+                double parsed;
+                string normalized = raw.Replace("_", string.Empty);
+                if (!double.TryParse(normalized, NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out parsed) ||
+                    double.IsNaN(parsed) || double.IsInfinity(parsed))
+                    return false;
+                value = ModSettingValue.FromNumber(parsed);
+                return true;
+            }
+
+            string parsedString;
+            if (!TryParseString(raw, out parsedString))
+                return false;
+            value = ModSettingValue.FromString(parsedString);
+            return true;
+        }
+
+        private static bool TryParseString(string raw, out string value)
+        {
+            value = null;
+            if (string.IsNullOrEmpty(raw) || raw.Length < 2)
+                return false;
+            char quote = raw[0];
+            if ((quote != '"' && quote != '\'') ||
+                raw[raw.Length - 1] != quote)
+                return false;
+            string content = raw.Substring(1, raw.Length - 2);
+            if (quote == '\'') {
+                value = content;
+                return true;
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < content.Length; i++) {
+                char current = content[i];
+                if (current != '\\') {
+                    builder.Append(current);
+                    continue;
+                }
+                if (++i >= content.Length)
+                    return false;
+                char escaped = content[i];
+                switch (escaped) {
+                    case '"': builder.Append('"'); break;
+                    case '\\': builder.Append('\\'); break;
+                    case 'b': builder.Append('\b'); break;
+                    case 't': builder.Append('\t'); break;
+                    case 'n': builder.Append('\n'); break;
+                    case 'f': builder.Append('\f'); break;
+                    case 'r': builder.Append('\r'); break;
+                    default: return false;
+                }
+            }
+            value = builder.ToString();
+            return true;
+        }
+
+        private static string FormatValue(ModSettingValue value)
+        {
+            if (value == null)
+                return "\"\"";
+            if (value.Type == ModSettingValueType.Boolean)
+                return value.BooleanValue ? "true" : "false";
+            if (value.Type == ModSettingValueType.Number)
+                return value.NumberValue.ToString("G15",
+                    CultureInfo.InvariantCulture);
+            return "\"" + EscapeString(value.StringValue) + "\"";
+        }
+
+        private static string EscapeString(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\b", "\\b")
+                .Replace("\t", "\\t")
+                .Replace("\n", "\\n")
+                .Replace("\f", "\\f")
+                .Replace("\r", "\\r");
+        }
+
+        private static string GetTypeName(ModSettingOption option)
+        {
+            if (option == null)
+                return "setting";
+            if (option.Type == ModSettingType.Boolean)
+                return "boolean";
+            if (option.Type == ModSettingType.Number)
+                return "number";
+            if (option.Type == ModSettingType.String)
+                return "string";
+            return "enum";
         }
 
         private static string NormalizeSectionHeader(string section)

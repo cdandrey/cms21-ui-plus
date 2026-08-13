@@ -1292,17 +1292,21 @@ namespace Cms21UiPlus
 
 
         public static SettingsRowHandle CreateSettingsRow(Transform parent,
-            string label, bool value, Action onClick)
+            string label, string valueText, bool showValueIndicator,
+            bool indicatorValue, Action onClick)
         {
             SettingsRowHandle native = CreateNativeSettingsRow(parent,
-                label, value, onClick);
+                label, valueText, showValueIndicator, indicatorValue,
+                onClick);
             if (native != null)
                 return native;
-            return CreateFallbackSettingsRow(parent, label, value, onClick);
+            return CreateFallbackSettingsRow(parent, label, valueText,
+                showValueIndicator, indicatorValue, onClick);
         }
 
         private static SettingsRowHandle CreateNativeSettingsRow(
-            Transform parent, string label, bool value, Action onClick)
+            Transform parent, string label, string valueText,
+            bool showValueIndicator, bool indicatorValue, Action onClick)
         {
             if (settingsSource == null ||
                 settingsSource.gameObject == null || parent == null)
@@ -1390,7 +1394,7 @@ namespace Cms21UiPlus
             RectTransform leftArrowRect;
             Graphic[] leftArrowGraphics;
             GameObject leftArrow = CreateSettingsArrow(root.transform,
-                "LeftArrow", true, -108f, out leftArrowRect,
+                "LeftArrow", true, -126f, out leftArrowRect,
                 out leftArrowGraphics);
             RectTransform rightArrowRect;
             Graphic[] rightArrowGraphics;
@@ -1419,14 +1423,16 @@ namespace Cms21UiPlus
                 ApplyWarning = applyWarning,
             };
             CaptureSettingsStateLayout(handle);
-            UpdateSettingsRow(handle, value);
+            UpdateSettingsRow(handle, valueText, showValueIndicator,
+                indicatorValue);
             SetSettingsRowVisualState(handle, false, false);
             root.SetActive(true);
             return handle;
         }
 
         private static SettingsRowHandle CreateFallbackSettingsRow(
-            Transform parent, string label, bool value, Action onClick)
+            Transform parent, string label, string valueText,
+            bool showValueIndicator, bool indicatorValue, Action onClick)
         {
             GameObject root = CreateUiObject("SettingRow", parent);
             RectTransform rect = root.GetComponent<RectTransform>();
@@ -1464,7 +1470,7 @@ namespace Cms21UiPlus
             RectTransform leftArrowRect;
             Graphic[] leftArrowGraphics;
             GameObject leftArrow = CreateSettingsArrow(root.transform,
-                "LeftArrow", true, -108f, out leftArrowRect,
+                "LeftArrow", true, -126f, out leftArrowRect,
                 out leftArrowGraphics);
             RectTransform rightArrowRect;
             Graphic[] rightArrowGraphics;
@@ -1490,19 +1496,20 @@ namespace Cms21UiPlus
                 ApplyWarning = applyWarning,
             };
             CaptureSettingsStateLayout(handle);
-            UpdateSettingsRow(handle, value);
+            UpdateSettingsRow(handle, valueText, showValueIndicator,
+                indicatorValue);
             return handle;
         }
 
         public static void UpdateSettingsRow(SettingsRowHandle handle,
-            bool value)
+            string valueText, bool showValueIndicator, bool indicatorValue)
         {
             if (handle == null)
                 return;
             if (handle.ValueIndicator != null)
-                handle.ValueIndicator.SetActive(true);
+                handle.ValueIndicator.SetActive(showValueIndicator);
             if (handle.ValueIndicatorImage != null) {
-                Color indicatorColor = value
+                Color indicatorColor = indicatorValue
                     ? SettingsEnabledColor : SettingsDisabledColor;
                 handle.ValueIndicatorImage.color = indicatorColor;
                 if (handle.ValueIndicatorImage.canvasRenderer != null)
@@ -1511,9 +1518,7 @@ namespace Cms21UiPlus
                 handle.ValueIndicatorImage.raycastTarget = false;
             }
             if (handle.State != null) {
-                handle.State.text = value
-                    ? ModLocalization.Get("LOC_Yes")
-                    : ModLocalization.Get("LOC_No");
+                handle.State.text = valueText ?? string.Empty;
                 handle.State.color = Color.white;
                 if (handle.State.canvasRenderer != null)
                     handle.State.canvasRenderer.SetColor(Color.white);
@@ -1540,15 +1545,16 @@ namespace Cms21UiPlus
         }
 
         public static void SetSettingsRowEditing(SettingsRowHandle handle,
-            bool editing, bool value, bool leftHovered, bool rightHovered)
+            bool editing, bool showLeftArrow, bool showRightArrow,
+            bool leftHovered, bool rightHovered)
         {
             if (handle == null)
                 return;
 
             if (handle.LeftArrow != null)
-                handle.LeftArrow.SetActive(editing && value);
+                handle.LeftArrow.SetActive(editing && showLeftArrow);
             if (handle.RightArrow != null)
-                handle.RightArrow.SetActive(editing && !value);
+                handle.RightArrow.SetActive(editing && showRightArrow);
 
             SetSettingsArrowColor(handle.LeftArrowGraphics,
                 leftHovered ? GetSettingsAccentColor() : Color.white);
@@ -1558,12 +1564,12 @@ namespace Cms21UiPlus
             if (handle.State == null)
                 return;
             RectTransform stateRect = handle.State.rectTransform;
-            if (editing) {
+            if (editing && (showLeftArrow || showRightArrow)) {
                 stateRect.anchorMin = new Vector2(1f, 0.5f);
                 stateRect.anchorMax = new Vector2(1f, 0.5f);
                 stateRect.pivot = new Vector2(0.5f, 0.5f);
                 stateRect.anchoredPosition = new Vector2(-63f, 0f);
-                stateRect.sizeDelta = new Vector2(62f,
+                stateRect.sizeDelta = new Vector2(96f,
                     Mathf.Max(0f, handle.StateSizeDelta.y));
                 handle.State.alignment = TextAnchor.MiddleCenter;
             } else {
@@ -1576,20 +1582,20 @@ namespace Cms21UiPlus
             }
         }
 
-        public static void SetSettingsRowRestartRequired(
-            SettingsRowHandle handle, bool required)
+        public static void SetSettingsRowWarning(
+            SettingsRowHandle handle, string text, bool yellow = false)
         {
             if (handle == null || handle.ApplyWarning == null)
                 return;
 
             Text warning = handle.ApplyWarning;
-            warning.text = ModLocalization.Get("LOC_RestartRequired");
-            Color color = SettingsSelected.Color;
+            warning.text = text ?? string.Empty;
+            Color color = yellow ? Color.yellow : SettingsSelected.Color;
             color.a = 1f;
             warning.color = color;
             if (warning.canvasRenderer != null)
                 warning.canvasRenderer.SetColor(color);
-            warning.gameObject.SetActive(required);
+            warning.gameObject.SetActive(!string.IsNullOrEmpty(warning.text));
         }
 
         private static Text CreateSettingsApplyWarning(Transform parent,

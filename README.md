@@ -158,9 +158,9 @@ For an assembly named `ExampleMod.dll`, provide a manifest named
 ```
 
 The manifest `modId` must match the assembly name without `.dll`, ignoring case. A
-relative `config.path` is resolved from the manifest directory. The manifest supports
-boolean values stored in one TOML section and can provide localization for their names
-and descriptions.
+relative `config.path` is resolved from the manifest directory. Declared settings can
+use boolean, number, string or enum values stored in one TOML section and can provide
+localization for their names, descriptions and enum state labels.
 
 Minimal example:
 
@@ -223,16 +223,57 @@ Manifest fields:
 - `config.section`: TOML section containing the declared keys;
 - `groups`: category definitions; `id` values must be unique and begin with a Latin
   letter;
-- `settings`: boolean setting definitions; `id` and `key` values must be unique;
+- `settings`: setting definitions; `id` and `key` values must be unique;
   TOML keys use letters, digits and underscores and cannot begin with a digit;
 - feature identifiers use the `FID_` prefix; localization identifiers use `LOC_`;
 - `name`: group title;
-- `nameKey` and `descriptionKey`: required localization keys for boolean settings;
+- `nameKey` and `descriptionKey`: required localization keys for settings;
 - `localization`: optional fixed-name block containing `en` and `ru` translations
   for the declared setting names and descriptions;
 - `order`: category or setting order; equal values keep manifest order;
 - `default`: value used when the key is absent and by category reset;
+- `type`: `boolean`, `number`, `string` or `enum`;
+- `step`: optional positive increment for `number`; defaults to `1`;
+- `enums`: reusable enum definitions. Each definition contains parallel `ids`, `en` and/or `ru` arrays; at least one localization array is required;
+- `enum`: reusable enum definition id used by a setting whose `type` is `enum`;
+- `enumValues`: optional inline enum definition with the same `ids`, `en` and `ru` arrays; use either `enum` or `enumValues`, not both;
+- `dependency` and `dependencyWarningKey`: optional pair for a runtime dependency exposed by the target mod. When an enabled boolean setting is unavailable, its warning is shown directly in the setting row;
+- `dependencyPartialWarningKey`: optional warning shown when the dependency is only partially available;
+- `dependencyDefaultWarningKey`: optional warning used when the dependency is unavailable under the target mod's default/vanilla state;
+- `dependencySwitchKey` and `dependencyWhenFalse`: optional pair that selects an alternate dependency id while another boolean setting is `false`; warnings are refreshed immediately when that setting changes in the draft;
 - `applyMode`: `immediate`, `reopenWindow`, `reloadLocation` or `restartGame`.
+
+Enum ids are the string values written to TOML and understood by the target mod.
+Localization is positional: every present language array must have the same length as
+`ids`. Either `en` or `ru` may be omitted; the available language is then used as the
+fallback. Example:
+
+```json
+{
+  "enums": [
+    {
+      "id": "ProcessingDuration",
+      "ids": ["Off", "Fast", "Default"],
+      "en": ["Off", "Fast", "Default"],
+      "ru": ["Откл", "Быстро", "Дефолтно"]
+    }
+  ],
+  "settings": [
+    {
+      "id": "FID_ProcessingDuration",
+      "key": "processingDuration",
+      "group": "general",
+      "type": "enum",
+      "enum": "ProcessingDuration",
+      "default": "Fast",
+      "applyMode": "restartGame",
+      "order": 20,
+      "nameKey": "LOC_ProcessingDurationName",
+      "descriptionKey": "LOC_ProcessingDurationDescription"
+    }
+  ]
+}
+```
 
 Both language objects must contain the same C#-style identifiers:
 
@@ -243,8 +284,14 @@ Both language objects must contain the same C#-style identifiers:
 }
 ```
 
-English is used for every game language except Russian. The localization block is used
-only for boolean setting `nameKey` and `descriptionKey` values.
+English is used for every game language except Russian.
+
+Target mods can publish dependency state through the optional public bridge
+`Cms21UiPlus.ModSettingDependencyRegistry.SetStatus(providerId, dependencyId, status)`, where
+`status` is `available`, `partial`, `unavailable` or `unavailableByDefault`. The existing
+`SetAvailable(providerId, dependencyId, available)` bridge remains supported for simple
+two-state dependencies. An unpublished dependency is treated as available, so manifests remain
+usable without a hard runtime dependency on another mod.
 
 `applyMode` is descriptive: CMS21 UI+ writes the configuration but does not notify,
 reload or invoke the other mod. Authors should use `restartGame` unless their own mod

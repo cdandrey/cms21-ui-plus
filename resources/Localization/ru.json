@@ -92,5 +92,15 @@
   "LOC_SettingAddMountPartSelectionFiltersDescription": "Добавить фильтры состояния, качества и поиск в окно выбора деталей при монтаже.",
   "LOC_ModDisplayName": "CMS21 UI+",
   "LOC_SettingAutoConfirmDynoStartName": "Пропуск подтверждения запуска диностенда",
-  "LOC_SettingAutoConfirmDynoStartDescription": "Автоматически принимать только лишнее подтверждение запуска диностенда и отключать звук этого подтверждения."
+  "LOC_SettingAutoConfirmDynoStartDescription": "Автоматически принимать только лишнее подтверждение запуска диностенда и отключать звук этого подтверждения.",
+  "LOC_SettingAddParkingSortingName": "Сортировка парковки",
+  "LOC_SettingAddParkingSortingDescription": "Добавить глобальную перестановку автомобилей по прибытию, состоянию или названию во всех разблокированных аллеях.",
+  "LOC_ParkingSortAction": "ПЕРЕСТАВИТЬ АВТОМОБИЛИ",
+  "LOC_ParkingSortWindowTitle": "ПЕРЕСТАВИТЬ АВТОМОБИЛИ ПО:",
+  "LOC_ParkingSortArrivalDescending": "ПРИБЫТИЮ ↓",
+  "LOC_ParkingSortArrivalAscending": "ПРИБЫТИЮ ↑",
+  "LOC_ParkingSortConditionDescending": "СОСТОЯНИЮ ↓",
+  "LOC_ParkingSortConditionAscending": "СОСТОЯНИЮ ↑",
+  "LOC_ParkingSortNameDescending": "НАЗВАНИЮ ↓",
+  "LOC_ParkingSortNameAscending": "НАЗВАНИЮ ↑"
 }

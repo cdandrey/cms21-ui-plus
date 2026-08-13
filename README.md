@@ -127,6 +127,7 @@ left mouse clicks, and the warehouse footer shows the active bulk-transfer short
 |---|---|---:|---|
 | **Livery file names** | `showLiveryFileNames` | `true` | Replaces bare numeric livery entries with normalized livery filenames in the supported livery selection interface, making similarly numbered variants identifiable without changing the selected texture. |
 | **Vehicle information on map** | `showCarConditionOnMap` | `true` | Adds total vehicle condition and rear licence-plate information to supported map vehicle cards and parking panels. Condition is calculated from body panels, mechanical parts, body and interior data while ignoring non-car/dummy elements handled by the game. |
+| **Parking sorting** | `addParkingSorting` | `true` | Adds the native rearrangement command and sorting window to the garage parking browser. The selected mode physically compacts and rearranges all cars across every unlocked parking alley, so the new slot order persists in the game save. Arrival order is preserved per profile even while a known car is temporarily outside parking. Name sorting groups identical names by condition from best to worst; condition sorting uses the current vehicle data. |
 | **Confirm dyno start automatically** | `autoConfirmDynoStart` | `true` | Automatically accepts only the localized redundant dyno-start confirmation, with its confirmation sound disabled. Other confirmation windows are not affected. The dyno window blur is controlled separately by CMS21 Immersion+. |
 | **Exit game in garage menu** | `addExitGameToGaragePauseMenu` | `true` | Enables the reserved Exit Game action in the normal garage pause menu and routes it through the game's own exit confirmation instead of adding a separate custom shutdown path. |
 
@@ -268,8 +269,10 @@ At runtime they are installed under:
 <Game>\Mods\CMS21UIPlus\
 ```
 
-`ProfileMemory.dat` is generated in that directory and stores only profile-specific
-inventory/warehouse sorting. `CMS21UIPlus.cfg.bak` can exist temporarily during an in-game
+`ProfileMemory.dat` is generated in that directory and stores profile-specific
+inventory/warehouse sorting plus the persistent parking-arrival history used by global rearrangement.
+Parking rearrangement changes the game's physical parking slots, so the resulting order is saved
+by the game. `CMS21UIPlus.cfg.bak` can exist temporarily during an in-game
 settings save and contains the previous configuration. It is deleted when the Mods menu closes,
 but can remain after an abnormal termination. Do not commit or package either generated file.
 

@@ -14,8 +14,10 @@ using Il2CppCMS.MainMenu;
 using Il2CppCMS.MainMenu.Controls;
 using Il2CppCMS.MainMenu.Logic;
 using Il2CppCMS.MainMenu.Windows;
+using GenericButtonOutline = Il2CppCMS.UI.Controls.GenericButtonOutline;
 using Il2CppCMS.UI.Description;
 using Il2CppCMS.UI.Logic;
+using Il2CppCMS.UI.Windows;
 #else
 using UnhollowerBaseLib;
 using UnhollowerRuntimeLib;
@@ -23,8 +25,10 @@ using CMS.MainMenu;
 using CMS.MainMenu.Controls;
 using CMS.MainMenu.Logic;
 using CMS.MainMenu.Windows;
+using GenericButtonOutline = CMS.UI.Controls.GenericButtonOutline;
 using CMS.UI.Description;
 using CMS.UI.Logic;
+using CMS.UI.Windows;
 #endif
 
 namespace Cms21UiPlus
@@ -180,6 +184,14 @@ namespace Cms21UiPlus
             public Image StateSink;
             public Text Text;
             public Color NormalTextRendererColor;
+        }
+
+        internal sealed class SortingWindowHandle
+        {
+            public GameObject Root;
+            public readonly List<GenericButtonOutline> Buttons =
+                new List<GenericButtonOutline>();
+            public Il2CppSystem.Action<int> MouseHoverAction;
         }
 
         internal sealed class ModsWindowHandle
@@ -856,6 +868,128 @@ namespace Cms21UiPlus
             WindowBackground.Apply(background);
             background.raycastTarget = true;
             return root;
+        }
+
+        public static SortingWindowHandle CreateSortingWindow(
+            SortingWindow source, string name, string title,
+            string[] captions, Action<int> onSelected)
+        {
+            if (source == null || source.gameObject == null ||
+                source.transform == null || source.transform.parent == null)
+                return null;
+
+            Transform sourceBackground = source.transform.Find("BG");
+            Transform sourceWindow = source.transform.Find("Window");
+            if (sourceBackground == null || sourceWindow == null)
+                return null;
+
+            GameObject root = CreateUiObject(name, source.transform.parent);
+            root.SetActive(false);
+            CopyRect(source.GetComponent<RectTransform>(),
+                root.GetComponent<RectTransform>());
+
+            GameObject background = GameObject.Instantiate(
+                sourceBackground.gameObject, root.transform);
+            background.name = "BG";
+            GameObject window = GameObject.Instantiate(
+                sourceWindow.gameObject, root.transform);
+            window.name = "Window";
+
+            Transform titleTransform = window.transform.Find("Top/Text");
+            Text titleText = titleTransform != null
+                ? titleTransform.GetComponent<Text>()
+                : null;
+            Transform bottom = window.transform.Find("Bottom");
+            if (titleText == null || bottom == null || captions == null ||
+                captions.Length < 6) {
+                UnityEngine.Object.Destroy(root);
+                return null;
+            }
+
+            SortingWindowHandle handle = new SortingWindowHandle {
+                Root = root,
+            };
+            for (int index = 0; index < 6; index++) {
+                string buttonName = index == 0
+                    ? "GenericButtonOutline"
+                    : "GenericButtonOutline (" + index + ")";
+                Transform buttonTransform = bottom.Find(buttonName);
+                GenericButtonOutline button = buttonTransform != null
+                    ? buttonTransform.GetComponent<GenericButtonOutline>()
+                    : null;
+                if (button == null) {
+                    DestroySortingWindow(handle);
+                    return null;
+                }
+
+                buttonTransform.gameObject.SetActive(true);
+                handle.Buttons.Add(button);
+            }
+
+            handle.MouseHoverAction =
+                DelegateSupport.ConvertDelegate<Il2CppSystem.Action<int>>(
+                    new Action<int>(hoveredIndex =>
+                        SelectSortingButton(handle, hoveredIndex)));
+
+            root.transform.SetAsLastSibling();
+            root.SetActive(true);
+            titleText.text = title ?? string.Empty;
+            for (int index = 0; index < handle.Buttons.Count; index++) {
+                GenericButtonOutline button = handle.Buttons[index];
+                int selectedIndex = index;
+                UnityEventUtility.RemoveAllListeners(button);
+                UnityAction action = onSelected != null
+                    ? DelegateSupport.ConvertDelegate<UnityAction>(
+                        new Action(() => onSelected(selectedIndex)))
+                    : null;
+                button.Y = index;
+                button.PlaySounds = true;
+                button.Setup(action, captions[index] ?? string.Empty, false, false);
+                button.OnMouseHover = handle.MouseHoverAction;
+                button.SetDisabled(false, true);
+                button.Deselect();
+            }
+            SelectSortingButton(handle, 0);
+            return handle;
+        }
+
+        private static void SelectSortingButton(SortingWindowHandle handle,
+            int selectedIndex)
+        {
+            if (handle == null || selectedIndex < 0 ||
+                selectedIndex >= handle.Buttons.Count)
+                return;
+
+            for (int index = 0; index < handle.Buttons.Count; index++) {
+                GenericButtonOutline button = handle.Buttons[index];
+                if (button == null)
+                    continue;
+                if (index == selectedIndex)
+                    button.Select();
+                else
+                    button.Deselect();
+            }
+        }
+
+        public static void DestroySortingWindow(SortingWindowHandle handle)
+        {
+            if (handle == null)
+                return;
+
+            for (int index = 0; index < handle.Buttons.Count; index++) {
+                GenericButtonOutline button = handle.Buttons[index];
+                if (button == null)
+                    continue;
+                button.OnMouseHover = null;
+                UnityEventUtility.RemoveAllListeners(button);
+            }
+            handle.MouseHoverAction = null;
+            handle.Buttons.Clear();
+            if (handle.Root != null) {
+                handle.Root.SetActive(false);
+                UnityEngine.Object.Destroy(handle.Root);
+            }
+            handle.Root = null;
         }
 
         public static ModsWindowHandle CreateModsWindow(Transform parent,

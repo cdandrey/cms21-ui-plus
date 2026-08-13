@@ -66,6 +66,7 @@
     <Compile Include="src\Features\Startup\StartupPromptAutoContinueFeature.cs" />
     <Compile Include="src\Features\UI\LiveryNamesFeature.cs" />
     <Compile Include="src\Features\UI\MapCarInformationFeature.cs" />
+    <Compile Include="src\Features\UI\ParkingSortingFeature.cs" />
     <Compile Include="src\UI\Native\NativeUiFactory.cs" />
     <Compile Include="src\UI\Native\WindowFooterHintController.cs" />
     <Compile Include="src\Infrastructure\ModLocalization.cs" />

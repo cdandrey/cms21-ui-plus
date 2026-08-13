@@ -249,6 +249,17 @@
       "descriptionKey": "LOC_SettingShowCarConditionOnMapDescription"
     },
     {
+      "id": "FID_AddParkingSorting",
+      "key": "addParkingSorting",
+      "group": "interface",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 35,
+      "nameKey": "LOC_SettingAddParkingSortingName",
+      "descriptionKey": "LOC_SettingAddParkingSortingDescription"
+    },
+    {
       "id": "FID_AutoConfirmDynoStart",
       "key": "autoConfirmDynoStart",
       "group": "interface",

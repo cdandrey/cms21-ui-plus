@@ -216,7 +216,7 @@ namespace Cms21UiPlus
                 .Replace(">", "&gt;");
         }
 
-        private static float CalculateTotalCondition(NewCarData carData)
+        internal static float CalculateTotalCondition(NewCarData carData)
         {
             float total =
                 Helper.RoundCondition(CalculatePanelsCondition(carData)) +

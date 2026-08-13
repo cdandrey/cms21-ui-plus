@@ -37,6 +37,8 @@ namespace Cms21UiPlus
         public bool showLiveryFileNames = true;
         [Tomlet.Attributes.TomlInlineComment("Show vehicle condition and licence plate on map and parking screens")]
         public bool showCarConditionOnMap = true;
+        [Tomlet.Attributes.TomlInlineComment("Physically rearrange cars across all unlocked parking alleys")]
+        public bool addParkingSorting = true;
         [Tomlet.Attributes.TomlInlineComment("Automatically accept the redundant dyno-start confirmation")]
         public bool autoConfirmDynoStart = true;
         [Tomlet.Attributes.TomlInlineComment("Show repairability indicators in all supported inventories")]
@@ -180,6 +182,7 @@ namespace Cms21UiPlus
             public SortType inventorySortType = SortType.ByConditionAsc;
             public SortType warehouseInventorySortType = SortType.ByConditionAsc;
             public SortType warehouseSortType = SortType.ByConditionAsc;
+            public string[] parkingArrivalOrder;
         }
     }
 }

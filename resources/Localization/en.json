@@ -92,5 +92,15 @@
   "LOC_SettingAddMountPartSelectionFiltersDescription": "Add condition, quality and search filters to the part-selection window used while mounting parts.",
   "LOC_ModDisplayName": "CMS21 UI+",
   "LOC_SettingAutoConfirmDynoStartName": "Skip dyno start confirmation",
-  "LOC_SettingAutoConfirmDynoStartDescription": "Automatically accept only the redundant dyno-start confirmation and suppress its confirmation sound."
+  "LOC_SettingAutoConfirmDynoStartDescription": "Automatically accept only the redundant dyno-start confirmation and suppress its confirmation sound.",
+  "LOC_SettingAddParkingSortingName": "Parking sorting",
+  "LOC_SettingAddParkingSortingDescription": "Add global parking rearrangement by arrival, condition, or name across all unlocked alleys.",
+  "LOC_ParkingSortAction": "REARRANGE CARS",
+  "LOC_ParkingSortWindowTitle": "REARRANGE CARS BY:",
+  "LOC_ParkingSortArrivalDescending": "ARRIVAL ↓",
+  "LOC_ParkingSortArrivalAscending": "ARRIVAL ↑",
+  "LOC_ParkingSortConditionDescending": "CONDITION ↓",
+  "LOC_ParkingSortConditionAscending": "CONDITION ↑",
+  "LOC_ParkingSortNameDescending": "NAME ↓",
+  "LOC_ParkingSortNameAscending": "NAME ↑"
 }

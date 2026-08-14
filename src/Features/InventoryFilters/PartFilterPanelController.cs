@@ -40,6 +40,9 @@ namespace Cms21UiPlus
         private Action conditionClick;
         private Action repairabilityClick;
         private Action qualityClick;
+        private Action conditionReverseClick;
+        private Action repairabilityReverseClick;
+        private Action qualityReverseClick;
         private Action<string> searchChanged;
 
         public PartFilterPanelController(string buttonPrefix)
@@ -74,6 +77,19 @@ namespace Cms21UiPlus
             bool includeCondition, bool includeRepairability,
             bool includeQuality)
         {
+            return AttachWithButtons(windowRoot, onConditionClick,
+                onRepairabilityClick, onQualityClick, onSearchChanged,
+                includeCondition, includeRepairability, includeQuality,
+                null, null, null);
+        }
+
+        internal bool AttachWithButtons(Transform windowRoot,
+            Action onConditionClick, Action onRepairabilityClick,
+            Action onQualityClick, Action<string> onSearchChanged,
+            bool includeCondition, bool includeRepairability,
+            bool includeQuality, Action onConditionReverseClick,
+            Action onRepairabilityReverseClick, Action onQualityReverseClick)
+        {
             if (windowRoot == null)
                 return false;
 
@@ -99,6 +115,11 @@ namespace Cms21UiPlus
             repairabilityClick = includeRepairability ?
                 onRepairabilityClick : null;
             qualityClick = includeQuality ? onQualityClick : null;
+            conditionReverseClick = includeCondition ?
+                onConditionReverseClick : null;
+            repairabilityReverseClick = includeRepairability ?
+                onRepairabilityReverseClick : null;
+            qualityReverseClick = includeQuality ? onQualityReverseClick : null;
             searchChanged = onSearchChanged;
             lastSearchText = string.Empty;
 
@@ -157,6 +178,9 @@ namespace Cms21UiPlus
             conditionClick = null;
             repairabilityClick = null;
             qualityClick = null;
+            conditionReverseClick = null;
+            repairabilityReverseClick = null;
+            qualityReverseClick = null;
             searchChanged = null;
             lastSearchText = string.Empty;
         }
@@ -469,6 +493,13 @@ namespace Cms21UiPlus
                     ? repairabilityClick : qualityClick;
             if (click != null)
                 button.onClick.AddListener(click);
+
+            Action reverseClick = kind == FilterButtonKind.Condition
+                ? conditionReverseClick
+                : kind == FilterButtonKind.Repairability
+                    ? repairabilityReverseClick : qualityReverseClick;
+            InventoryFilterManager.RegisterReverseQuickFilterClick(
+                button, reverseClick);
         }
 
         private void ApplyVerticalOffset()
@@ -589,6 +620,8 @@ namespace Cms21UiPlus
         {
             if (buttonTransform == null)
                 return;
+            InventoryFilterManager.UnregisterReverseQuickFilterClick(
+                buttonTransform.GetComponent<Button>());
             buttonTransform.gameObject.SetActive(false);
             UnityEngine.Object.Destroy(buttonTransform.gameObject);
         }

@@ -32,6 +32,8 @@ namespace Cms21UiPlus
             internal MountPartSelectionFilterFeature.DownWindowShowState Mount;
             internal SpringClampInventoryFilterFeature.DownWindowShowState Spring;
             internal TireChangerInventoryFilterFeature.DownWindowShowState TireChanger;
+            internal BrakeLatheInventoryFilterFeature.DownWindowShowState BrakeLathe;
+            internal WheelBalancerInventoryFilterFeature.DownWindowShowState WheelBalancer;
         }
         [HarmonyPatch(typeof(ChoosePartUpWindow), nameof(ChoosePartUpWindow.Show),
             new Type[] { typeof(string), typeof(ChoosePartUpWindowType) })]
@@ -44,6 +46,10 @@ namespace Cms21UiPlus
             SpringClampInventoryFilterFeature.OnUpWindowShowPrefix(
                 __instance, __1);
             TireChangerInventoryFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1);
+            BrakeLatheInventoryFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1);
+            WheelBalancerInventoryFilterFeature.OnUpWindowShowPrefix(
                 __instance, __1);
         }
 
@@ -62,6 +68,10 @@ namespace Cms21UiPlus
                 __instance, __1);
             TireChangerInventoryFilterFeature.OnUpWindowShowPrefix(
                 __instance, __1);
+            BrakeLatheInventoryFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1);
+            WheelBalancerInventoryFilterFeature.OnUpWindowShowPrefix(
+                __instance, __1);
         }
 
         [HarmonyPatch(typeof(ChoosePartUpWindow), nameof(ChoosePartUpWindow.Show),
@@ -76,6 +86,10 @@ namespace Cms21UiPlus
             SpringClampInventoryFilterFeature.OnUpWindowShowPostfix(
                 __instance, __1, __result);
             TireChangerInventoryFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result);
+            BrakeLatheInventoryFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result);
+            WheelBalancerInventoryFilterFeature.OnUpWindowShowPostfix(
                 __instance, __1, __result);
         }
 
@@ -95,6 +109,10 @@ namespace Cms21UiPlus
                 __instance, __1, __result);
             TireChangerInventoryFilterFeature.OnUpWindowShowPostfix(
                 __instance, __1, __result);
+            BrakeLatheInventoryFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result);
+            WheelBalancerInventoryFilterFeature.OnUpWindowShowPostfix(
+                __instance, __1, __result);
         }
 
         [HarmonyPatch(typeof(ChoosePartUpWindow), nameof(ChoosePartUpWindow.Hide),
@@ -106,6 +124,8 @@ namespace Cms21UiPlus
             MountPartSelectionFilterFeature.OnUpWindowHidden(__instance);
             SpringClampInventoryFilterFeature.OnUpWindowHidden(__instance);
             TireChangerInventoryFilterFeature.OnUpWindowHidden(__instance);
+            BrakeLatheInventoryFilterFeature.OnUpWindowHidden(__instance);
+            WheelBalancerInventoryFilterFeature.OnUpWindowHidden(__instance);
         }
 
         [HarmonyPatch(typeof(ChoosePartUpWindow),
@@ -119,6 +139,10 @@ namespace Cms21UiPlus
                 !SpringClampInventoryFilterFeature
                     .ShouldSuppressNativeSelection(__instance, __0) &&
                 !TireChangerInventoryFilterFeature
+                    .ShouldSuppressNativeSelection(__instance, __0) &&
+                !BrakeLatheInventoryFilterFeature
+                    .ShouldSuppressNativeSelection(__instance, __0) &&
+                !WheelBalancerInventoryFilterFeature
                     .ShouldSuppressNativeSelection(__instance, __0);
         }
 
@@ -132,8 +156,13 @@ namespace Cms21UiPlus
                 !SpringClampInventoryFilterFeature
                     .ShouldSuppressSubmit(__instance) &&
                 !TireChangerInventoryFilterFeature
+                    .ShouldSuppressSubmit(__instance) &&
+                !BrakeLatheInventoryFilterFeature
+                    .ShouldSuppressSubmit(__instance) &&
+                !WheelBalancerInventoryFilterFeature
                     .ShouldSuppressSubmit(__instance);
         }
+
 
         [HarmonyPatch(typeof(ChoosePartDownWindow),
             nameof(ChoosePartDownWindow.Show), new Type[] {
@@ -152,6 +181,10 @@ namespace Cms21UiPlus
             __state.Spring = SpringClampInventoryFilterFeature
                 .PrepareNativeListForShow(__instance, ref __0, ref __1);
             __state.TireChanger = TireChangerInventoryFilterFeature
+                .PrepareNativeListForShow(__instance, ref __0, ref __1);
+            __state.BrakeLathe = BrakeLatheInventoryFilterFeature
+                .PrepareNativeListForShow(__instance, ref __0, ref __1);
+            __state.WheelBalancer = WheelBalancerInventoryFilterFeature
                 .PrepareNativeListForShow(__instance, ref __0, ref __1);
         }
 
@@ -174,6 +207,10 @@ namespace Cms21UiPlus
                 __state.Spring);
             TireChangerInventoryFilterFeature.OnWindowShown(__instance,
                 __state.TireChanger);
+            BrakeLatheInventoryFilterFeature.OnWindowShown(__instance,
+                __state.BrakeLathe);
+            WheelBalancerInventoryFilterFeature.OnWindowShown(__instance,
+                __state.WheelBalancer);
         }
 
         [HarmonyPatch(typeof(RepairPartWindow),
@@ -210,6 +247,10 @@ namespace Cms21UiPlus
                 __instance, ref __0);
             TireChangerInventoryFilterFeature.FilterNativeListBeforeRefresh(
                 __instance, ref __0);
+            BrakeLatheInventoryFilterFeature.FilterNativeListBeforeRefresh(
+                __instance, ref __0);
+            WheelBalancerInventoryFilterFeature.FilterNativeListBeforeRefresh(
+                __instance, ref __0);
         }
 
         [HarmonyPatch(typeof(ChoosePartPageManager),
@@ -228,6 +269,10 @@ namespace Cms21UiPlus
                 __instance, __0);
             TireChangerInventoryFilterFeature.OnNativeListRefreshed(
                 __instance, __0);
+            BrakeLatheInventoryFilterFeature.OnNativeListRefreshed(
+                __instance, __0);
+            WheelBalancerInventoryFilterFeature.OnNativeListRefreshed(
+                __instance, __0);
         }
 
         [HarmonyPatch(typeof(InputField), nameof(InputField.KeyPressed))]
@@ -240,7 +285,10 @@ namespace Cms21UiPlus
             MountPartSelectionFilterFeature.OnInputFieldKeyPressed(__instance);
             SpringClampInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
             TireChangerInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
+            BrakeLatheInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
+            WheelBalancerInventoryFilterFeature.OnInputFieldKeyPressed(__instance);
         }
+
 
         [HarmonyPatch(typeof(ScrapUpgrade), "GetItemsForUpgrade")]
         [HarmonyPostfix]

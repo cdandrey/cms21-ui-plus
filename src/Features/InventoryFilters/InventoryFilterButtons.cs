@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -34,6 +35,9 @@ namespace Cms21UiPlus
         private const float FallbackRepairX = -300f;
         private const float FallbackQualityX = -272f;
         private const float FallbackOwnedX = -244f;
+
+        private static readonly Dictionary<int, Action> ReverseQuickFilterClicks =
+            new Dictionary<int, Action>();
 
         private static readonly Color32 ActiveButtonColor =
             new Color32(255, 255, 255, 255);
@@ -295,6 +299,8 @@ namespace Cms21UiPlus
                     ownedButton = CreateButton(inventory, buttonRoot,
                         OwnedButtonName, QuickFilterButtonKind.Owned);
             } else if (ownedButton != null) {
+                UnregisterReverseQuickFilterClick(
+                    ownedButton.GetComponent<Button>());
                 ownedButton.gameObject.SetActive(false);
                 UnityEngine.Object.Destroy(ownedButton.gameObject);
                 ownedButton = null;
@@ -394,27 +400,41 @@ namespace Cms21UiPlus
             button.navigation = navigation;
             UnityEventUtility.RemoveAllListeners(button);
 
+            Action reverseClickAction;
             if (kind == QuickFilterButtonKind.Condition) {
                 Action clickAction = delegate () {
                     CycleConditionFilter(ResolveActiveInventory(inventory));
                 };
                 button.onClick.AddListener(clickAction);
+                reverseClickAction = delegate () {
+                    CycleConditionFilterReverse(ResolveActiveInventory(inventory));
+                };
             } else if (kind == QuickFilterButtonKind.Repairability) {
                 Action clickAction = delegate () {
                     CycleRepairabilityFilter(ResolveActiveInventory(inventory));
                 };
                 button.onClick.AddListener(clickAction);
+                reverseClickAction = delegate () {
+                    CycleRepairabilityFilterReverse(ResolveActiveInventory(inventory));
+                };
             } else if (kind == QuickFilterButtonKind.Quality) {
                 Action clickAction = delegate () {
                     CycleQualityFilter(ResolveActiveInventory(inventory));
                 };
                 button.onClick.AddListener(clickAction);
+                reverseClickAction = delegate () {
+                    CycleQualityFilterReverse(ResolveActiveInventory(inventory));
+                };
             } else {
                 Action clickAction = delegate () {
                     CycleOwnedFilter(ResolveActiveInventory(inventory));
                 };
                 button.onClick.AddListener(clickAction);
+                reverseClickAction = delegate () {
+                    CycleOwnedFilterReverse(ResolveActiveInventory(inventory));
+                };
             }
+            RegisterReverseQuickFilterClick(button, reverseClickAction);
         }
 
         private static void ApplyButtonLayout(BaseInventory inventory,
@@ -655,6 +675,60 @@ namespace Cms21UiPlus
             RedrawInventory(inventory);
         }
 
+        private static void CycleConditionFilterReverse(BaseInventory inventory)
+        {
+            if (inventory == null)
+                return;
+
+            if (IsBarnOrJunkyardScene()) {
+                switch (junkyardConditionFilterMode) {
+                    case JunkyardConditionFilterMode.Off:
+                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Green;
+                        break;
+                    case JunkyardConditionFilterMode.Green:
+                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Yellow;
+                        break;
+                    case JunkyardConditionFilterMode.Yellow:
+                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Orange;
+                        break;
+                    case JunkyardConditionFilterMode.Orange:
+                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Red;
+                        break;
+                    case JunkyardConditionFilterMode.Red:
+                        junkyardConditionFilterMode =
+                            JunkyardConditionFilterMode.RepairThresholdToPerfect;
+                        break;
+                    default:
+                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Off;
+                        break;
+                }
+            } else {
+                switch (garageConditionFilterMode) {
+                    case GarageConditionFilterMode.Off:
+                        garageConditionFilterMode = GarageConditionFilterMode.Perfect;
+                        break;
+                    case GarageConditionFilterMode.Perfect:
+                        garageConditionFilterMode = GarageConditionFilterMode.GreenRing;
+                        break;
+                    case GarageConditionFilterMode.GreenRing:
+                        garageConditionFilterMode = GarageConditionFilterMode.Yellow;
+                        break;
+                    case GarageConditionFilterMode.Yellow:
+                        garageConditionFilterMode = GarageConditionFilterMode.Orange;
+                        break;
+                    case GarageConditionFilterMode.Orange:
+                        garageConditionFilterMode = GarageConditionFilterMode.Red;
+                        break;
+                    default:
+                        garageConditionFilterMode = GarageConditionFilterMode.Off;
+                        break;
+                }
+            }
+
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
         private static void CycleRepairabilityFilter(BaseInventory inventory)
         {
             if (inventory == null)
@@ -680,6 +754,35 @@ namespace Cms21UiPlus
                     return RepairabilityQuickFilterMode.RepairGroupOnly;
                 case RepairabilityQuickFilterMode.RepairGroupOnly:
                     return RepairabilityQuickFilterMode.NonRepairableOnly;
+                default:
+                    return RepairabilityQuickFilterMode.Off;
+            }
+        }
+
+        private static void CycleRepairabilityFilterReverse(BaseInventory inventory)
+        {
+            if (inventory == null)
+                return;
+
+            if (IsBarnOrJunkyardScene())
+                junkyardRepairabilityFilterMode =
+                    GetPreviousRepairabilityMode(junkyardRepairabilityFilterMode);
+            else
+                garageRepairabilityFilterMode =
+                    GetPreviousRepairabilityMode(garageRepairabilityFilterMode);
+
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        internal static RepairabilityQuickFilterMode GetPreviousRepairabilityMode(
+            RepairabilityQuickFilterMode current)
+        {
+            switch (current) {
+                case RepairabilityQuickFilterMode.Off:
+                    return RepairabilityQuickFilterMode.NonRepairableOnly;
+                case RepairabilityQuickFilterMode.NonRepairableOnly:
+                    return RepairabilityQuickFilterMode.RepairGroupOnly;
                 default:
                     return RepairabilityQuickFilterMode.Off;
             }
@@ -718,6 +821,39 @@ namespace Cms21UiPlus
             }
         }
 
+        private static void CycleQualityFilterReverse(BaseInventory inventory)
+        {
+            if (inventory == null)
+                return;
+
+            if (IsBarnOrJunkyardScene())
+                junkyardQualityFilterMode = GetPreviousQualityMode(junkyardQualityFilterMode);
+            else
+                garageQualityFilterMode = GetPreviousQualityMode(garageQualityFilterMode);
+
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        internal static QualityQuickFilterMode GetPreviousQualityMode(
+            QualityQuickFilterMode current)
+        {
+            switch (current) {
+                case QualityQuickFilterMode.Off:
+                    return QualityQuickFilterMode.NonImproved;
+                case QualityQuickFilterMode.NonImproved:
+                    return QualityQuickFilterMode.Quality3;
+                case QualityQuickFilterMode.Quality3:
+                    return QualityQuickFilterMode.Quality2;
+                case QualityQuickFilterMode.Quality2:
+                    return QualityQuickFilterMode.Quality1;
+                case QualityQuickFilterMode.Quality1:
+                    return QualityQuickFilterMode.Improved;
+                default:
+                    return QualityQuickFilterMode.Off;
+            }
+        }
+
         private static void CycleOwnedFilter(BaseInventory inventory)
         {
             if (!SupportsOwnedFilter(inventory))
@@ -737,6 +873,60 @@ namespace Cms21UiPlus
 
             ClearSelectedButton();
             RedrawInventory(inventory);
+        }
+
+        private static void CycleOwnedFilterReverse(BaseInventory inventory)
+        {
+            if (!SupportsOwnedFilter(inventory))
+                return;
+
+            switch (ownedFilterMode) {
+                case OwnedQuickFilterMode.Off:
+                    ownedFilterMode = OwnedQuickFilterMode.Missing;
+                    break;
+                case OwnedQuickFilterMode.Missing:
+                    ownedFilterMode = OwnedQuickFilterMode.Owned;
+                    break;
+                default:
+                    ownedFilterMode = OwnedQuickFilterMode.Off;
+                    break;
+            }
+
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        internal static void RegisterReverseQuickFilterClick(
+            Button button, Action action)
+        {
+            if (button == null)
+                return;
+
+            int id = button.GetInstanceID();
+            if (action == null)
+                ReverseQuickFilterClicks.Remove(id);
+            else
+                ReverseQuickFilterClicks[id] = action;
+        }
+
+        internal static void UnregisterReverseQuickFilterClick(Button button)
+        {
+            if (button != null)
+                ReverseQuickFilterClicks.Remove(button.GetInstanceID());
+        }
+
+        internal static bool TryHandleReverseQuickFilterClick(Button button)
+        {
+            if (button == null)
+                return false;
+
+            Action action;
+            if (!ReverseQuickFilterClicks.TryGetValue(button.GetInstanceID(), out action) ||
+                action == null)
+                return false;
+
+            action();
+            return true;
         }
 
         private static void RedrawInventory(BaseInventory inventory)
@@ -971,6 +1161,8 @@ namespace Cms21UiPlus
                     continue;
                 }
 
+                UnregisterReverseQuickFilterClick(
+                    child.GetComponent<Button>());
                 child.gameObject.SetActive(false);
                 UnityEngine.Object.Destroy(child.gameObject);
             }

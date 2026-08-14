@@ -1,4 +1,6 @@
 using HarmonyLib;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 #if NET6_0_OR_GREATER
 using Il2CppCMS.UI.Windows;
@@ -97,6 +99,19 @@ namespace Cms21UiPlus
         {
             InventoryFilterManager.FinishRedraw(__instance);
             InventoryFilterManager.EnsureButtons(__instance);
+        }
+
+        [HarmonyPatch(typeof(Button), nameof(Button.OnPointerClick))]
+        [HarmonyPrefix]
+        private static bool ButtonOnPointerClickPrefix(
+            Button __instance, PointerEventData __0)
+        {
+            if (__0 == null ||
+                __0.button != PointerEventData.InputButton.Right)
+                return true;
+
+            return !InventoryFilterManager.TryHandleReverseQuickFilterClick(
+                __instance);
         }
 
 

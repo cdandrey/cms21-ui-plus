@@ -210,7 +210,9 @@ namespace Cms21UiPlus
                 activeWindow = window;
                 if (!Panel.AttachWithButtons(window.transform,
                     CycleConditionFilter, null, CycleQualityFilter,
-                    OnSearchChanged, true, false, true)) {
+                    OnSearchChanged, true, false, true,
+                    CycleConditionFilterReverse, null,
+                    CycleQualityFilterReverse)) {
                     DeactivateWindow();
                     yield break;
                 }
@@ -262,9 +264,41 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
+        private static void CycleConditionFilterReverse()
+        {
+            switch (conditionMode) {
+                case GarageConditionFilterMode.Off:
+                    conditionMode = GarageConditionFilterMode.GreenRing;
+                    break;
+                case GarageConditionFilterMode.GreenRing:
+                    conditionMode = GarageConditionFilterMode.Yellow;
+                    break;
+                case GarageConditionFilterMode.Yellow:
+                    conditionMode = GarageConditionFilterMode.Orange;
+                    break;
+                default:
+                    conditionMode = GarageConditionFilterMode.Off;
+                    break;
+            }
+
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode,
+                RepairabilityQuickFilterMode.Off, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
         private static void CycleQualityFilter()
         {
             qualityMode = InventoryFilterManager.GetNextQualityMode(qualityMode);
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode,
+                RepairabilityQuickFilterMode.Off, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
+        private static void CycleQualityFilterReverse()
+        {
+            qualityMode = InventoryFilterManager.GetPreviousQualityMode(qualityMode);
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
                 RepairabilityQuickFilterMode.Off, qualityMode);

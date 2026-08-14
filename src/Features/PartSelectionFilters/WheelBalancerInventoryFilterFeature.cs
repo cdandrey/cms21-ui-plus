@@ -18,22 +18,22 @@ using CMS.UI.Windows;
 
 namespace Cms21UiPlus
 {
-    internal static class MountPartSelectionFilterFeature
+    internal static class WheelBalancerInventoryFilterFeature
     {
         internal struct DownWindowShowState
         {
-            internal bool IsMountWindow;
+            internal bool IsWheelBalancerWindow;
             internal bool NeedsEmptyRefresh;
         }
 
-        private const string WindowId = "MountPartSelection";
-        private const string ResetHintId = "Hint_ResetMountPartFilters";
+        private const string WindowId = "WheelBalancer";
+        private const string ResetHintId = "Hint_ResetWheelBalancerFilters";
         private const float PanelVerticalOffset = 8f;
 
         private static readonly List<ChoosePartDownItem> OriginalItems =
             new List<ChoosePartDownItem>();
         private static readonly PartFilterPanelController Panel =
-            new PartFilterPanelController("QMountPartFilter");
+            new PartFilterPanelController("QWheelBalancerFilter");
         private static readonly FieldInfo CurrentItemField =
             typeof(ChoosePartUpWindow).GetField("currentItem",
                 BindingFlags.Instance | BindingFlags.Public |
@@ -45,6 +45,7 @@ namespace Cms21UiPlus
 
 
         private static ChoosePartUpWindow activeUpWindow;
+        private static ChoosePartUpWindow knownUpWindow;
         private static ChoosePartDownWindow activeDownWindow;
         private static GarageConditionFilterMode conditionMode =
             GarageConditionFilterMode.Off;
@@ -59,9 +60,10 @@ namespace Cms21UiPlus
         private static GameObject filteredEmptyStateRoot;
 
         internal static void OnUpWindowShowPrefix(ChoosePartUpWindow window,
-            ChoosePartUpWindowType type, string overload)
+            ChoosePartUpWindowType type)
         {
-            if (type != ChoosePartUpWindowType.Mount) {
+            knownUpWindow = window;
+            if (type != ChoosePartUpWindowType.WheelBalance) {
                 if (IsActiveUpWindow(window))
                     DeactivateWindow();
                 return;
@@ -78,9 +80,9 @@ namespace Cms21UiPlus
         }
 
         internal static void OnUpWindowShowPostfix(ChoosePartUpWindow window,
-            ChoosePartUpWindowType type, bool result, string overload)
+            ChoosePartUpWindowType type, bool result)
         {
-            if (type != ChoosePartUpWindowType.Mount)
+            if (type != ChoosePartUpWindowType.WheelBalance)
                 return;
 
             if (!result && IsActiveUpWindow(window)) {
@@ -106,11 +108,11 @@ namespace Cms21UiPlus
             ref int selectedIndex)
         {
             DownWindowShowState state = new DownWindowShowState();
-            if (!IsActiveMountDownWindow(window) || applyingFilteredList ||
-                items == null)
+            if (!EnsureActiveWheelBalancerDownWindow(window) ||
+                applyingFilteredList || items == null)
                 return state;
 
-            state.IsMountWindow = true;
+            state.IsWheelBalancerWindow = true;
             activeDownWindow = window;
             CaptureNativeItems(items);
 
@@ -133,7 +135,7 @@ namespace Cms21UiPlus
         internal static void OnWindowShown(ChoosePartDownWindow window,
             DownWindowShowState state)
         {
-            if (!state.IsMountWindow || !IsActiveMountDownWindow(window))
+            if (!state.IsWheelBalancerWindow || !IsActiveWheelBalancerDownWindow(window))
                 return;
 
             activeDownWindow = window;
@@ -162,7 +164,7 @@ namespace Cms21UiPlus
             ChoosePartPageManager pageManager,
             ref Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> items)
         {
-            if (!IsActiveMountDownWindow(pageManager) ||
+            if (!IsActiveWheelBalancerDownWindow(pageManager) ||
                 applyingFilteredList || items == null)
                 return;
 
@@ -181,7 +183,7 @@ namespace Cms21UiPlus
             ChoosePartPageManager pageManager,
             Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> items)
         {
-            if (!IsActiveMountDownWindow(pageManager) || applyingFilteredList)
+            if (!IsActiveWheelBalancerDownWindow(pageManager) || applyingFilteredList)
                 return;
 
             bool empty = items == null || items.Count == 0;
@@ -200,12 +202,12 @@ namespace Cms21UiPlus
             ChoosePartUpWindow window, ChoosePartDownItem item)
         {
             if (!IsEnabled() || !IsActiveUpWindow(window) ||
-                window.choosePartUpWindowType != ChoosePartUpWindowType.Mount ||
+                window.choosePartUpWindowType != ChoosePartUpWindowType.WheelBalance ||
                 !HasActiveFilters() || item == null)
                 return false;
 
             bool suppress = item.BaseItem == null ||
-                !PartFilterRules.Matches(item.BaseItem, CreateCriteria());
+                !MatchesActiveFilter(item.BaseItem);
             if (suppress) {
                 ClearCurrentPreviewItem();
                 awaitingFilteredSelection = true;
@@ -220,17 +222,13 @@ namespace Cms21UiPlus
         internal static bool ShouldSuppressSubmit(ChoosePartUpWindow window)
         {
             if (!IsEnabled() || !IsActiveUpWindow(window) ||
-                window.choosePartUpWindowType != ChoosePartUpWindowType.Mount ||
+                window.choosePartUpWindowType != ChoosePartUpWindowType.WheelBalance ||
                 !HasActiveFilters())
                 return false;
-            if (activeDownWindow == null)
-                return true;
 
-            int selectedIndex;
-            ChoosePartDownItem item =
-                activeDownWindow.GetCurrentItem(out selectedIndex);
+            ChoosePartDownItem item = GetCurrentPreviewItem();
             return item == null || item.BaseItem == null ||
-                !PartFilterRules.Matches(item.BaseItem, CreateCriteria());
+                !MatchesActiveFilter(item.BaseItem);
         }
 
         internal static void ResetAll()
@@ -240,6 +238,7 @@ namespace Cms21UiPlus
             qualityMode = QualityQuickFilterMode.Off;
             searchText = string.Empty;
             OriginalItems.Clear();
+            knownUpWindow = null;
             applyingFilteredList = false;
         }
 
@@ -249,7 +248,7 @@ namespace Cms21UiPlus
                 activeDownWindow == null || activeUpWindow.gameObject == null ||
                 !activeUpWindow.gameObject.activeInHierarchy ||
                 activeUpWindow.choosePartUpWindowType !=
-                    ChoosePartUpWindowType.Mount)
+                    ChoosePartUpWindowType.WheelBalance)
                 return false;
 
             ResetFilters();
@@ -259,7 +258,7 @@ namespace Cms21UiPlus
         private static bool IsEnabled()
         {
             return Main.SettingsEntry != null &&
-                Main.SettingsEntry.Value.addMountPartSelectionFilters;
+                Main.SettingsEntry.Value.addWheelBalancerInventoryFilters;
         }
 
         private static bool HasActiveFilters()
@@ -275,20 +274,53 @@ namespace Cms21UiPlus
                 window.GetInstanceID() == activeUpWindow.GetInstanceID();
         }
 
-        private static bool IsActiveMountDownWindow(
+        private static bool EnsureActiveWheelBalancerDownWindow(
+            ChoosePartDownWindow window)
+        {
+            if (!IsEnabled() || window == null)
+                return false;
+
+            if (IsMatchingWheelBalancerUpWindow(activeUpWindow, window)) {
+                activeDownWindow = window;
+                return true;
+            }
+
+            ChoosePartUpWindow candidate = knownUpWindow;
+            if (candidate == null) {
+                candidate = UnityEngine.Object
+                    .FindObjectOfType<ChoosePartUpWindow>();
+                knownUpWindow = candidate;
+            }
+            if (!IsMatchingWheelBalancerUpWindow(candidate, window))
+                return false;
+
+            activeUpWindow = candidate;
+            activeDownWindow = window;
+            return true;
+        }
+
+        private static bool IsMatchingWheelBalancerUpWindow(
+            ChoosePartUpWindow upWindow, ChoosePartDownWindow downWindow)
+        {
+            return upWindow != null && downWindow != null &&
+                upWindow.gameObject != null &&
+                upWindow.gameObject.activeInHierarchy &&
+                upWindow.choosePartUpWindowType ==
+                    ChoosePartUpWindowType.WheelBalance &&
+                upWindow.choosePartDownWindow != null &&
+                upWindow.choosePartDownWindow.GetInstanceID() ==
+                    downWindow.GetInstanceID();
+        }
+
+        private static bool IsActiveWheelBalancerDownWindow(
             ChoosePartPageManager window)
         {
             if (!IsEnabled() || window == null || activeUpWindow == null ||
-                activeDownWindow == null || activeUpWindow.gameObject == null ||
-                !activeUpWindow.gameObject.activeInHierarchy ||
-                activeUpWindow.choosePartUpWindowType !=
-                    ChoosePartUpWindowType.Mount)
+                activeDownWindow == null)
                 return false;
 
             return window.GetInstanceID() == activeDownWindow.GetInstanceID() &&
-                activeUpWindow.choosePartDownWindow != null &&
-                activeUpWindow.choosePartDownWindow.GetInstanceID() ==
-                    activeDownWindow.GetInstanceID();
+                IsMatchingWheelBalancerUpWindow(activeUpWindow, activeDownWindow);
         }
 
         private static void CaptureNativeItems(
@@ -458,12 +490,65 @@ namespace Cms21UiPlus
         {
             Il2CppSystem.Collections.Generic.List<ChoosePartDownItem> filtered =
                 new Il2CppSystem.Collections.Generic.List<ChoosePartDownItem>();
+            PartFilterCriteria groupCriteria = null;
+            PartFilterCriteria qualityCriteria = null;
+            if (criteria != null && criteria.UsesQualityFilter) {
+                groupCriteria = CreateCriteria();
+                groupCriteria.QualityMode = QualityQuickFilterMode.Off;
+                qualityCriteria = new PartFilterCriteria {
+                    Context = PartFilterContext.Garage,
+                    QualityMode = criteria.QualityMode,
+                };
+            }
+
             foreach (ChoosePartDownItem item in OriginalItems) {
                 if (item != null && item.BaseItem != null &&
-                    PartFilterRules.Matches(item.BaseItem, criteria))
+                    MatchesWheelBalancerItem(item.BaseItem, criteria,
+                        groupCriteria, qualityCriteria))
                     filtered.Add(item);
             }
             return filtered;
+        }
+
+        private static bool MatchesWheelBalancerItem(BaseItem baseItem,
+            PartFilterCriteria criteria, PartFilterCriteria groupCriteria,
+            PartFilterCriteria qualityCriteria)
+        {
+            if (baseItem == null || criteria == null)
+                return false;
+
+            GroupItem group = baseItem.TryCast<GroupItem>();
+            if (group == null || !criteria.UsesQualityFilter)
+                return PartFilterRules.Matches(baseItem, criteria);
+
+            if (!PartFilterRules.Matches(group, groupCriteria) ||
+                group.ItemList == null)
+                return false;
+
+            foreach (Item groupItem in group.ItemList) {
+                if (groupItem != null &&
+                    PartFilterRules.Matches(groupItem, qualityCriteria))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool MatchesActiveFilter(BaseItem baseItem)
+        {
+            PartFilterCriteria criteria = CreateCriteria();
+            PartFilterCriteria groupCriteria = null;
+            PartFilterCriteria qualityCriteria = null;
+            if (criteria.UsesQualityFilter) {
+                groupCriteria = CreateCriteria();
+                groupCriteria.QualityMode = QualityQuickFilterMode.Off;
+                qualityCriteria = new PartFilterCriteria {
+                    Context = PartFilterContext.Garage,
+                    QualityMode = criteria.QualityMode,
+                };
+            }
+
+            return MatchesWheelBalancerItem(baseItem, criteria, groupCriteria,
+                qualityCriteria);
         }
 
         private static void ApplyCurrentFilters(bool resetPage)
@@ -483,8 +568,8 @@ namespace Cms21UiPlus
                         activeDownWindow.PreviousPage(true);
                 }
             } catch (Exception exception) {
-                ModLogger.Log("[MountPartSelectionFilter] Failed to refresh the " +
-                    "filtered mount-part list." + Environment.NewLine +
+                ModLogger.Log("[WheelBalancerInventoryFilter] Failed to refresh the " +
+                    "filtered wheel-balancer list." + Environment.NewLine +
                     exception, Types.LoggingLevels.Warning);
             } finally {
                 applyingFilteredList = false;
@@ -506,8 +591,8 @@ namespace Cms21UiPlus
                 PreparePageManagerForRefresh(activeDownWindow, original);
                 activeDownWindow.Refresh(original);
             } catch (Exception exception) {
-                ModLogger.Log("[MountPartSelectionFilter] Failed to restore the " +
-                    "native mount-part list." + Environment.NewLine +
+                ModLogger.Log("[WheelBalancerInventoryFilter] Failed to restore the " +
+                    "native wheel-balancer list." + Environment.NewLine +
                     exception, Types.LoggingLevels.Warning);
             } finally {
                 applyingFilteredList = false;
@@ -575,6 +660,19 @@ namespace Cms21UiPlus
                 CurrentItemProperty.SetValue(activeUpWindow, null, null);
         }
 
+        private static ChoosePartDownItem GetCurrentPreviewItem()
+        {
+            if (activeUpWindow == null)
+                return null;
+
+            object value = null;
+            if (CurrentItemField != null)
+                value = CurrentItemField.GetValue(activeUpWindow);
+            else if (CurrentItemProperty != null && CurrentItemProperty.CanRead)
+                value = CurrentItemProperty.GetValue(activeUpWindow, null);
+            return value as ChoosePartDownItem;
+        }
+
         private static void HideItemsDetail()
         {
             if (activeUpWindow == null || activeUpWindow.transform == null)
@@ -619,7 +717,7 @@ namespace Cms21UiPlus
                 if (filteredEmptyStateRoot == null)
                     return;
 
-                filteredEmptyStateRoot.name = "QMountPartSelectionEmptyState";
+                filteredEmptyStateRoot.name = "QWheelBalancerEmptyState";
                 RectTransform rect =
                     filteredEmptyStateRoot.GetComponent<RectTransform>();
                 NativeUiFactory.Stretch(rect, 0f, 0f, 0f, 0f);

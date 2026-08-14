@@ -49,12 +49,14 @@
     <Compile Include="src\Features\InventorySorting\InventorySortPersistenceFeature.cs" />
     <Compile Include="src\Features\Jobs\BodyPartMarkingFeature.cs" />
     <Compile Include="src\Features\Jobs\FinishedPartUnmarker.cs" />
+    <Compile Include="src\Features\PartSelectionFilters\BrakeLatheInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\MountPartSelectionFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\PartSelectionFilterPatches.cs" />
     <Compile Include="src\Features\PartSelectionFilters\RepairInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\ScrapInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\SpringClampInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\TireChangerInventoryFilterFeature.cs" />
+    <Compile Include="src\Features\PartSelectionFilters\WheelBalancerInventoryFilterFeature.cs" />
     <Compile Include="src\Features\Settings\ManifestModSettingsProvider.cs" />
     <Compile Include="src\Features\Settings\ModSettingDependencyRegistry.cs" />
     <Compile Include="src\Features\Settings\ModSettingsConfigStore.cs" />

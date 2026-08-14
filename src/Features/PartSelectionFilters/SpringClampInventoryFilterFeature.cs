@@ -46,6 +46,7 @@ namespace Cms21UiPlus
             QualityQuickFilterMode.Off;
         private static string searchText = string.Empty;
         private static bool applyingFilteredList;
+        private static bool awaitingFilteredSelection;
         private static NativeUiFactory.FooterHintHandle resetHint;
         private static GameObject emptyStateRoot;
         private static GameObject separateItemsDetailRoot;
@@ -53,15 +54,21 @@ namespace Cms21UiPlus
         private static GameObject nativeDownEmptyStateRoot;
         private static bool nativeDownEmptyStateWasActive;
         private static GameObject separateWindowEmptyStateRoot;
-        private static readonly List<CurrentDetailObjectState>
-            HiddenCurrentDetailObjects =
-                new List<CurrentDetailObjectState>(5);
-        private static int hiddenCurrentSegment = -1;
-        private struct CurrentDetailObjectState
-        {
-            internal GameObject Target;
-            internal bool WasActive;
-        }
+        private static GameObject hiddenItemsDetailRoot;
+        private static bool hiddenItemsDetailWasActive;
+        private static GameObject hiddenCurrentDetailRoot;
+        private static bool hiddenCurrentDetailWasActive;
+        private static int hiddenCurrentDetailSegment = -1;
+        private static GameObject hiddenArrow1Root;
+        private static bool hiddenArrow1WasActive;
+        private static GameObject hiddenArrow2Root;
+        private static bool hiddenArrow2WasActive;
+        private static GameObject hiddenFollowingDetailRoot;
+        private static bool hiddenFollowingDetailWasActive;
+        private static int emptyStateSegment = -1;
+        private static bool emptyStateShowsNoItems;
+        private static GameObject assemblyWindowEmptyStateRoot;
+        private static bool assemblyWindowEmptyStateShowsNoItems;
         private static readonly FieldInfo CurrentItemField =
             typeof(ChoosePartUpWindow).GetField("currentItem",
                 BindingFlags.Instance | BindingFlags.Public |
@@ -159,7 +166,9 @@ namespace Cms21UiPlus
             activeDownWindow = window;
             if (!Panel.AttachWithButtons(window.transform,
                     CycleConditionFilter, null, CycleQualityFilter,
-                    OnSearchChanged, true, false, true)) {
+                    OnSearchChanged, true, false, true,
+                    CycleConditionFilterReverse, null,
+                    CycleQualityFilterReverse)) {
                 RestoreOriginalList();
                 DeactivateWindow();
                 return;
@@ -232,8 +241,14 @@ namespace Cms21UiPlus
                 return false;
 
             bool suppress = !MatchesActiveFilter(item.BaseItem);
-            if (suppress)
+            if (suppress) {
                 ClearCurrentPreviewItem();
+                awaitingFilteredSelection = true;
+            } else {
+                awaitingFilteredSelection = false;
+                RestoreFilteredSelectionUi();
+                RestoreSeparateEmptyState();
+            }
             return suppress;
         }
 
@@ -381,9 +396,51 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
+        private static void CycleConditionFilterReverse()
+        {
+            switch (conditionMode) {
+                case GarageConditionFilterMode.Off:
+                    conditionMode = GarageConditionFilterMode.Red;
+                    break;
+                case GarageConditionFilterMode.Red:
+                    conditionMode = GarageConditionFilterMode.Orange;
+                    break;
+                case GarageConditionFilterMode.Orange:
+                    conditionMode = GarageConditionFilterMode.Yellow;
+                    break;
+                case GarageConditionFilterMode.Yellow:
+                    conditionMode = GarageConditionFilterMode.GreenRing;
+                    break;
+                case GarageConditionFilterMode.GreenRing:
+                    conditionMode = GarageConditionFilterMode.Perfect;
+                    break;
+                case GarageConditionFilterMode.Perfect:
+                    conditionMode =
+                        GarageConditionFilterMode.RepairThresholdToPerfect;
+                    break;
+                default:
+                    conditionMode = GarageConditionFilterMode.Off;
+                    break;
+            }
+
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode,
+                RepairabilityQuickFilterMode.Off, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
         private static void CycleQualityFilter()
         {
             qualityMode = InventoryFilterManager.GetNextQualityMode(qualityMode);
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode,
+                RepairabilityQuickFilterMode.Off, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
+        private static void CycleQualityFilterReverse()
+        {
+            qualityMode = InventoryFilterManager.GetPreviousQualityMode(qualityMode);
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
                 RepairabilityQuickFilterMode.Off, qualityMode);
@@ -554,6 +611,7 @@ namespace Cms21UiPlus
             if (isActiveDownWindow && HasActiveFilters()) {
                 activeDownWindow.DeselectCurrentItem();
                 ClearCurrentPreviewItem();
+                awaitingFilteredSelection = true;
             }
             if (isEmpty) {
                 pageManager.currentPage = 0;
@@ -566,31 +624,70 @@ namespace Cms21UiPlus
 
         private static void ApplyFilteredEmptyState(bool isEmpty)
         {
-            if (!isEmpty) {
-                RestoreCurrentDetail();
+            if (!HasActiveFilters()) {
+                awaitingFilteredSelection = false;
+                RestoreFilteredSelectionUi();
                 RestoreSeparateEmptyState();
-                if (emptyStateRoot != null && emptyStateRoot.activeSelf)
-                    emptyStateRoot.SetActive(false);
                 return;
             }
 
-            ClearCurrentPreviewItem();
+            if (!isEmpty && !awaitingFilteredSelection) {
+                RestoreFilteredSelectionUi();
+                RestoreSeparateEmptyState();
+                return;
+            }
+
+            if (isEmpty)
+                ClearCurrentPreviewItem();
+
             if (activeUpWindow != null &&
                 activeUpWindow.choosePartUpWindowType ==
                     ChoosePartUpWindowType.SpringSeparate) {
-                RestoreCurrentDetail();
-                if (emptyStateRoot != null && emptyStateRoot.activeSelf)
-                    emptyStateRoot.SetActive(false);
-                ApplySeparateEmptyState();
+                RestoreFilteredSelectionUi();
+                if (isEmpty)
+                    ApplySeparateEmptyState();
+                else {
+                    awaitingFilteredSelection = false;
+                    RestoreSeparateEmptyState();
+                }
                 return;
             }
 
             RestoreSeparateEmptyState();
+            ApplyAssemblySelectionState(isEmpty);
+        }
+
+        private static void ApplyAssemblySelectionState(bool isEmpty)
+        {
+            int segment = GetCurrentActiveSegment();
+            if (segment <= 0) {
+                HideAssemblyArrows(true, true);
+                RestoreCurrentDetail();
+                RestoreFollowingDetail();
+                HideEmptyState();
+                HideItemsDetail();
+                if (isEmpty)
+                    EnsureAssemblyWindowEmptyState(true);
+                else
+                    HideAssemblyWindowEmptyState();
+                return;
+            }
+
+            HideAssemblyWindowEmptyState();
+            RestoreItemsDetail();
+            RestoreCurrentDetail();
+            RestoreFollowingDetail();
+            if (segment == 1)
+                HideAssemblyArrows(true, true);
+            else if (segment == 2)
+                HideAssemblyArrows(false, true);
+            else
+                RestoreAssemblyArrows();
             Transform currentDetail = GetCurrentDetail();
-            HideCurrentDetail(currentDetail);
-            EnsureEmptyState(currentDetail);
-            if (emptyStateRoot != null && !emptyStateRoot.activeSelf)
-                emptyStateRoot.SetActive(true);
+            HideCurrentDetail(currentDetail, segment);
+            if (segment == 1)
+                HideFollowingDetail(GetDetail(2));
+            EnsureEmptyState(currentDetail, segment, isEmpty);
         }
 
         private static void ApplySeparateEmptyState()
@@ -696,29 +793,112 @@ namespace Cms21UiPlus
                 separateWindowEmptyStateRoot.SetActive(false);
         }
 
-        private static void EnsureEmptyState(Transform currentDetail)
+        private static void EnsureEmptyState(Transform currentDetail,
+            int segment, bool showNoItems)
         {
-            if (currentDetail == null)
+            if (currentDetail == null || currentDetail.parent == null)
                 return;
 
             if (emptyStateRoot != null &&
-                emptyStateRoot.transform.parent != currentDetail) {
+                (emptyStateRoot.transform.parent != currentDetail.parent ||
+                 emptyStateSegment != segment ||
+                 emptyStateShowsNoItems != showNoItems)) {
                 UnityEngine.Object.Destroy(emptyStateRoot);
                 emptyStateRoot = null;
+                emptyStateSegment = -1;
+                emptyStateShowsNoItems = false;
             }
-            if (emptyStateRoot != null)
+            if (emptyStateRoot == null) {
+                emptyStateRoot = NativeUiFactory.CreateNativeNoItemsPage(
+                    currentDetail.parent);
+                if (emptyStateRoot == null)
+                    return;
+
+                emptyStateRoot.name = "QSpringClampSelectionPrompt";
+                RectTransform sourceRect =
+                    currentDetail.GetComponent<RectTransform>();
+                RectTransform emptyRect =
+                    emptyStateRoot.GetComponent<RectTransform>();
+                NativeUiFactory.CopyRect(sourceRect, emptyRect);
+                emptyStateRoot.transform.SetAsLastSibling();
+
+                Graphic[] graphics =
+                    emptyStateRoot.GetComponentsInChildren<Graphic>(true);
+                for (int i = 0; i < graphics.Length; i++) {
+                    if (graphics[i] != null)
+                        graphics[i].raycastTarget = false;
+                }
+
+                if (!showNoItems) {
+                    Text text = emptyStateRoot.GetComponentInChildren<Text>(true);
+                    if (text != null)
+                        text.text = ModLocalization.Get("LOC_SelectPartPrompt");
+                }
+                emptyStateSegment = segment;
+                emptyStateShowsNoItems = showNoItems;
+            }
+
+            if (!emptyStateRoot.activeSelf)
+                emptyStateRoot.SetActive(true);
+        }
+
+        private static void HideEmptyState()
+        {
+            if (emptyStateRoot != null && emptyStateRoot.activeSelf)
+                emptyStateRoot.SetActive(false);
+        }
+
+        private static void EnsureAssemblyWindowEmptyState(bool showNoItems)
+        {
+            if (activeUpWindow == null || activeUpWindow.transform == null)
                 return;
 
-            emptyStateRoot = NativeUiFactory.CreateNativeNoItemsPage(
-                currentDetail);
-            if (emptyStateRoot == null)
-                return;
+            if (assemblyWindowEmptyStateRoot != null &&
+                (assemblyWindowEmptyStateRoot.transform.parent !=
+                    activeUpWindow.transform ||
+                 assemblyWindowEmptyStateShowsNoItems != showNoItems)) {
+                UnityEngine.Object.Destroy(assemblyWindowEmptyStateRoot);
+                assemblyWindowEmptyStateRoot = null;
+            }
+            if (assemblyWindowEmptyStateRoot == null) {
+                assemblyWindowEmptyStateRoot =
+                    NativeUiFactory.CreateNativeNoItemsPage(
+                        activeUpWindow.transform);
+                if (assemblyWindowEmptyStateRoot == null)
+                    return;
 
-            emptyStateRoot.name = "QSpringClampEmptyState";
-            RectTransform emptyRect =
-                emptyStateRoot.GetComponent<RectTransform>();
-            NativeUiFactory.Stretch(emptyRect, 0f, 0f, 0f, 0f);
-            emptyStateRoot.transform.SetAsLastSibling();
+                assemblyWindowEmptyStateRoot.name =
+                    "QSpringClampAssemblyEmptyState";
+                RectTransform rect = assemblyWindowEmptyStateRoot
+                    .GetComponent<RectTransform>();
+                NativeUiFactory.Stretch(rect, 0f, 0f, 0f, 0f);
+                assemblyWindowEmptyStateRoot.transform.SetAsLastSibling();
+
+                Graphic[] graphics = assemblyWindowEmptyStateRoot
+                    .GetComponentsInChildren<Graphic>(true);
+                for (int i = 0; i < graphics.Length; i++) {
+                    if (graphics[i] != null)
+                        graphics[i].raycastTarget = false;
+                }
+
+                if (!showNoItems) {
+                    Text text = assemblyWindowEmptyStateRoot
+                        .GetComponentInChildren<Text>(true);
+                    if (text != null)
+                        text.text = ModLocalization.Get("LOC_SelectPartPrompt");
+                }
+                assemblyWindowEmptyStateShowsNoItems = showNoItems;
+            }
+
+            if (!assemblyWindowEmptyStateRoot.activeSelf)
+                assemblyWindowEmptyStateRoot.SetActive(true);
+        }
+
+        private static void HideAssemblyWindowEmptyState()
+        {
+            if (assemblyWindowEmptyStateRoot != null &&
+                assemblyWindowEmptyStateRoot.activeSelf)
+                assemblyWindowEmptyStateRoot.SetActive(false);
         }
 
         private static void ClearCurrentPreviewItem()
@@ -735,11 +915,13 @@ namespace Cms21UiPlus
 
         private static Transform GetCurrentDetail()
         {
-            if (activeUpWindow == null || activeUpWindow.transform == null)
-                return null;
+            return GetDetail(GetCurrentActiveSegment());
+        }
 
-            int segment = GetCurrentActiveSegment();
-            if (segment < 0 || segment > 2)
+        private static Transform GetDetail(int segment)
+        {
+            if (activeUpWindow == null || activeUpWindow.transform == null ||
+                segment < 0 || segment > 2)
                 return null;
 
             Transform detailsRoot = activeUpWindow.transform.Find("ItemsDetail");
@@ -752,66 +934,73 @@ namespace Cms21UiPlus
             return detailsRoot.Find(detailName);
         }
 
-        private static void HideCurrentDetail(Transform detail)
+        private static void HideItemsDetail()
         {
-            if (detail == null)
+            if (activeUpWindow == null || activeUpWindow.transform == null)
                 return;
 
-            int segment = GetCurrentActiveSegment();
-            if (segment < 0 || segment > 2)
+            Transform itemsDetail = activeUpWindow.transform.Find("ItemsDetail");
+            if (itemsDetail == null || itemsDetail.gameObject == null)
                 return;
 
-            if (hiddenCurrentSegment != segment) {
+            if (hiddenItemsDetailRoot != itemsDetail.gameObject) {
+                RestoreItemsDetail();
+                hiddenItemsDetailRoot = itemsDetail.gameObject;
+                hiddenItemsDetailWasActive = hiddenItemsDetailRoot.activeSelf;
+            }
+            if (hiddenItemsDetailRoot.activeSelf)
+                hiddenItemsDetailRoot.SetActive(false);
+        }
+
+        private static void RestoreItemsDetail()
+        {
+            if (hiddenItemsDetailRoot != null &&
+                hiddenItemsDetailRoot.activeSelf != hiddenItemsDetailWasActive)
+                hiddenItemsDetailRoot.SetActive(hiddenItemsDetailWasActive);
+            hiddenItemsDetailRoot = null;
+            hiddenItemsDetailWasActive = false;
+        }
+
+        private static void HideCurrentDetail(Transform detail, int segment)
+        {
+            if (detail == null || detail.gameObject == null)
+                return;
+
+            if (hiddenCurrentDetailRoot != detail.gameObject ||
+                hiddenCurrentDetailSegment != segment) {
                 RestoreCurrentDetail();
-                hiddenCurrentSegment = segment;
+                hiddenCurrentDetailRoot = detail.gameObject;
+                hiddenCurrentDetailWasActive = hiddenCurrentDetailRoot.activeSelf;
+                hiddenCurrentDetailSegment = segment;
             }
-
-            for (int i = 0; i < detail.childCount; i++) {
-                Transform child = detail.GetChild(i);
-                if (child == null || child.gameObject == null ||
-                    IsCurrentDetailBackground(child) ||
-                    (emptyStateRoot != null &&
-                     child.gameObject == emptyStateRoot))
-                    continue;
-                RememberAndHideCurrentDetail(child);
-            }
+            if (hiddenCurrentDetailRoot.activeSelf)
+                hiddenCurrentDetailRoot.SetActive(false);
         }
 
-        private static bool IsCurrentDetailBackground(Transform target)
+        private static void HideFollowingDetail(Transform detail)
         {
-            if (target == null || target.gameObject == null)
-                return false;
+            if (detail == null || detail.gameObject == null)
+                return;
 
-            string name = target.gameObject.name;
-            return string.Equals(name, "BGSolid",
-                       StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(name, "BGSolid2",
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(name, "BGImg",
-                    StringComparison.OrdinalIgnoreCase);
+            if (hiddenFollowingDetailRoot != detail.gameObject) {
+                RestoreFollowingDetail();
+                hiddenFollowingDetailRoot = detail.gameObject;
+                hiddenFollowingDetailWasActive =
+                    hiddenFollowingDetailRoot.activeSelf;
+            }
+            if (hiddenFollowingDetailRoot.activeSelf)
+                hiddenFollowingDetailRoot.SetActive(false);
         }
 
-        private static void RememberAndHideCurrentDetail(Transform target)
+        private static void RestoreFollowingDetail()
         {
-            if (target == null || target.gameObject == null)
-                return;
-
-            for (int i = 0; i < HiddenCurrentDetailObjects.Count; i++) {
-                CurrentDetailObjectState existing =
-                    HiddenCurrentDetailObjects[i];
-                if (existing.Target != target.gameObject)
-                    continue;
-                if (target.gameObject.activeSelf)
-                    target.gameObject.SetActive(false);
-                return;
-            }
-
-            CurrentDetailObjectState state = new CurrentDetailObjectState();
-            state.Target = target.gameObject;
-            state.WasActive = target.gameObject.activeSelf;
-            HiddenCurrentDetailObjects.Add(state);
-            if (state.WasActive)
-                target.gameObject.SetActive(false);
+            if (hiddenFollowingDetailRoot != null &&
+                hiddenFollowingDetailRoot.activeSelf !=
+                    hiddenFollowingDetailWasActive)
+                hiddenFollowingDetailRoot.SetActive(
+                    hiddenFollowingDetailWasActive);
+            hiddenFollowingDetailRoot = null;
+            hiddenFollowingDetailWasActive = false;
         }
 
         private static int GetCurrentActiveSegment()
@@ -837,15 +1026,85 @@ namespace Cms21UiPlus
 
         private static void RestoreCurrentDetail()
         {
-            for (int i = 0; i < HiddenCurrentDetailObjects.Count; i++) {
-                CurrentDetailObjectState state = HiddenCurrentDetailObjects[i];
-                if (state.Target == null)
+            if (hiddenCurrentDetailRoot != null &&
+                hiddenCurrentDetailRoot.activeSelf != hiddenCurrentDetailWasActive)
+                hiddenCurrentDetailRoot.SetActive(hiddenCurrentDetailWasActive);
+            hiddenCurrentDetailRoot = null;
+            hiddenCurrentDetailWasActive = false;
+            hiddenCurrentDetailSegment = -1;
+        }
+
+        private static void HideAssemblyArrows(bool hideArrow1,
+            bool hideArrow2)
+        {
+            RestoreAssemblyArrows();
+            if (hideArrow1)
+                HideAssemblyArrow(0, ref hiddenArrow1Root,
+                    ref hiddenArrow1WasActive);
+            if (hideArrow2)
+                HideAssemblyArrow(1, ref hiddenArrow2Root,
+                    ref hiddenArrow2WasActive);
+        }
+
+        private static void HideAssemblyArrow(int arrowIndex,
+            ref GameObject hiddenRoot, ref bool wasActive)
+        {
+            GameObject root = GetArrowSpacer(arrowIndex);
+            if (root == null)
+                return;
+
+            hiddenRoot = root;
+            wasActive = root.activeSelf;
+            if (root.activeSelf)
+                root.SetActive(false);
+        }
+
+        private static GameObject GetArrowSpacer(int arrowIndex)
+        {
+            if (activeUpWindow == null || activeUpWindow.transform == null)
+                return null;
+
+            Transform itemsDetail = activeUpWindow.transform.Find("ItemsDetail");
+            if (itemsDetail == null)
+                return null;
+
+            int currentIndex = 0;
+            for (int i = 0; i < itemsDetail.childCount; i++) {
+                Transform child = itemsDetail.GetChild(i);
+                if (child == null || child.name != "ArrowSpacer")
                     continue;
-                if (state.Target.activeSelf != state.WasActive)
-                    state.Target.SetActive(state.WasActive);
+                if (currentIndex == arrowIndex)
+                    return child.gameObject;
+                currentIndex++;
             }
-            HiddenCurrentDetailObjects.Clear();
-            hiddenCurrentSegment = -1;
+            return null;
+        }
+
+        private static void RestoreAssemblyArrows()
+        {
+            RestoreAssemblyArrow(ref hiddenArrow1Root,
+                ref hiddenArrow1WasActive);
+            RestoreAssemblyArrow(ref hiddenArrow2Root,
+                ref hiddenArrow2WasActive);
+        }
+
+        private static void RestoreAssemblyArrow(ref GameObject hiddenRoot,
+            ref bool wasActive)
+        {
+            if (hiddenRoot != null && hiddenRoot.activeSelf != wasActive)
+                hiddenRoot.SetActive(wasActive);
+            hiddenRoot = null;
+            wasActive = false;
+        }
+
+        private static void RestoreFilteredSelectionUi()
+        {
+            RestoreAssemblyArrows();
+            RestoreItemsDetail();
+            RestoreCurrentDetail();
+            RestoreFollowingDetail();
+            HideEmptyState();
+            HideAssemblyWindowEmptyState();
         }
 
         private static void CreateResetHint()
@@ -881,15 +1140,22 @@ namespace Cms21UiPlus
 
         private static void DeactivateWindow()
         {
-            RestoreCurrentDetail();
+            RestoreFilteredSelectionUi();
             RestoreSeparateEmptyState();
             if (emptyStateRoot != null) {
                 UnityEngine.Object.Destroy(emptyStateRoot);
                 emptyStateRoot = null;
+                emptyStateSegment = -1;
+                emptyStateShowsNoItems = false;
             }
             if (separateWindowEmptyStateRoot != null) {
                 UnityEngine.Object.Destroy(separateWindowEmptyStateRoot);
                 separateWindowEmptyStateRoot = null;
+            }
+            if (assemblyWindowEmptyStateRoot != null) {
+                UnityEngine.Object.Destroy(assemblyWindowEmptyStateRoot);
+                assemblyWindowEmptyStateRoot = null;
+                assemblyWindowEmptyStateShowsNoItems = false;
             }
             DestroyResetHint();
             Panel.Detach();
@@ -897,6 +1163,7 @@ namespace Cms21UiPlus
             activeDownWindow = null;
             activeUpWindow = null;
             applyingFilteredList = false;
+            awaitingFilteredSelection = false;
         }
     }
 }

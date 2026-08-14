@@ -46,6 +46,8 @@ switches use `restartGame`.
 | **Repair inventory filters** | `addRepairInventoryFilters` | `true` | Adds an immediate localized-name search plus condition and quality filters to both the mechanical-part repair inventory and the body-panel repair inventory. The filtered result is rebuilt after a repair animation completes, and its state is independent from the scrap filters. |
 | **Spring clamp quick filters** | `addSpringClampInventoryFilters` | `true` | Adds condition, quality and localized-name search to spring-clamp assembly and disassembly selection. Filter state is preserved when the selection window closes and can be reset with `LeftAlt`. This switch is independent from the normal inventory, scrap and repair quick filters. |
 | **Tire changer quick filters** | `addTireChangerInventoryFilters` | `true` | Adds condition, quality and localized-name search to tire-changer assembly and disassembly selection. Complete wheels are filtered by aggregate condition, while quality matching uses their contained rim/tire parts. Filtered-out entries cannot remain selected, empty results keep the chooser open, and `LeftAlt` resets the filters. |
+| **Wheel balancer quick filters** | `addWheelBalancerInventoryFilters` | `true` | Adds condition, quality and localized-name search to the wheel-balancer selection. Complete wheels are filtered by aggregate condition, while quality matching uses their contained rim/tire parts. Filtered-out entries cannot remain selected or submitted, empty results keep the chooser open, and `LeftAlt` resets the filters. |
+| **Brake lathe quick filters** | `addBrakeLatheInventoryFilters` | `true` | Adds condition, quality and localized-name search to the brake-lathe part selection window. Filtered-out entries cannot remain selected or submitted, empty results keep the chooser open, and `LeftAlt` resets the filters. |
 | **Mount part-selection quick filters** | `addMountPartSelectionFilters` | `true` | Adds condition, quality and localized-name search to the inventory chooser opened while mounting a part. The native chooser receives only matching entries, so filtered-out parts cannot remain selected. `LeftAlt` resets all mount-selection filters. |
 
 #### Filter cycles and condition ranges
@@ -53,13 +55,16 @@ switches use `restartGame`.
 Condition filtering uses the game's current repair/junk threshold instead of duplicating it as a fixed mod value.
 
 - Garage inventory and both warehouse tabs: off → red (below the repair threshold) → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%) → green (100%).
-- Spring clamp, tire changer and mount part selection: off → **white** (repair threshold through 100%) → green (100%) → green ring (80–99%) → yellow (50–79%) → orange (normally 15–49%) → red (below the repair threshold).
+- Spring clamp, tire changer, wheel balancer and mount part selection: off → **white** (repair threshold through 100%) → green (100%) → green ring (80–99%) → yellow (50–79%) → orange (normally 15–49%) → red (below the repair threshold).
+- Brake lathe: off → **white** (repair threshold through 100%) → green ring (80–99%) → yellow (50–79%) → orange (normally 15–49%) → red (below the repair threshold); the 100% state is omitted because perfect brake parts do not need machining.
 - Repair inventories: off → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%). Their native lists already exclude parts below the repair threshold.
 - Scrap: off → red (below the repair threshold) → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%). Upgrade has no condition quick filter.
 - Barn and junkyard: off → **white** (repair threshold through 100%) → red (normally 0–14%) → orange (normally 15–49%) → yellow (50–79%) → green ring (80–99%).
 - Repairability in every window that exposes this control: off → repairable only → non-repairable only.
 - Quality in every window that exposes this control: off → upgraded (1–3 stars) → 1 star → 2 stars → 3 stars → not upgraded (0 stars).
 - Barn and junkyard ownership: off → owned → missing. A matching copy at 50% condition or better counts as owned for this filter.
+
+Left click advances every quick-filter cycle; right click moves through the same states in reverse.
 
 The additional search fields in scrap, repair, spring-clamp, tire-changer and mount part-selection inventories match the localized displayed part name immediately and combine with the active quick filters. The game's existing inventory and warehouse search fields are not replaced.
 

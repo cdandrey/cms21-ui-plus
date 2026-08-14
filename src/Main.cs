@@ -90,6 +90,8 @@ namespace Cms21UiPlus
             MountPartSelectionFilterFeature.ResetAll();
             SpringClampInventoryFilterFeature.ResetAll();
             TireChangerInventoryFilterFeature.ResetAll();
+            WheelBalancerInventoryFilterFeature.ResetAll();
+            BrakeLatheInventoryFilterFeature.ResetAll();
             ParkingSortingFeature.Reset();
             if (sceneName == "Menu")
                 ModSettingsMenuFeature.ResetAll();

@@ -128,13 +128,35 @@
       "descriptionKey": "LOC_SettingAddTireChangerInventoryFiltersDescription"
     },
     {
+      "id": "FID_AddWheelBalancerInventoryFilters",
+      "key": "addWheelBalancerInventoryFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 25,
+      "nameKey": "LOC_SettingAddWheelBalancerInventoryFiltersName",
+      "descriptionKey": "LOC_SettingAddWheelBalancerInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_AddBrakeLatheInventoryFilters",
+      "key": "addBrakeLatheInventoryFilters",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 26,
+      "nameKey": "LOC_SettingAddBrakeLatheInventoryFiltersName",
+      "descriptionKey": "LOC_SettingAddBrakeLatheInventoryFiltersDescription"
+    },
+    {
       "id": "FID_AddMountPartSelectionFilters",
       "key": "addMountPartSelectionFilters",
       "group": "inventoryFilters",
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 25,
+      "order": 27,
       "nameKey": "LOC_SettingAddMountPartSelectionFiltersName",
       "descriptionKey": "LOC_SettingAddMountPartSelectionFiltersDescription"
     },

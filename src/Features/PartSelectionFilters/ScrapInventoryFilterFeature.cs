@@ -147,7 +147,10 @@ namespace Cms21UiPlus
                 if (Panel.AttachWithButtons(window.transform,
                     CycleConditionFilter, CycleRepairabilityFilter,
                     CycleQualityFilter, OnSearchChanged,
-                    includeConditionFilter, true, true)) {
+                    includeConditionFilter, true, true,
+                    CycleConditionFilterReverse,
+                    CycleRepairabilityFilterReverse,
+                    CycleQualityFilterReverse)) {
                     Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
                     if (!enteringUpgrade)
                         CreateResetHint();
@@ -645,6 +648,31 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
+        private static void CycleConditionFilterReverse()
+        {
+            switch (conditionMode) {
+                case GarageConditionFilterMode.Off:
+                    conditionMode = GarageConditionFilterMode.GreenRing;
+                    break;
+                case GarageConditionFilterMode.GreenRing:
+                    conditionMode = GarageConditionFilterMode.Yellow;
+                    break;
+                case GarageConditionFilterMode.Yellow:
+                    conditionMode = GarageConditionFilterMode.Orange;
+                    break;
+                case GarageConditionFilterMode.Orange:
+                    conditionMode = GarageConditionFilterMode.Red;
+                    break;
+                default:
+                    conditionMode = GarageConditionFilterMode.Off;
+                    break;
+            }
+
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
         private static void CycleRepairabilityFilter()
         {
             switch (repairabilityMode) {
@@ -666,9 +694,26 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
+        private static void CycleRepairabilityFilterReverse()
+        {
+            repairabilityMode = InventoryFilterManager
+                .GetPreviousRepairabilityMode(repairabilityMode);
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
         private static void CycleQualityFilter()
         {
             qualityMode = InventoryFilterManager.GetNextQualityMode(qualityMode);
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
+        private static void CycleQualityFilterReverse()
+        {
+            qualityMode = InventoryFilterManager.GetPreviousQualityMode(qualityMode);
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
             ApplyCurrentFilters(true);

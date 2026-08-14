@@ -17,7 +17,9 @@ namespace Cms21UiPlus
 
             if (Input.GetKeyUp(KeyCode.LeftAlt) &&
                 (MountPartSelectionFilterFeature.TryResetFromKeyboardShortcut() ||
-                 TireChangerInventoryFilterFeature.TryResetFromKeyboardShortcut()))
+                 TireChangerInventoryFilterFeature.TryResetFromKeyboardShortcut() ||
+                 WheelBalancerInventoryFilterFeature.TryResetFromKeyboardShortcut() ||
+                 BrakeLatheInventoryFilterFeature.TryResetFromKeyboardShortcut()))
                 return;
 
             if (!IsEnabled || !WasBindingReleased())

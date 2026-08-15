@@ -64,6 +64,7 @@
     <Compile Include="src\Features\Settings\ModSettingsModel.cs" />
     <Compile Include="src\Features\Settings\UiSettingsManifest.cs" />
     <Compile Include="src\Features\ShoppingList\ShoppingListAutoRemoveFeature.cs" />
+    <Compile Include="src\Features\ShoppingList\ShoppingListPresentationFeature.cs" />
     <Compile Include="src\Features\ShoppingList\WheelShopListPurchaseFeature.cs" />
     <Compile Include="src\Features\Startup\StartupIntroSkipFeature.cs" />
     <Compile Include="src\Features\Startup\StartupPromptAutoContinueFeature.cs" />

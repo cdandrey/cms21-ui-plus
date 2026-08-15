@@ -19,18 +19,23 @@ namespace Cms21UiPlus
 
         public static bool IsRepairable(Item item)
         {
-            if (item == null)
+            return item != null && IsRepairable(item.ID);
+        }
+
+        public static bool IsRepairable(string itemID)
+        {
+            if (string.IsNullOrEmpty(itemID))
                 return false;
 
             GameInventory inventory = Singleton<GameInventory>.Instance;
-            if (inventory == null || !inventory.ExistsInPartProperty(item.ID))
+            if (inventory == null || !inventory.ExistsInPartProperty(itemID))
                 return false;
 
-            PartProperty property = inventory.GetItemProperty(item.ID);
+            PartProperty property = inventory.GetItemProperty(itemID);
             if (property != null && property.RepairGroup != 0)
                 return true;
 
-            switch (item.ID) {
+            switch (itemID) {
                 case "tarczaHamulcowa_1":
                 case "tarczaWentylowana_1":
                 case "tarczaWentylowana_1B":

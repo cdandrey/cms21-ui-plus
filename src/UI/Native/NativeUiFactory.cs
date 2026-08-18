@@ -292,7 +292,6 @@ namespace Cms21UiPlus
             public readonly ImageStyle Image = new ImageStyle();
             public Quaternion LocalRotation = Quaternion.identity;
             public Vector3 LocalScale = Vector3.one;
-            public string SourceName;
             public bool IsValid;
 
             public void Capture(Image source)
@@ -305,8 +304,6 @@ namespace Cms21UiPlus
                 LocalScale = new Vector3(
                     scale.x < 0f ? -1f : 1f,
                     scale.y < 0f ? -1f : 1f, 1f);
-                SourceName = source.gameObject.name + "/" +
-                    source.sprite.name;
                 IsValid = true;
             }
 
@@ -325,13 +322,11 @@ namespace Cms21UiPlus
                 Image.PixelsPerUnitMultiplier = 1f;
                 LocalRotation = Quaternion.identity;
                 LocalScale = Vector3.one;
-                SourceName = sprite.name;
                 IsValid = true;
             }
 
             public void Reset()
             {
-                SourceName = null;
                 IsValid = false;
                 LocalRotation = Quaternion.identity;
                 LocalScale = Vector3.one;
@@ -516,14 +511,6 @@ namespace Cms21UiPlus
             EnsureFallbacks(launchButton);
             initialized = true;
 
-            ModLogger.Log("[NativeUI] Styles cached: tutorials=" +
-                Describe(tutorialsSource != null
-                    ? tutorialsSource.gameObject : null) +
-                "; settings=" + Describe(settingsSource != null
-                    ? settingsSource.gameObject : null) +
-                "; hints=" + Describe(hintSource != null
-                    ? hintSource.gameObject : null) + ".",
-                Types.LoggingLevels.Debug);
         }
 
 
@@ -901,7 +888,7 @@ namespace Cms21UiPlus
                 : null;
             Transform bottom = window.transform.Find("Bottom");
             if (titleText == null || bottom == null || captions == null ||
-                captions.Length < 6) {
+                captions.Length == 0 || captions.Length > 8) {
                 UnityEngine.Object.Destroy(root);
                 return null;
             }
@@ -909,6 +896,9 @@ namespace Cms21UiPlus
             SortingWindowHandle handle = new SortingWindowHandle {
                 Root = root,
             };
+            RectTransform previousButtonRect = null;
+            RectTransform lastButtonRect = null;
+            GameObject lastButtonObject = null;
             for (int index = 0; index < 6; index++) {
                 string buttonName = index == 0
                     ? "GenericButtonOutline"
@@ -917,13 +907,59 @@ namespace Cms21UiPlus
                 GenericButtonOutline button = buttonTransform != null
                     ? buttonTransform.GetComponent<GenericButtonOutline>()
                     : null;
-                if (button == null) {
+                RectTransform buttonRect = buttonTransform != null
+                    ? buttonTransform.GetComponent<RectTransform>()
+                    : null;
+                if (button == null || buttonRect == null) {
                     DestroySortingWindow(handle);
                     return null;
                 }
 
-                buttonTransform.gameObject.SetActive(true);
-                handle.Buttons.Add(button);
+                bool active = index < captions.Length;
+                buttonTransform.gameObject.SetActive(active);
+                if (active)
+                    handle.Buttons.Add(button);
+                if (index == 4)
+                    previousButtonRect = buttonRect;
+                else if (index == 5) {
+                    lastButtonRect = buttonRect;
+                    lastButtonObject = buttonTransform.gameObject;
+                }
+            }
+
+            if (captions.Length > 6) {
+                if (previousButtonRect == null || lastButtonRect == null ||
+                    lastButtonObject == null) {
+                    DestroySortingWindow(handle);
+                    return null;
+                }
+
+                Vector2 step = lastButtonRect.anchoredPosition -
+                    previousButtonRect.anchoredPosition;
+                if (Mathf.Abs(step.x) < 0.1f &&
+                    Mathf.Abs(step.y) < 0.1f)
+                    step = new Vector2(0f,
+                        -Mathf.Max(1f, lastButtonRect.rect.height));
+
+                for (int index = 6; index < captions.Length; index++) {
+                    GameObject clone = GameObject.Instantiate(
+                        lastButtonObject, bottom);
+                    clone.name = "GenericButtonOutline (" + index + ")";
+                    RectTransform cloneRect =
+                        clone.GetComponent<RectTransform>();
+                    GenericButtonOutline button =
+                        clone.GetComponent<GenericButtonOutline>();
+                    if (cloneRect == null || button == null) {
+                        UnityEngine.Object.Destroy(clone);
+                        DestroySortingWindow(handle);
+                        return null;
+                    }
+                    cloneRect.anchoredPosition =
+                        lastButtonRect.anchoredPosition +
+                        step * (index - 5);
+                    clone.SetActive(true);
+                    handle.Buttons.Add(button);
+                }
             }
 
             handle.MouseHoverAction =
@@ -3833,12 +3869,6 @@ namespace Cms21UiPlus
             }
 
             CaptureGlobalSettingsArrowSprites();
-            ModLogger.Log("[NativeUI] Settings arrows: left=" +
-                (SettingsLeftArrow.IsValid
-                    ? SettingsLeftArrow.SourceName : "fallback") +
-                "; right=" + (SettingsRightArrow.IsValid
-                    ? SettingsRightArrow.SourceName : "fallback") + ".",
-                Types.LoggingLevels.Debug);
         }
 
         private static int ScoreSettingsArrowCandidate(Image candidate,
@@ -4385,12 +4415,5 @@ namespace Cms21UiPlus
             return builder.ToString();
         }
 
-        private static string Describe(GameObject gameObject)
-        {
-            if (gameObject == null)
-                return "<none>";
-            return gameObject.name + "{active=" +
-                gameObject.activeInHierarchy + "}";
-        }
     }
 }

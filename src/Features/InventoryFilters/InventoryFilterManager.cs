@@ -85,10 +85,7 @@ namespace Cms21UiPlus
             foreach (DrawSnapshot snapshot in DrawSnapshots.Values) {
                 try {
                     snapshot.Restore();
-                } catch (Exception exception) {
-                    ModLogger.Log("[InventoryFilter] Failed to restore a filter snapshot " +
-                        "during reset." + Environment.NewLine + exception,
-                        Types.LoggingLevels.Debug);
+                } catch {
                 }
             }
 

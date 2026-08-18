@@ -465,9 +465,6 @@ namespace Cms21UiPlus
                     new Il2CppSystem.Collections.Generic.List<GroupItem>();
                 condition = BulkScrapAllCondition;
 
-                ModLogger.Log("[ScrapInventoryFilter] Native bulk scrap restricted to " +
-                    selectedItems.Count + " selected loose part(s).",
-                    Types.LoggingLevels.Normal);
                 return true;
             } catch (Exception exception) {
                 ModLogger.Log("[ScrapInventoryFilter] Failed to prepare the " +
@@ -1059,9 +1056,6 @@ namespace Cms21UiPlus
             }
 
             if (PendingBulkItemUids.Count == 0) {
-                ModLogger.Log("[ScrapInventoryFilter] Space hold ignored because " +
-                    "the current list contains no unlocked loose parts.",
-                    Types.LoggingLevels.Normal);
                 return false;
             }
 
@@ -1085,9 +1079,6 @@ namespace Cms21UiPlus
                 uiManager.ShowAskWindow(title, description,
                     new Action<bool>(OnBulkConfirmationResult), true);
 
-                ModLogger.Log("[ScrapInventoryFilter] Opened confirmation for " +
-                    PendingBulkItemUids.Count + " selected loose part(s).",
-                    Types.LoggingLevels.Normal);
                 return true;
             } catch (Exception exception) {
                 CancelPendingFilteredBulkScrap();
@@ -1106,8 +1097,6 @@ namespace Cms21UiPlus
 
             if (!accepted) {
                 PendingBulkItemUids.Clear();
-                ModLogger.Log("[ScrapInventoryFilter] Bulk scrap confirmation " +
-                    "was cancelled.", Types.LoggingLevels.Normal);
                 return;
             }
 
@@ -1161,11 +1150,6 @@ namespace Cms21UiPlus
                         "removed no selected parts. Requested threshold=" +
                         condition + ", selected=" + beforeCount + ".",
                         Types.LoggingLevels.Warning);
-                } else {
-                    ModLogger.Log("[ScrapInventoryFilter] Bulk scrap " +
-                        "removed " + removedCount + " part(s) through " +
-                        "Inventory.ScrapPerCondition.",
-                        Types.LoggingLevels.Normal);
                 }
             } catch (Exception exception) {
                 ModLogger.Log("[ScrapInventoryFilter] Bulk scrap failed." +

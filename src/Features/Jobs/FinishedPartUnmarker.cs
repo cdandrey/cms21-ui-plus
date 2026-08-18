@@ -27,7 +27,7 @@ namespace Cms21UiPlus
         public static void PartScriptShowMountedPrefix(PartScript __instance)
         {
             if (IsEnabled)
-                TryUnmarkMountedPart(__instance, false);
+                TryUnmarkMountedPart(__instance);
         }
 
         [HarmonyPatch(typeof(PartScript), nameof(PartScript.SetCondition))]
@@ -38,10 +38,10 @@ namespace Cms21UiPlus
                 GameMode.Get().GetCurrentMode() != gameMode.PartSelectMount)
                 return;
 
-            TryUnmarkMountedPart(__instance, true);
+            TryUnmarkMountedPart(__instance);
         }
 
-        private static void TryUnmarkMountedPart(PartScript part, bool instantMount)
+        private static void TryUnmarkMountedPart(PartScript part)
         {
             try {
                 CarLoader carLoader = GameScript.Get().GetIOMouseOverCarLoader2();
@@ -53,27 +53,22 @@ namespace Cms21UiPlus
                 if (job == null)
                     return;
 
-                UnmarkIfFinished(part, job.globalCondition,
-                    instantMount ? "unmarked done B" : "unmarked done");
-                foreach (PartScript linkedPart in part.GetUnmountWith()) {
-                    UnmarkIfFinished(linkedPart, job.globalCondition,
-                        instantMount ? "unmarked done B with" : "unmarked done with");
-                }
+                UnmarkIfFinished(part, job.globalCondition);
+                foreach (PartScript linkedPart in part.GetUnmountWith())
+                    UnmarkIfFinished(linkedPart, job.globalCondition);
             } catch (Exception exception) {
                 ModLogger.Log("[Jobs] Failed to update finished-part marking." +
                     Environment.NewLine + exception, Types.LoggingLevels.Error);
             }
         }
 
-        private static void UnmarkIfFinished(PartScript part, float requiredCondition,
-            string logSuffix)
+        private static void UnmarkIfFinished(PartScript part, float requiredCondition)
         {
             if (part == null || part.Condition < requiredCondition ||
                 !part.markImportantPart)
                 return;
 
             part.markImportantPart = false;
-            ModLogger.Log(part.name + " " + logSuffix, Types.LoggingLevels.Debug);
         }
     }
 }

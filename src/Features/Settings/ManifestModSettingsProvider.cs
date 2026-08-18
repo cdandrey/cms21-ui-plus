@@ -168,10 +168,6 @@ namespace Cms21UiPlus
             savedValues = merged;
             status = ModLocalization.Get("LOC_SettingSaved") +
                 ModLocalization.GetApplyModeStatus(applyMode);
-            ModLogger.Log("[ModSettings] Manifest setting saved: mod=" +
-                id + "; key=" + option.Key + "; config=" + configPath +
-                "; manifest=" + manifestPath + ".",
-                Types.LoggingLevels.Normal);
             return true;
         }
 
@@ -212,9 +208,6 @@ namespace Cms21UiPlus
             savedValues = CloneValues(candidate.Values);
             status = ModLocalization.Get("LOC_SettingsSaved") +
                 ModLocalization.GetApplyModeStatus(highestApplyMode);
-            ModLogger.Log("[ModSettings] Manifest settings saved: mod=" +
-                id + "; config=" + configPath + "; manifest=" +
-                manifestPath + ".", Types.LoggingLevels.Normal);
             return true;
         }
 

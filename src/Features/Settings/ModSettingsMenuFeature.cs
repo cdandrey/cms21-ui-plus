@@ -575,8 +575,6 @@ namespace Cms21UiPlus
             InsertLaunchButtonIntoNativeLists(buttons, templateIndex,
                 template);
             mainSection.UpdateMouseEvents();
-            ModLogger.Log("[ModSettings] Main-menu Mods entry attached.",
-                Types.LoggingLevels.NormalClean);
             return true;
         }
 
@@ -777,19 +775,6 @@ namespace Cms21UiPlus
                 ClearCardSelection();
                 ResetCardPointerTracking();
                 UpdateCardPointerSelection(true);
-
-                RectTransform windowRect =
-                    windowObject.GetComponent<RectTransform>();
-                RectTransform cardAreaRect = cardsRoot;
-                ModLogger.Log("[ModSettings] Independent Mods UI opened; " +
-                    "discovered=" + installedMods.Count +
-                    "; settings providers=" + CountSupportedMods() +
-                    "; native TutorialsWindow untouched; native cards=" +
-                    (tutorialsStyleSource.tutorialItems != null
-                        ? tutorialsStyleSource.tutorialItems.Length : 0) +
-                    "; window=" + FormatRect(windowRect) +
-                    "; cards=" + FormatRect(cardAreaRect) + ".",
-                    Types.LoggingLevels.NormalClean);
             } catch (Exception exception) {
                 DisableAfterError("mods window open", exception);
             }
@@ -1694,10 +1679,6 @@ namespace Cms21UiPlus
                 CustomizeDiscardConfirmationHints();
                 EnableNativeDiscardConfirmationInput();
                 Input.ResetInputAxes();
-                ModLogger.Log("[ModSettings] Native discard confirmation " +
-                    "opened; overlay raycasts suspended; native manager " +
-                    "input=" + discardNativeManagerInputEnabled + ".",
-                    Types.LoggingLevels.Debug);
             } catch (Exception exception) {
                 discardConfirmationOpen = false;
                 RestoreDiscardConfirmationHints();
@@ -1723,9 +1704,6 @@ namespace Cms21UiPlus
             pendingDiscardAction = null;
             RestoreOverlayAfterDiscardConfirmation();
             Input.ResetInputAxes();
-            ModLogger.Log("[ModSettings] Native discard confirmation " +
-                "closed; accepted=" + accepted + ".",
-                Types.LoggingLevels.Debug);
             bool canLeave = !accepted || ApplyDraft();
             if (canLeave) {
                 discardPreviousSelection = null;
@@ -1778,10 +1756,6 @@ namespace Cms21UiPlus
             }
 
             discardHintLabelsCustomized = acceptUpdated && cancelUpdated;
-            if (discardHintLabelsCustomized) {
-                ModLogger.Log("[ModSettings] Native discard confirmation " +
-                    "hints relabeled.", Types.LoggingLevels.Debug);
-            }
         }
 
         private static void CaptureDiscardHintOriginal(Text text)
@@ -1990,9 +1964,6 @@ namespace Cms21UiPlus
                 return result;
             }
 
-            ModLogger.Log("[ModSettings] Scanning " + dllFiles.Length +
-                " DLL file(s) in " + modsDirectory + ".",
-                Types.LoggingLevels.Debug);
             Array.Sort(dllFiles, StringComparer.OrdinalIgnoreCase);
             HashSet<string> seenAssemblies = new HashSet<string>(
                 StringComparer.OrdinalIgnoreCase);
@@ -2012,9 +1983,6 @@ namespace Cms21UiPlus
                             Types.LoggingLevels.Warning);
                         continue;
                     }
-                    ModLogger.Log("[ModSettings] DLL metadata read: " +
-                        fileName + " -> " + assemblyName + ".",
-                        Types.LoggingLevels.Debug);
                 } catch (Exception exception) {
                     ModLogger.Log("[ModSettings] Failed to read DLL " +
                         "metadata: " + fileName + "." +
@@ -2042,31 +2010,16 @@ namespace Cms21UiPlus
                         "invalid: assembly=" + assemblyName + "; " +
                         manifestStatus + ".",
                         Types.LoggingLevels.Warning);
-                } else {
-                    ModLogger.Log("[ModSettings] UI settings manifest: " +
-                        "assembly=" + assemblyName + "; " +
-                        manifestStatus + ".",
-                        Types.LoggingLevels.Debug);
                 }
 
-                string melonStatus;
-                string displayName;
-                if (provider != null) {
-                    displayName = provider.DisplayName;
-                    melonStatus = "display name supplied by manifest";
-                } else {
-                    displayName = TryGetMelonDisplayName(loadedAssembly,
-                        out melonStatus);
-                }
+                string displayName = provider != null
+                    ? provider.DisplayName
+                    : TryGetMelonDisplayName(loadedAssembly);
                 if (loadedAssembly == typeof(Main).Assembly &&
                     provider == null)
                     displayName = BuildInfo.Name;
 
                 if (string.IsNullOrEmpty(displayName) && provider == null) {
-                    ModLogger.Log("[ModSettings] DLL skipped: " + fileName +
-                        "; assembly=" + assemblyName +
-                        "; reason=" + melonStatus + ".",
-                        Types.LoggingLevels.Debug);
                     continue;
                 }
 
@@ -2075,11 +2028,6 @@ namespace Cms21UiPlus
 
                 result.Add(new InstalledModEntry(filePath, assemblyName,
                     displayName, provider));
-                ModLogger.Log("[ModSettings] Mod card added: " + fileName +
-                    "; name=\"" + displayName + "\"; UI settings=" +
-                    (provider != null ? "supported" : "not supported") +
-                    "; manifest=" + manifestStatus + ".",
-                    Types.LoggingLevels.Debug);
             }
 
             result.Sort(delegate (InstalledModEntry left,
@@ -2091,13 +2039,10 @@ namespace Cms21UiPlus
             return result;
         }
 
-        private static string TryGetMelonDisplayName(Assembly assembly,
-            out string status)
+        private static string TryGetMelonDisplayName(Assembly assembly)
         {
-            if (assembly == null) {
-                status = "assembly is not loaded";
+            if (assembly == null)
                 return null;
-            }
 
             try {
                 IList<CustomAttributeData> attributes =
@@ -2114,36 +2059,18 @@ namespace Cms21UiPlus
 
                     IList<CustomAttributeTypedArgument> arguments =
                         attribute.ConstructorArguments;
-                    if (arguments.Count < 2) {
-                        status = "MelonInfo metadata is malformed";
+                    if (arguments.Count < 2)
                         return null;
-                    }
                     string displayName = arguments[1].Value as string;
-                    if (string.IsNullOrEmpty(displayName)) {
-                        status = "MelonInfo display name is empty";
-                        return null;
-                    }
-                    status = "read successfully";
-                    return displayName;
+                    return string.IsNullOrEmpty(displayName)
+                        ? null : displayName;
                 }
-                status = "MelonInfo metadata was not found";
             } catch (Exception exception) {
-                status = "MelonInfo metadata read failed: " +
-                    exception.GetType().Name + ": " + exception.Message;
-                ModLogger.Log("[ModSettings] " + status + ".",
+                ModLogger.Log("[ModSettings] MelonInfo metadata read failed." +
+                    Environment.NewLine + exception,
                     Types.LoggingLevels.Warning);
             }
             return null;
-        }
-
-        private static int CountSupportedMods()
-        {
-            int count = 0;
-            for (int i = 0; i < installedMods.Count; i++) {
-                if (installedMods[i].SupportsSettings)
-                    count++;
-            }
-            return count;
         }
 
         private static void SelectFirstSettingsRow()
@@ -2194,17 +2121,6 @@ namespace Cms21UiPlus
             }
         }
 
-        private static string FormatRect(RectTransform rect)
-        {
-            if (rect == null)
-                return "<null>";
-            Vector2 size = rect.rect.size;
-            Vector2 position = rect.anchoredPosition;
-            return Mathf.Abs(size.x).ToString("0.##") + "x" +
-                Mathf.Abs(size.y).ToString("0.##") + "@" +
-                position.x.ToString("0.##") + "," +
-                position.y.ToString("0.##");
-        }
 
         private static void SuppressMainMenuInteraction()
         {
@@ -2266,13 +2182,6 @@ namespace Cms21UiPlus
                 NativeUiFactory.UpdateMainMenuButtonVisual(
                     launchButton, true);
 
-            ModLogger.Log("[ModSettings] Native main-menu state suspended: " +
-                "mainInput=" + mainSectionInputWasEnabled +
-                "; adInput=" + adSectionInputWasEnabled +
-                "; adsVisible=" + adsWereVisible +
-                "; navigation=" + (suspendedNavigation != null) +
-                "; hiddenHints=" + hiddenNativeHintObjects.Count + ".",
-                Types.LoggingLevels.Debug);
         }
 
         private static void RestoreMainMenuInteraction()

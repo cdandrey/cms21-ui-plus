@@ -329,11 +329,6 @@ namespace Cms21UiPlus
                 }
             }
 
-            ModLogger.Log("[FilteredWarehouseTransfer] moved=" + moved +
-                ", direction=" +
-                (toWarehouse ? "inventory-to-warehouse" :
-                    "warehouse-to-inventory") + ".",
-                Types.LoggingLevels.Normal);
             UpdateHintAfterMove();
             return moved > 0 || mutationStarted;
         }

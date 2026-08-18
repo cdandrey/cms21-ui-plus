@@ -29,6 +29,13 @@ namespace Cms21UiPlus
         private static bool nativeRowLayoutCaptured;
         private static RowLayoutState nativeRowLayout;
 
+        private static bool IsEnabled {
+            get {
+                return Main.SettingsEntry != null &&
+                    Main.SettingsEntry.Value.addShoppingListSorting;
+            }
+        }
+
         private struct RowLayoutState
         {
             internal float SelectedWidth;
@@ -44,7 +51,7 @@ namespace Cms21UiPlus
         private static void ShopListWindowShowPostfix(ShopListWindow __instance,
             bool __result)
         {
-            if (__result)
+            if (__result && IsEnabled)
                 ApplyTwoColumnPresentation(__instance);
         }
 
@@ -52,7 +59,8 @@ namespace Cms21UiPlus
         [HarmonyPostfix]
         private static void ShopListWindowFillItemsPostfix(ShopListWindow __instance)
         {
-            ApplyTwoColumnPresentation(__instance);
+            if (IsEnabled)
+                ApplyTwoColumnPresentation(__instance);
         }
 
         private static void ApplyTwoColumnPresentation(ShopListWindow window)

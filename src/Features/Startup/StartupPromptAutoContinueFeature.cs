@@ -59,9 +59,6 @@ namespace Cms21UiPlus
 
                         transitionRequested = true;
                         try {
-                            ModLogger.Log(
-                                "[Startup] Continuing past the startup prompt.",
-                                Types.LoggingLevels.Normal);
                             button.StartCoroutine(button.LoadScene());
                         } catch (Exception exception) {
                             transitionRequested = false;

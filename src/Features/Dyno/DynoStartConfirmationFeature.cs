@@ -39,8 +39,6 @@ namespace Cms21UiPlus
 
             __instance.AskWindow.withSound = false;
             __instance.AskWindow.AcceptAction();
-            ModLogger.Log("[Dyno] Start confirmation accepted automatically.",
-                Types.LoggingLevels.Debug);
         }
 
         private static bool IsDynoStartConfirmation(string description)

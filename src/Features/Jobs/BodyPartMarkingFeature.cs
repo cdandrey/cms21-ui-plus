@@ -199,11 +199,6 @@ namespace Cms21UiPlus
                             carLoader, carPart, interactive);
                     } else {
                         interactive.HighlightNone();
-                        if (carPart.AdditionalString != Unmarked) {
-                            ModLogger.Log("[Jobs] Unexpected body-part marker: " +
-                                carPart.AdditionalString,
-                                Types.LoggingLevels.Debug);
-                        }
                     }
                 } catch (Exception exception) {
                     ModLogger.Log("[Jobs] Failed to refresh body-part highlight." +

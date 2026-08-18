@@ -156,8 +156,6 @@ namespace Cms21UiPlus
                 if (Refresh())
                     yield break;
 
-                ModLogger.Log("[OwnedParts] Cache refresh retry " + attempt + "/5.",
-                    Types.LoggingLevels.Warning);
                 yield return new WaitForSeconds(1f);
                 if (!GlobalState.IsGarageSceneActive)
                     yield break;
@@ -169,23 +167,16 @@ namespace Cms21UiPlus
 
         public static bool Refresh()
         {
-            if (!GlobalState.IsGarageSceneActive) {
-                ModLogger.Log("[OwnedParts] Cache refresh skipped: garage scene flag is false.",
-                    Types.LoggingLevels.Warning);
+            if (!GlobalState.IsGarageSceneActive)
                 return false;
-            }
 
             Inventory inventory = Singleton<Inventory>.Instance;
             Warehouse warehouse = GlobalState.GameManager != null
                 ? GlobalState.GameManager.Warehouse
                 : null;
 
-            if (inventory == null || inventory.items == null || warehouse == null) {
-                ModLogger.Log("[OwnedParts] Cache refresh postponed: inventory=" +
-                    (inventory != null) + ", warehouse=" + (warehouse != null) + ".",
-                    Types.LoggingLevels.Warning);
+            if (inventory == null || inventory.items == null || warehouse == null)
                 return false;
-            }
 
             Dictionary<string, ConditionBreakdown> refreshed =
                 new Dictionary<string, ConditionBreakdown>(StringComparer.Ordinal);
@@ -195,13 +186,6 @@ namespace Cms21UiPlus
                 new Dictionary<string, List<WheelVariantCount>>(
                     StringComparer.Ordinal);
 
-            int directItemCount = inventory.items.Count;
-            int groupCount = inventory.groups != null ? inventory.groups.Count : 0;
-            int groupedItemCount = 0;
-            int warehouseItemCount = 0;
-            int warehouseGroupCount = 0;
-            int warehouseGroupedItemCount = 0;
-
             foreach (Item item in inventory.items)
                 AddTo(refreshed, refreshedWheelCounts, item);
 
@@ -210,7 +194,6 @@ namespace Cms21UiPlus
                     if (group == null || group.ItemList == null)
                         continue;
 
-                    groupedItemCount += group.ItemList.Count;
                     AddGroupTo(refreshedGroupCounts, group);
                 }
             }
@@ -233,7 +216,6 @@ namespace Cms21UiPlus
                                     continue;
 
                                 AddTo(refreshed, refreshedWheelCounts, item);
-                                warehouseItemCount++;
                             }
                         }
                     }
@@ -250,8 +232,6 @@ namespace Cms21UiPlus
                         if (group == null || group.ItemList == null)
                             continue;
 
-                        warehouseGroupCount++;
-                        warehouseGroupedItemCount += group.ItemList.Count;
                         AddGroupTo(refreshedGroupCounts, group);
                     }
                 }
@@ -275,16 +255,6 @@ namespace Cms21UiPlus
                 refreshedWheelCounts)
                 WheelCountsByItemID.Add(entry.Key, entry.Value);
 
-            ModLogger.Log("[OwnedParts] Cache refreshed: inventoryItems=" +
-                directItemCount + ", inventoryGroups=" + groupCount +
-                ", inventoryGroupedItems=" + groupedItemCount +
-                ", warehouseItems=" + warehouseItemCount +
-                ", warehouseGroups=" + warehouseGroupCount +
-                ", warehouseGroupedItems=" + warehouseGroupedItemCount +
-                ", usableMinimumCondition=" + (MinimumCondition * 100f) + "%" +
-                ", uniqueItemKeys=" + Counts.Count +
-                ", uniqueGroupKeys=" + GroupCounts.Count,
-                Types.LoggingLevels.Debug);
             return true;
         }
 

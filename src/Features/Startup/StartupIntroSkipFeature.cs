@@ -11,8 +11,6 @@ namespace Cms21UiPlus
                 !Main.SettingsEntry.Value.skipStartupVideosTotally)
                 return;
 
-            ModLogger.Log("[Startup] Skipping intro scenes.",
-                Types.LoggingLevels.Normal);
             SceneManager.LoadScene("LoadResources");
         }
     }

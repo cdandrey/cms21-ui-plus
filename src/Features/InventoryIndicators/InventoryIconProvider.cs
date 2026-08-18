@@ -32,16 +32,8 @@ namespace Cms21UiPlus
         private static Sprite quality3Icon;
         private static Sprite qualityNonIcon;
 
-        private const int ExpectedIconCount = 18;
-
         private static readonly HashSet<string> LoggedIcons =
             new HashSet<string>(StringComparer.Ordinal);
-        private static readonly HashSet<string> AttemptedIcons =
-            new HashSet<string>(StringComparer.Ordinal);
-
-        private static int loadedIconCount;
-        private static int failedIconCount;
-        private static bool loadSummaryLogged;
 
         public static Sprite GetRedRepairWrenchIcon()
         {
@@ -157,7 +149,6 @@ namespace Cms21UiPlus
                 if (LoggedIcons.Add(logKey))
                     ModLogger.Log("[InventoryIcons] Prepared icon is missing: " + logicalName +
                         " at " + filePath + ".", Types.LoggingLevels.Warning);
-                RecordLoadResult(logicalName, false);
                 return null;
             }
 
@@ -168,45 +159,14 @@ namespace Cms21UiPlus
                     ModLogger.Log("[InventoryIcons] Failed to load " + logicalName +
                         " from " + filePath + "." + Environment.NewLine + exception,
                         Types.LoggingLevels.Warning);
-                RecordLoadResult(logicalName, false);
                 return null;
             }
 
-            if (LoggedIcons.Add(logKey)) {
-                ModLogger.Log(cache != null
-                    ? "[InventoryIcons] Loaded " + logicalName + " from " + filePath + "."
-                    : "[InventoryIcons] Could not decode " + logicalName + " at " + filePath + ".",
-                    cache != null ? Types.LoggingLevels.Debug : Types.LoggingLevels.Warning);
+            if (cache == null && LoggedIcons.Add(logKey)) {
+                ModLogger.Log("[InventoryIcons] Could not decode " + logicalName +
+                    " at " + filePath + ".", Types.LoggingLevels.Warning);
             }
-
-            RecordLoadResult(logicalName, cache != null);
             return cache;
-        }
-
-        private static void RecordLoadResult(string logicalName, bool loaded)
-        {
-            if (!AttemptedIcons.Add(logicalName))
-                return;
-
-            if (loaded)
-                loadedIconCount++;
-            else
-                failedIconCount++;
-
-            if (loadSummaryLogged || AttemptedIcons.Count < ExpectedIconCount)
-                return;
-
-            loadSummaryLogged = true;
-            ModLogger.Log(
-                failedIconCount == 0
-                    ? "[InventoryIcons] Loaded " + loadedIconCount +
-                        " inventory indicator icons."
-                    : "[InventoryIcons] Loaded " + loadedIconCount + " of " +
-                        ExpectedIconCount + " inventory indicator icons; failed=" +
-                        failedIconCount + ".",
-                failedIconCount == 0
-                    ? Types.LoggingLevels.Normal
-                    : Types.LoggingLevels.Warning);
         }
     }
 }

@@ -23,6 +23,8 @@ namespace Cms21UiPlus
         public bool removePartsFromShoppingList = true;
         [Tomlet.Attributes.TomlInlineComment("Prefill purchase amount and wheel dimensions from the shopping list")]
         public bool wheelShopListPurchaseHelper = true;
+        [Tomlet.Attributes.TomlInlineComment("Enable the improved shopping list with two-column layout, quantity controls, indicators, sorting and bulk purchase")]
+        public bool addShoppingListSorting = true;
         [Tomlet.Attributes.TomlInlineComment("Quickly switch between matching mount and unmount modes")]
         public bool quickSwitchMountModes = true;
         [Tomlet.Attributes.TomlInlineComment("Add an exit-game action to the garage pause menu")]

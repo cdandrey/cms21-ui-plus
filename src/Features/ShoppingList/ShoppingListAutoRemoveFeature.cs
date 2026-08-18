@@ -195,14 +195,10 @@ namespace Cms21UiPlus
             ShopListItemData entry, int purchasedAmount)
         {
             if (purchasedAmount >= entry.Amount) {
-                ModLogger.Log("[ShoppingList] Removed purchased entry: " + entry.ID,
-                    Types.LoggingLevels.Debug);
                 entries.Remove(entry);
                 return;
             }
 
-            ModLogger.Log("[ShoppingList] Reduced entry " + entry.ID + ": " +
-                entry.Amount + "-" + purchasedAmount, Types.LoggingLevels.Debug);
             for (int i = 0; i < purchasedAmount; i++)
                 UIManager.Get().ShopListWindow.RemoveFromShopList(
                     entry.ID, entry.AdditionalData, false);

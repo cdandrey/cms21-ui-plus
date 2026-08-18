@@ -114,8 +114,6 @@ namespace Cms21UiPlus
                 Directory.CreateDirectory(directory);
 
             File.WriteAllText(filePath, TomletMain.TomlStringFrom(Defaults));
-            ModLogger.Log("[KeyBindings] Created " + filePath + ".",
-                Types.LoggingLevels.Normal);
         }
 
         private static KeyCode ParseKey(string value, KeyCode fallback, string settingName)

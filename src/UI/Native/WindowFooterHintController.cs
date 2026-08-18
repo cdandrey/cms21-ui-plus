@@ -66,6 +66,7 @@ namespace Cms21UiPlus
             public bool CanHold;
             public float TimeToHold;
             public bool OnlyHandleMouseClickInput = true;
+            public bool AllowAutomaticRowWrap = true;
         }
 
         private sealed class HintEntry
@@ -75,6 +76,7 @@ namespace Cms21UiPlus
             public int Order;
             public NativeUiFactory.ControlHintRowHandle FactoryRow;
             public NativeUiFactory.FooterHintHandle Hint;
+            public bool AllowAutomaticRowWrap;
         }
 
         private sealed class WindowState
@@ -122,6 +124,7 @@ namespace Cms21UiPlus
             public float Width;
             public float Height;
             public int RequestedRow;
+            public bool AllowAutomaticRowWrap;
         }
 
         private sealed class FooterHintPlacement
@@ -312,9 +315,11 @@ namespace Cms21UiPlus
                 state.ItemCount = request.ItemCount;
 
             layoutChanged |= entry.Row != request.Row ||
-                entry.Order != request.Order;
+                entry.Order != request.Order ||
+                entry.AllowAutomaticRowWrap != request.AllowAutomaticRowWrap;
             entry.Row = request.Row;
             entry.Order = request.Order;
+            entry.AllowAutomaticRowWrap = request.AllowAutomaticRowWrap;
             if (layoutChanged)
                 ScheduleLayout(state);
             return entry.Hint;
@@ -591,6 +596,7 @@ namespace Cms21UiPlus
                     Width = occupiedWidth,
                     Height = height,
                     RequestedRow = entry.Row,
+                    AllowAutomaticRowWrap = entry.AllowAutomaticRowWrap,
                 });
             }
 
@@ -658,9 +664,9 @@ namespace Cms21UiPlus
                 FooterHintLayoutInput hint = hints[i];
                 if (hint == null)
                     continue;
-                bool useSecondRow = secondRowStarted ||
-                    hint.RequestedRow > 0 ||
-                    firstRowCursor + hint.Width > availableRight;
+                bool useSecondRow = hint.RequestedRow > 0 ||
+                    (hint.AllowAutomaticRowWrap && (secondRowStarted ||
+                        firstRowCursor + hint.Width > availableRight));
                 if (useSecondRow)
                     secondRowStarted = true;
                 FooterHintPlacement placement = new FooterHintPlacement {

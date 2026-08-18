@@ -216,6 +216,17 @@
       "descriptionKey": "LOC_SettingWheelShopListPurchaseHelperDescription"
     },
     {
+      "id": "FID_AddShoppingListSorting",
+      "key": "addShoppingListSorting",
+      "group": "shopping",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "restartGame",
+      "order": 30,
+      "nameKey": "LOC_SettingAddShoppingListSortingName",
+      "descriptionKey": "LOC_SettingAddShoppingListSortingDescription"
+    },
+    {
       "id": "FID_UnmarkFinishedParts",
       "key": "unmarkFinishedParts",
       "group": "jobs",

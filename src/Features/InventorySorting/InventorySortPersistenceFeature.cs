@@ -61,8 +61,6 @@ namespace Cms21UiPlus
                 return;
             }
 
-            ModLogger.Log("Unknown sortable inventory: " + __instance +
-                ", sort=" + newSortType, Types.LoggingLevels.Debug);
         }
 
         [HarmonyPatch(typeof(InventoryWindow), nameof(InventoryWindow.Show))]

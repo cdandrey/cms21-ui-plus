@@ -43,12 +43,10 @@ namespace Cms21UiPlus
                 " initializing; Unity " + Application.unityVersion + ", game " +
                 GameSettings.BuildVersion + ".";
             ModLogger.Log(startMessage, Types.LoggingLevels.NormalClean);
-            ModLogger.Log(startMessage, Types.LoggingLevels.PlayerLog);
 
             GlobalState.GameManager = Singleton<GameManager>.Instance;
             GlobalState.IsMenuSceneActive =
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Menu";
-            DetectPlatform();
             bool melonDebug = Environment.GetCommandLineArgs().Contains("--melonloader.debug");
 
             LoadSettings();
@@ -64,7 +62,6 @@ namespace Cms21UiPlus
             if (!initialized)
                 return;
             SaveProfileMemory();
-            ModLogger.Log(BuildInfo.ShortName + " stopped.", Types.LoggingLevels.Normal);
             ModLogger.Shutdown();
         }
 
@@ -150,30 +147,13 @@ namespace Cms21UiPlus
             Type[] patchTypes = typeof(Main).Assembly.GetTypes()
                 .Where(type => type.GetCustomAttributes(typeof(HarmonyPatch), false).Length > 0)
                 .OrderBy(type => type.FullName, StringComparer.Ordinal).ToArray();
-            int applied = 0;
-            int failed = 0;
             foreach (Type patchType in patchTypes) {
                 try {
                     HarmonyInstance.CreateClassProcessor(patchType).Patch();
-                    applied++;
                 } catch (Exception exception) {
-                    failed++;
                     ModLogger.Log("[Harmony] Patch class failed: " + patchType.FullName +
                         NewLine + exception, Types.LoggingLevels.Error);
                 }
-            }
-            ModLogger.Log("Harmony patch classes: applied=" + applied + ", failed=" + failed + ".",
-                failed == 0 ? Types.LoggingLevels.NormalClean : Types.LoggingLevels.Warning);
-        }
-
-        private static void DetectPlatform()
-        {
-            try {
-                string platform = GlobalState.GameManager.PlatformManager.platform.ToString();
-                ModLogger.Log("Platform " + platform, Types.LoggingLevels.NormalClean);
-            } catch (Exception exception) {
-                ModLogger.Log("[Startup] Platform detection failed." + NewLine + exception,
-                    Types.LoggingLevels.Warning);
             }
         }
 

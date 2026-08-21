@@ -73,7 +73,7 @@ namespace Cms21UiPlus
                 }
 
                 if (matchingEntry != null)
-                    RemovePurchasedAmount(entries, matchingEntry, __state.Amount);
+                    RemovePurchasedAmount(matchingEntry, __state.Amount);
             } catch (Exception exception) {
                 ModLogger.Log("[ShoppingList] Failed to update licence-plate entry." +
                     Environment.NewLine + exception, Types.LoggingLevels.Error);
@@ -109,8 +109,10 @@ namespace Cms21UiPlus
                     UIManager.Get().ShopListWindow.items;
 
                 foreach (ShopListItemData entry in entries) {
-                    if (entry == null || entry.AdditionalData == null)
+                    if (entry == null)
                         continue;
+
+                    ShopListItemDataEx additional = entry.AdditionalData;
                     if (!PartIdentityComparer.MatchesPurchase(
                         __state.ItemID,
                         __state.ET,
@@ -118,14 +120,14 @@ namespace Cms21UiPlus
                         __state.Size,
                         __state.Width,
                         entry.ID,
-                        entry.AdditionalData.ET,
-                        entry.AdditionalData.Profile,
-                        entry.AdditionalData.Size,
-                        entry.AdditionalData.Width,
+                        additional != null ? additional.ET : 0,
+                        additional != null ? additional.Profile : 0,
+                        additional != null ? additional.Size : 0,
+                        additional != null ? additional.Width : 0,
                         true))
                         continue;
 
-                    RemovePurchasedAmount(entries, entry, __state.Amount);
+                    RemovePurchasedAmount(entry, __state.Amount);
                     break;
                 }
             } catch (Exception exception) {
@@ -190,18 +192,21 @@ namespace Cms21UiPlus
                 Main.SettingsEntry.Value.removePartsFromShoppingList;
         }
 
-        private static void RemovePurchasedAmount(
-            Il2CppSystem.Collections.Generic.List<ShopListItemData> entries,
-            ShopListItemData entry, int purchasedAmount)
+        private static void RemovePurchasedAmount(ShopListItemData entry,
+            int purchasedAmount)
         {
-            if (purchasedAmount >= entry.Amount) {
-                entries.Remove(entry);
+            ShopListWindow window = UIManager.Get().ShopListWindow;
+            if (window == null || entry == null || purchasedAmount <= 0)
                 return;
-            }
 
-            for (int i = 0; i < purchasedAmount; i++)
-                UIManager.Get().ShopListWindow.RemoveFromShopList(
-                    entry.ID, entry.AdditionalData, false);
+            if (purchasedAmount >= entry.Amount)
+                window.items.Remove(entry);
+            else
+                entry.Amount -= purchasedAmount;
+
+            window.Save();
+            WheelShopListPurchaseFeature.ClearSelectedEntry();
+            ShoppingListRefresh.RefreshItems(window);
         }
     }
 }

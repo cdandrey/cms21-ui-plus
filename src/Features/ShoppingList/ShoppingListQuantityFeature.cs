@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Events;
@@ -30,8 +29,6 @@ namespace Cms21UiPlus
         private const float AmountGap = 3.5f;
         private static readonly Color HoverColor =
             new Color(1f, 0.65f, 0.04f, 1f);
-        private static readonly MethodInfo FillItemsMethod =
-            AccessTools.Method(typeof(ShopListWindow), "FillItems");
         private static ShopListWindow selectedWindow;
         private static int selectedRowIndex = -1;
 
@@ -135,6 +132,7 @@ namespace Cms21UiPlus
                     return;
                 }
 
+                UpdateAmountText(row, data.Amount);
                 LayoutControls(row, minusButton, plusButton);
                 minusButton.interactable = data.Amount > 1;
                 plusButton.interactable = data.Amount < int.MaxValue;
@@ -357,6 +355,33 @@ namespace Cms21UiPlus
             target.localScale = source.localScale;
         }
 
+        private static void UpdateAmountText(ShopListItem row, int amount)
+        {
+            if (row == null || row.amount == null)
+                return;
+
+            string text = row.amount.text ?? string.Empty;
+            int numberStart = -1;
+            int numberEnd = -1;
+            for (int i = 0; i < text.Length; i++) {
+                if (!char.IsDigit(text[i])) {
+                    if (numberStart >= 0)
+                        break;
+                    continue;
+                }
+
+                if (numberStart < 0)
+                    numberStart = i;
+                numberEnd = i + 1;
+            }
+
+            string amountText = amount.ToString();
+            row.amount.text = numberStart >= 0
+                ? text.Substring(0, numberStart) + amountText +
+                    text.Substring(numberEnd)
+                : amountText;
+        }
+
         private static void AdjustQuantity(ShopListWindow window,
             ShopListItem row, int delta)
         {
@@ -387,9 +412,10 @@ namespace Cms21UiPlus
 
                 data.Amount += delta;
                 window.items[rowIndex] = data;
-                WheelShopListPurchaseFeature.RefreshSelectedEntry(data);
                 window.Save();
-                RefreshItems(window);
+                WheelShopListPurchaseFeature.RefreshSelectedEntry(data);
+                UpdateAmountText(row, data.Amount);
+                UpdateRow(window, row, data);
             } catch (Exception exception) {
                 ModLogger.Log(
                     "[ShoppingList] Failed to adjust requested quantity." +
@@ -398,12 +424,5 @@ namespace Cms21UiPlus
             }
         }
 
-        private static void RefreshItems(ShopListWindow window)
-        {
-            if (window == null || FillItemsMethod == null)
-                return;
-            FillItemsMethod.Invoke(window, null);
-            ShoppingListTwoColumnNavigationFeature.RefreshRowsNow(window);
-        }
     }
 }

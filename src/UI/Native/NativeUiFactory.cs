@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -89,6 +90,7 @@ namespace Cms21UiPlus
             public Color NormalColor;
             public ControlDescription Description;
             public ControlDescription Source;
+            public UIDescription InputOwner;
             public UnityAction Action;
             public string[] Keys;
             public string Text;
@@ -97,7 +99,13 @@ namespace Cms21UiPlus
             public float Height;
             public bool Enabled = true;
             public bool BlockKeyboardInput = true;
-            public bool RequiresFrameUpdate;
+            public bool UsesNativeHoldSuffix;
+            public bool HoldSuffixHovered;
+            public EventTrigger HoldHoverTrigger;
+            public string HoldBaseText;
+            public string HoldSuffixText;
+            public Color HoldBaseColor;
+            public int HoldSuffixFontSize;
             public bool NormalizeRect;
             public bool IsStyledFooter;
             public ControlHintRowHandle Row;
@@ -422,8 +430,8 @@ namespace Cms21UiPlus
         private static readonly TextStyle SettingsText = new TextStyle();
         private static readonly TextStyle HintText = new TextStyle();
 
-        private static readonly List<FooterHintHandle> ActiveControlHints =
-            new List<FooterHintHandle>();
+        private static readonly Dictionary<int, FooterHintHandle>
+            NativeHoldHoverHints = new Dictionary<int, FooterHintHandle>();
         private const string ModifierKeyObjectPrefix =
             "CMS21UIPlus.ModifierKey_";
 
@@ -433,6 +441,7 @@ namespace Cms21UiPlus
         private static ControlDescription hintSource;
         private static MainMenuVisualHandle mainMenuVisual;
         private static Sprite modCardIcon;
+        private static int modCardIconTutorialIndex = -1;
         private static Color mainMenuNormalGraphicColor = Color.white;
         private static Color mainMenuNormalTextColor = Color.white;
         private static Color mainMenuNormalTextComponentColor = Color.white;
@@ -460,7 +469,7 @@ namespace Cms21UiPlus
         private static Color hintNormalColor =
             new Color(0.74f, 0.74f, 0.74f, 1f);
         private static readonly Color HintHoverColor =
-            new Color(1f, 0.65f, 0.04f, 1f);
+            new Color(1f, 153f / 255f, 0f, 1f);
         private static Vector2 nativeHintKeySize = new Vector2(14.4f, 14.4f);
         private static float nativeHintHeight = 15f;
         private static int nativeHintFontSize = 10;
@@ -2543,7 +2552,6 @@ namespace Cms21UiPlus
                 Width = CalculateControlHintWidth(rect),
                 Enabled = true,
                 BlockKeyboardInput = options.OnlyHandleMouseClickInput,
-                RequiresFrameUpdate = options.CanHold,
                 NormalizeRect = options.NormalizeRect,
             };
 
@@ -2559,8 +2567,225 @@ namespace Cms21UiPlus
                 handle.Height = Mathf.Max(1f, bounds.size.y);
             }
 
-            ActiveControlHints.Add(handle);
+            if (!RegisterControlHintInputOwner(handle)) {
+                DestroyFooterHint(handle);
+                return null;
+            }
             return handle;
+        }
+
+        private static bool RegisterControlHintInputOwner(
+            FooterHintHandle handle)
+        {
+            if (handle == null || handle.Description == null ||
+                handle.Source == null || handle.BlockKeyboardInput ||
+                !handle.Description.canHold)
+                return true;
+
+            UIDescription owner =
+                handle.Source.GetComponentInParent<UIDescription>();
+            if (owner == null || owner.descriptions == null)
+                return false;
+
+            ControlDescription[] descriptions = owner.descriptions;
+            for (int i = 0; i < descriptions.Length; i++) {
+                if (descriptions[i] != handle.Description)
+                    continue;
+                handle.InputOwner = owner;
+                return true;
+            }
+
+            ControlDescription[] expanded =
+                new ControlDescription[descriptions.Length + 1];
+            Array.Copy(descriptions, expanded, descriptions.Length);
+            expanded[descriptions.Length] = handle.Description;
+            owner.descriptions = expanded;
+            handle.InputOwner = owner;
+            return true;
+        }
+
+        private static void UnregisterControlHintInputOwner(
+            FooterHintHandle handle)
+        {
+            if (handle == null)
+                return;
+
+            UIDescription owner = handle.InputOwner;
+            handle.InputOwner = null;
+            if (owner == null || owner.descriptions == null ||
+                handle.Description == null)
+                return;
+
+            ControlDescription[] descriptions = owner.descriptions;
+            int index = -1;
+            for (int i = 0; i < descriptions.Length; i++) {
+                if (descriptions[i] != handle.Description)
+                    continue;
+                index = i;
+                break;
+            }
+            if (index < 0)
+                return;
+
+            ControlDescription[] reduced =
+                new ControlDescription[descriptions.Length - 1];
+            if (index > 0)
+                Array.Copy(descriptions, 0, reduced, 0, index);
+            if (index < descriptions.Length - 1)
+                Array.Copy(descriptions, index + 1, reduced, index,
+                    descriptions.Length - index - 1);
+            owner.descriptions = reduced;
+        }
+
+        internal static void ApplyNativeHoldSuffix(FooterHintHandle handle,
+            string baseText, string holdText)
+        {
+            if (handle == null || handle.Description == null ||
+                handle.Label == null)
+                return;
+
+            Text sourceLabel = handle.Source != null &&
+                handle.Source.texts != null &&
+                handle.Source.texts.Length > 0
+                    ? handle.Source.texts[0] : null;
+            if (!handle.UsesNativeHoldSuffix) {
+                handle.HoldBaseColor = sourceLabel != null
+                    ? GetRenderedTextColor(sourceLabel) : hintNormalColor;
+                handle.HoldSuffixFontSize =
+                    Mathf.Max(8, handle.Label.fontSize - 2);
+                Text nativeHold = FindNativeHoldText(handle.Source);
+                if (nativeHold != null)
+                    handle.HoldSuffixFontSize = nativeHold.fontSize;
+            }
+
+            handle.Description.forceNormalColor = true;
+            handle.UsesNativeHoldSuffix = true;
+            handle.HoldBaseText = baseText ?? string.Empty;
+            handle.HoldSuffixText = holdText ?? string.Empty;
+            handle.HoldSuffixHovered = handle.Description.mouseOver;
+            EnsureNativeHoldHoverEvents(handle);
+            RenderNativeHoldSuffix(handle, handle.HoldSuffixHovered, true);
+        }
+
+        private static void EnsureNativeHoldHoverEvents(
+            FooterHintHandle handle)
+        {
+            if (handle == null || handle.Root == null ||
+                handle.HoldHoverTrigger != null)
+                return;
+
+            EventTrigger trigger = handle.Root.GetComponent<EventTrigger>();
+            if (trigger == null)
+                trigger = handle.Root.AddComponent<EventTrigger>();
+            if (trigger == null)
+                return;
+
+            handle.HoldHoverTrigger = trigger;
+            NativeHoldHoverHints[trigger.GetInstanceID()] = handle;
+        }
+
+        internal static void OnNativeHoldPointerEnter(EventTrigger trigger)
+        {
+            SetNativeHoldHoverState(trigger, true);
+        }
+
+        internal static void OnNativeHoldPointerExit(EventTrigger trigger)
+        {
+            SetNativeHoldHoverState(trigger, false);
+        }
+
+        private static void SetNativeHoldHoverState(EventTrigger trigger,
+            bool hovered)
+        {
+            if (trigger == null)
+                return;
+
+            FooterHintHandle handle;
+            if (!NativeHoldHoverHints.TryGetValue(trigger.GetInstanceID(),
+                    out handle) || handle == null || handle.Root == null ||
+                handle.Label == null || !handle.UsesNativeHoldSuffix ||
+                handle.HoldSuffixHovered == hovered)
+                return;
+
+            handle.HoldSuffixHovered = hovered;
+            RenderNativeHoldSuffix(handle, hovered, false);
+        }
+
+        private static void RenderNativeHoldSuffix(FooterHintHandle handle,
+            bool hovered, bool refreshLayout)
+        {
+            if (handle == null || handle.Label == null)
+                return;
+
+            Color baseColor = hovered ? HintHoverColor : handle.HoldBaseColor;
+            Text label = handle.Label;
+            label.supportRichText = true;
+            label.color = Color.white;
+            label.CrossFadeColor(Color.white, 0f, true, true);
+            string displayText =
+                "<color=#" + ColorToHtmlRgba(baseColor) + ">" +
+                (handle.HoldBaseText ?? string.Empty) + "</color> " +
+                "<size=" + handle.HoldSuffixFontSize + "><color=#" +
+                ColorToHtmlRgba(HintHoverColor) + ">[" +
+                (handle.HoldSuffixText ?? string.Empty) +
+                "]</color></size>";
+            if (string.Equals(label.text, displayText,
+                    StringComparison.Ordinal)) {
+                handle.Text = displayText;
+                return;
+            }
+
+            label.text = displayText;
+            handle.Text = displayText;
+            if (refreshLayout && handle.Description != null)
+                handle.Description.RefreshLayout();
+        }
+
+        private static string ColorToHtmlRgba(Color color)
+        {
+            int r = Mathf.RoundToInt(Mathf.Clamp01(color.r) * 255f);
+            int g = Mathf.RoundToInt(Mathf.Clamp01(color.g) * 255f);
+            int b = Mathf.RoundToInt(Mathf.Clamp01(color.b) * 255f);
+            int a = Mathf.RoundToInt(Mathf.Clamp01(color.a) * 255f);
+            return r.ToString("X2") + g.ToString("X2") +
+                b.ToString("X2") + a.ToString("X2");
+        }
+
+        private static Color GetRenderedTextColor(Text text)
+        {
+            return text != null && text.canvasRenderer != null
+                ? text.canvasRenderer.GetColor() : Color.clear;
+        }
+
+        private static Text FindNativeHoldText(ControlDescription source)
+        {
+            if (source == null)
+                return null;
+
+            Transform direct = source.transform.Find("hold");
+            Text directText = direct != null
+                ? direct.GetComponent<Text>() : null;
+            if (directText != null)
+                return directText;
+
+            UIDescription owner = source.GetComponentInParent<UIDescription>();
+            if (owner == null)
+                return null;
+
+            ControlDescription[] descriptions =
+                owner.GetComponentsInChildren<ControlDescription>(true);
+            for (int i = 0; i < descriptions.Length; i++) {
+                ControlDescription candidate = descriptions[i];
+                if (candidate == null || candidate.transform == null)
+                    continue;
+
+                Transform hold = candidate.transform.Find("hold");
+                Text holdText = hold != null
+                    ? hold.GetComponent<Text>() : null;
+                if (holdText != null)
+                    return holdText;
+            }
+            return null;
         }
 
         private static void NormalizeControlHintRect(
@@ -3328,36 +3553,6 @@ namespace Cms21UiPlus
                 RelayoutControlHintRow(handle.Row);
         }
 
-        public static void UpdateControlHints()
-        {
-            for (int i = ActiveControlHints.Count - 1; i >= 0; i--) {
-                FooterHintHandle handle = ActiveControlHints[i];
-                if (handle == null || handle.Root == null ||
-                    handle.Description == null) {
-                    ActiveControlHints.RemoveAt(i);
-                    continue;
-                }
-                if (!handle.Root.activeInHierarchy ||
-                    handle.Description.blockInput ||
-                    !handle.RequiresFrameUpdate)
-                    continue;
-
-                try {
-                    handle.Description.CustomUpdate();
-                    SyncModifierKeyImageColors(handle.Description);
-                } catch (Exception exception) {
-                    ModLogger.Log("[NativeUI] Control hint update failed." +
-                        Environment.NewLine + exception,
-                        Types.LoggingLevels.Warning);
-                    handle.Description.blockInput = true;
-                    handle.Description.blockMouseInput = true;
-                    handle.Description.blockKeyboardInput = true;
-                    ActiveControlHints.RemoveAt(i);
-                }
-            }
-
-        }
-
         public static void DestroyFooterHint(FooterHintHandle handle)
         {
             if (handle == null)
@@ -3366,7 +3561,10 @@ namespace Cms21UiPlus
             handle.Row = null;
             if (row != null)
                 row.Hints.Remove(handle);
-            ActiveControlHints.Remove(handle);
+            UnregisterControlHintInputOwner(handle);
+            if (handle.HoldHoverTrigger != null)
+                NativeHoldHoverHints.Remove(
+                    handle.HoldHoverTrigger.GetInstanceID());
             if (handle.Description != null &&
                 handle.Description.OnAction != null)
                 handle.Description.OnAction.RemoveAllListeners();
@@ -3384,8 +3582,10 @@ namespace Cms21UiPlus
             handle.ContentRect = null;
             handle.Button = null;
             handle.KeyImages.Clear();
+            handle.HoldHoverTrigger = null;
             handle.Description = null;
             handle.Source = null;
+            handle.InputOwner = null;
             handle.Action = null;
             handle.Keys = null;
             handle.Text = null;
@@ -3757,10 +3957,11 @@ namespace Cms21UiPlus
                 ? title.rectTransform : null);
             BaseText.Capture(title);
 
-            TutorialItem iconSource = workbench != null
-                ? workbench : template;
-            Image icon = FindFirstImage(iconSource.transform,
-                "Icon", null);
+            TutorialItem iconSource = ResolveModCardIconSource(
+                tutorialsWindow, workbench, template);
+            Image icon = iconSource != null
+                ? FindFirstImage(iconSource.transform, "Icon", null)
+                : null;
             CardIcon.Capture(icon);
             CardIconRect.Capture(icon != null
                 ? icon.rectTransform : null);
@@ -4249,6 +4450,34 @@ namespace Cms21UiPlus
                     HintText.FontSize, 10, 18);
         }
 
+        private static TutorialItem ResolveModCardIconSource(
+            TutorialsWindow window, TutorialItem preferred,
+            TutorialItem fallback)
+        {
+            if (window == null || window.tutorialItems == null)
+                return preferred ?? fallback;
+
+            if (modCardIconTutorialIndex >= 0 &&
+                modCardIconTutorialIndex < window.tutorialItems.Length) {
+                TutorialItem cached =
+                    window.tutorialItems[modCardIconTutorialIndex];
+                if (cached != null && cached.gameObject != null)
+                    return cached;
+            }
+
+            TutorialItem source = preferred ?? fallback;
+            if (source == null)
+                return null;
+            for (int i = 0; i < window.tutorialItems.Length; i++) {
+                TutorialItem item = window.tutorialItems[i];
+                if (item != null && item.gameObject == source.gameObject) {
+                    modCardIconTutorialIndex = i;
+                    break;
+                }
+            }
+            return source;
+        }
+
         private static TutorialItem FindTutorialCard(
             TutorialsWindow window, bool workbenchOnly)
         {
@@ -4415,5 +4644,23 @@ namespace Cms21UiPlus
             return builder.ToString();
         }
 
+    }
+
+    [HarmonyPatch]
+    internal static class NativeHoldFooterPointerPatch
+    {
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnPointerEnter))]
+        [HarmonyPostfix]
+        private static void OnPointerEnterPostfix(EventTrigger __instance)
+        {
+            NativeUiFactory.OnNativeHoldPointerEnter(__instance);
+        }
+
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnPointerExit))]
+        [HarmonyPostfix]
+        private static void OnPointerExitPostfix(EventTrigger __instance)
+        {
+            NativeUiFactory.OnNativeHoldPointerExit(__instance);
+        }
     }
 }

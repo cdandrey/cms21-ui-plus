@@ -112,6 +112,9 @@ namespace Cms21UiPlus
                 Vector2 cellSize = grid.cellSize;
                 cellSize.x = targetWidth;
                 grid.cellSize = cellSize;
+                grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                grid.constraintCount = TargetVisualColumns;
+                grid.childAlignment = TextAnchor.UpperLeft;
 
                 ResizeRows(parent, nativeCellWidth, targetWidth);
             } catch (Exception exception) {

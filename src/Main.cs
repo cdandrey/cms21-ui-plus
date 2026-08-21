@@ -127,13 +127,8 @@ namespace Cms21UiPlus
             if (!initialized)
                 return;
             QuickMountModeSwitchFeature.Update();
-            NativeUiFactory.UpdateControlHints();
-            FilteredWarehouseTransferFeature.Update();
-            InventoryFilterManager.UpdateResetShortcut();
-            ScrapInventoryFilterFeature.Update();
-            RepairInventoryFilterFeature.Update();
-            SpringClampInventoryFilterFeature.Update();
-            if (GlobalState.IsMenuSceneActive)
+            if (GlobalState.IsMenuSceneActive &&
+                ModSettingsMenuFeature.RequiresUpdate)
                 ModSettingsMenuFeature.Update();
         }
 

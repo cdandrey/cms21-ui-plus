@@ -7,7 +7,6 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 
 #if NET6_0_OR_GREATER
 using Il2Cpp;
@@ -18,6 +17,7 @@ using Il2CppCMS.MainMenu;
 using Il2CppCMS.MainMenu.Controls;
 using Il2CppCMS.MainMenu.Sections;
 using Il2CppCMS.MainMenu.Windows;
+using LanguageSettingsTab = Il2CppCMS.MainMenu.Settings.LanguageSettingsTab;
 using Il2CppCMS.UI.Description;
 using Il2CppCMS.UI.Logic;
 using Il2CppCMS.UI.Logic.Navigation;
@@ -29,6 +29,7 @@ using CMS.MainMenu;
 using CMS.MainMenu.Controls;
 using CMS.MainMenu.Sections;
 using CMS.MainMenu.Windows;
+using LanguageSettingsTab = CMS.MainMenu.Settings.LanguageSettingsTab;
 using CMS.UI.Description;
 using CMS.UI.Logic;
 using CMS.UI.Logic.Navigation;
@@ -136,8 +137,19 @@ namespace Cms21UiPlus
         private static Selectable firstSelectable;
         private static int currentPage;
         private static int selectedVisibleCard = -1;
-        private static Vector3 lastCardPointerPosition;
-        private static bool cardPointerPositionInitialized;
+        private static readonly Dictionary<int, int> cardButtonIndexes =
+            new Dictionary<int, int>();
+        private static readonly Dictionary<int, SettingBinding>
+            settingsButtonBindings =
+                new Dictionary<int, SettingBinding>();
+        private static readonly Dictionary<int, SettingBinding>
+            settingsArrowBindings =
+                new Dictionary<int, SettingBinding>();
+        private static readonly Dictionary<int, int> settingsArrowDirections =
+            new Dictionary<int, int>();
+        private static SettingBinding hoveredSettingsBinding;
+        private static SettingBinding selectedSettingsBinding;
+        private static int hoveredSettingsArrowId;
         private static float nextDiscoveryTime;
         private static bool disabled;
 
@@ -193,6 +205,14 @@ namespace Cms21UiPlus
             }
         }
 
+        public static bool RequiresUpdate
+        {
+            get {
+                return !disabled && (mainSection == null ||
+                    launchButton == null || IsOverlayOpen);
+            }
+        }
+
         public static bool IsDiscardConfirmationOpen
         {
             get { return discardConfirmationOpen; }
@@ -220,48 +240,29 @@ namespace Cms21UiPlus
 
         private static void UpdateUnsafe()
         {
-            if (!string.Equals(SceneManager.GetActiveScene().name, "Menu",
-                StringComparison.Ordinal)) {
-                CloseWindow(false);
-                mainMenuManager = null;
-                mainSection = null;
-                tutorialsStyleSource = null;
-                NativeUiFactory.Reset();
-                return;
-            }
-
             if ((mainMenuManager == null || mainSection == null) &&
                 Time.unscaledTime >= nextDiscoveryTime) {
                 nextDiscoveryTime = Time.unscaledTime + DiscoveryInterval;
                 DiscoverMainMenu();
             }
 
-            if (mainSection != null) {
-                if (launchButton == null)
-                    EnsureLaunchButton();
-                else
-                    RefreshLaunchButtonPresentation();
-            }
+            if (mainSection != null && launchButton == null)
+                EnsureLaunchButton();
 
             if (!IsOverlayOpen)
                 return;
 
-            SuppressMainMenuInteraction();
-            KeepNativeMainHintsHidden();
             if (discardConfirmationOpen) {
                 CustomizeDiscardConfirmationHints();
                 return;
             }
-            windowObject.transform.SetAsLastSibling();
-            if (!IsSettingsPageOpen)
-                UpdateCardPointerSelection();
             HandleOverlayInput();
-            if (!IsOverlayOpen)
-                return;
-            if (IsSettingsPageOpen) {
-                UpdateSettingsRowVisuals();
-                UpdateDirtyStatus();
-            }
+        }
+
+        internal static void OnLanguageChanged()
+        {
+            if (launchButton != null)
+                RefreshLaunchButtonPresentation();
         }
 
         public static bool TryOpenFromMainMenuButton(
@@ -307,8 +308,6 @@ namespace Cms21UiPlus
 
         private static bool HandleSettingsInput()
         {
-            HandleSettingsArrowPointerInput();
-
             bool editingString = editingBinding != null &&
                 editingBinding.Option != null &&
                 editingBinding.Option.Type == ModSettingType.String;
@@ -479,11 +478,11 @@ namespace Cms21UiPlus
             firstSelectable = null;
             installedMods.Clear();
             cards.Clear();
+            cardButtonIndexes.Clear();
             settingBindings.Clear();
+            ResetSettingsInteractionState();
             currentPage = 0;
             selectedVisibleCard = -1;
-            lastCardPointerPosition = Vector3.zero;
-            cardPointerPositionInitialized = false;
             nextDiscoveryTime = 0f;
             disabled = false;
             NativeUiFactory.Reset();
@@ -602,7 +601,7 @@ namespace Cms21UiPlus
             RefreshLaunchButtonPresentation();
         }
 
-        private static void RefreshLaunchButtonPresentation()
+        internal static void RefreshLaunchButtonPresentation()
         {
             if (launchButton == null || launchButton.gameObject == null)
                 return;
@@ -754,7 +753,9 @@ namespace Cms21UiPlus
 
                 NativeUiFactory.Initialize(mainMenuManager, launchButton,
                     tutorialsStyleSource);
+                ModLocalization.Reset();
                 EnsureWindow();
+                BuildFooterHints();
                 installedMods.Clear();
                 installedMods.AddRange(DiscoverInstalledMods());
                 currentPage = 0;
@@ -773,8 +774,7 @@ namespace Cms21UiPlus
                     launchButton, true);
                 SuppressMainMenuInteraction();
                 ClearCardSelection();
-                ResetCardPointerTracking();
-                UpdateCardPointerSelection(true);
+                UpdateCardPointerSelection();
             } catch (Exception exception) {
                 DisableAfterError("mods window open", exception);
             }
@@ -802,13 +802,13 @@ namespace Cms21UiPlus
             settingsStatusText = window.SettingsStatus;
             cardsFooterRoot = window.CardsFooterRoot;
             footerRoot = window.FooterRoot;
-            BuildFooterHints();
         }
 
         private static void BuildCardsPage()
         {
             DestroyNamedChildren(cardsRoot, "ModCard");
             cards.Clear();
+            cardButtonIndexes.Clear();
             selectedVisibleCard = -1;
 
             int pageCount = GetPageCount();
@@ -855,6 +855,8 @@ namespace Cms21UiPlus
                     column * (cardSize.x + gapX),
                     -row * (cardSize.y + gapY));
                 cards.Add(card);
+                if (card.Button != null)
+                    cardButtonIndexes[card.Button.GetInstanceID()] = local;
             }
 
             if (pageIndicatorText != null) {
@@ -882,8 +884,7 @@ namespace Cms21UiPlus
             currentPage = next;
             BuildCardsPage();
             ClearCardSelection();
-            ResetCardPointerTracking();
-            UpdateCardPointerSelection(true);
+            UpdateCardPointerSelection();
         }
 
         private static void SelectCard(int index)
@@ -901,19 +902,7 @@ namespace Cms21UiPlus
 
         private static void UpdateCardPointerSelection()
         {
-            UpdateCardPointerSelection(false);
-        }
-
-        private static void UpdateCardPointerSelection(bool force)
-        {
             Vector3 pointerPosition = Input.mousePosition;
-            if (!force && cardPointerPositionInitialized &&
-                (pointerPosition - lastCardPointerPosition).sqrMagnitude <
-                    0.01f)
-                return;
-            lastCardPointerPosition = pointerPosition;
-            cardPointerPositionInitialized = true;
-
             for (int i = 0; i < cards.Count; i++) {
                 NativeUiFactory.ModCardHandle card = cards[i];
                 if (card == null || card.Button == null ||
@@ -923,19 +912,76 @@ namespace Cms21UiPlus
                     card.Root.GetComponent<RectTransform>();
                 if (rect != null &&
                     RectTransformUtility.RectangleContainsScreenPoint(
-                        rect, Input.mousePosition)) {
-                    if (selectedVisibleCard != i)
-                        SelectCard(i);
+                        rect, pointerPosition)) {
+                    SelectCard(i);
                     return;
                 }
             }
             ClearCardSelection();
         }
 
-        private static void ResetCardPointerTracking()
+        internal static void OnCardPointerEnter(Selectable selectable)
         {
-            cardPointerPositionInitialized = false;
-            lastCardPointerPosition = Vector3.zero;
+            if (!IsOverlayOpen || selectable == null)
+                return;
+            if (IsSettingsPageOpen) {
+                SettingBinding binding;
+                if (settingsButtonBindings.TryGetValue(
+                        selectable.GetInstanceID(), out binding))
+                    SetHoveredSettingsBinding(binding);
+                return;
+            }
+            int index;
+            if (cardButtonIndexes.TryGetValue(selectable.GetInstanceID(),
+                    out index) && selectedVisibleCard != index)
+                SelectCard(index);
+        }
+
+        internal static void OnCardPointerExit(Selectable selectable)
+        {
+            if (!IsOverlayOpen || selectable == null)
+                return;
+            if (IsSettingsPageOpen) {
+                SettingBinding binding;
+                if (settingsButtonBindings.TryGetValue(
+                        selectable.GetInstanceID(), out binding) &&
+                    hoveredSettingsBinding == binding)
+                    SetHoveredSettingsBinding(null);
+                return;
+            }
+            int index;
+            if (cardButtonIndexes.TryGetValue(selectable.GetInstanceID(),
+                    out index) && selectedVisibleCard == index)
+                ClearCardSelection();
+        }
+
+        internal static void OnSettingsSelectableSelected(
+            Selectable selectable)
+        {
+            if (!IsOverlayOpen || !IsSettingsPageOpen || selectable == null)
+                return;
+            SettingBinding binding;
+            if (!settingsButtonBindings.TryGetValue(
+                    selectable.GetInstanceID(), out binding))
+                return;
+            SettingBinding previous = selectedSettingsBinding;
+            selectedSettingsBinding = binding;
+            RefreshSettingsRowFocus(previous);
+            RefreshSettingsRowFocus(binding);
+        }
+
+        internal static void OnSettingsSelectableDeselected(
+            Selectable selectable)
+        {
+            if (selectable == null)
+                return;
+            SettingBinding binding;
+            if (!settingsButtonBindings.TryGetValue(
+                    selectable.GetInstanceID(), out binding) ||
+                selectedSettingsBinding != binding)
+                return;
+            selectedSettingsBinding = null;
+            RefreshSettingsRowFocus(binding);
         }
 
         private static void ClearCardSelection()
@@ -1129,11 +1175,13 @@ namespace Cms21UiPlus
             settingsHeaderText.text = provider.DisplayName;
             BuildProviderSettings();
             SelectFirstSettingsRow();
+            UpdateSettingsPointerSelection();
             RelayoutFooterHints();
         }
 
         private static void BuildProviderSettings()
         {
+            ResetSettingsInteractionState();
             DestroyChildren(settingsContent);
             settingBindings.Clear();
             editingBinding = null;
@@ -1182,6 +1230,7 @@ namespace Cms21UiPlus
                     SettingBinding created = new SettingBinding(row, option,
                         value, savedValue, effectiveValue);
                     settingBindings.Add(created);
+                    RegisterSettingsRowInteraction(created);
                     UpdateBindingWarning(created);
                     if (firstSelectable == null && row != null)
                         firstSelectable = row.Button;
@@ -1301,36 +1350,150 @@ namespace Cms21UiPlus
                 UpdateBindingWarning(settingBindings[i]);
         }
 
-        private static void UpdateSettingsRowVisuals()
+        private static void RegisterSettingsRowInteraction(
+            SettingBinding binding)
         {
-            GameObject selected = EventSystem.current != null
-                ? EventSystem.current.currentSelectedGameObject : null;
+            if (binding == null || binding.Row == null)
+                return;
+            if (binding.Row.Button != null) {
+                settingsButtonBindings[
+                    binding.Row.Button.GetInstanceID()] = binding;
+            }
+            RegisterSettingsArrowInteraction(binding,
+                binding.Row.LeftArrow, -1);
+            RegisterSettingsArrowInteraction(binding,
+                binding.Row.RightArrow, 1);
+        }
+
+        private static void RegisterSettingsArrowInteraction(
+            SettingBinding binding, GameObject arrow, int direction)
+        {
+            if (binding == null || arrow == null)
+                return;
+            Image hitArea = arrow.GetComponent<Image>();
+            if (hitArea == null)
+                hitArea = arrow.AddComponent<Image>();
+            hitArea.color = Color.clear;
+            hitArea.raycastTarget = true;
+            EventTrigger trigger = arrow.GetComponent<EventTrigger>();
+            if (trigger == null)
+                trigger = arrow.AddComponent<EventTrigger>();
+            if (trigger == null)
+                return;
+            int id = trigger.GetInstanceID();
+            settingsArrowBindings[id] = binding;
+            settingsArrowDirections[id] = direction;
+        }
+
+        private static void ResetSettingsInteractionState()
+        {
+            settingsButtonBindings.Clear();
+            settingsArrowBindings.Clear();
+            settingsArrowDirections.Clear();
+            hoveredSettingsBinding = null;
+            selectedSettingsBinding = null;
+            hoveredSettingsArrowId = 0;
+        }
+
+        private static void SetHoveredSettingsBinding(
+            SettingBinding binding)
+        {
+            if (hoveredSettingsBinding == binding)
+                return;
+            SettingBinding previous = hoveredSettingsBinding;
+            hoveredSettingsBinding = binding;
+            RefreshSettingsRowFocus(previous);
+            RefreshSettingsRowFocus(binding);
+        }
+
+        private static void RefreshSettingsRowFocus(SettingBinding binding)
+        {
+            if (binding == null || binding.Row == null)
+                return;
+            NativeUiFactory.SetSettingsRowVisualState(binding.Row,
+                hoveredSettingsBinding == binding,
+                selectedSettingsBinding == binding);
+        }
+
+        private static void RefreshEditingBindingVisual()
+        {
+            SettingBinding binding = editingBinding;
+            if (binding == null || binding.Row == null)
+                return;
+            bool showLeft = binding.Option != null &&
+                binding.Option.CanMoveValue(binding.Value, -1);
+            bool showRight = binding.Option != null &&
+                binding.Option.CanMoveValue(binding.Value, 1);
+            EventTrigger leftTrigger = binding.Row.LeftArrow != null
+                ? binding.Row.LeftArrow.GetComponent<EventTrigger>() : null;
+            EventTrigger rightTrigger = binding.Row.RightArrow != null
+                ? binding.Row.RightArrow.GetComponent<EventTrigger>() : null;
+            if ((!showLeft && leftTrigger != null &&
+                    leftTrigger.GetInstanceID() == hoveredSettingsArrowId) ||
+                (!showRight && rightTrigger != null &&
+                    rightTrigger.GetInstanceID() == hoveredSettingsArrowId))
+                hoveredSettingsArrowId = 0;
+            NativeUiFactory.SetSettingsRowEditing(binding.Row, true,
+                showLeft, showRight,
+                showLeft && leftTrigger != null &&
+                    leftTrigger.GetInstanceID() == hoveredSettingsArrowId,
+                showRight && rightTrigger != null &&
+                    rightTrigger.GetInstanceID() == hoveredSettingsArrowId);
+        }
+
+        private static void UpdateSettingsPointerSelection()
+        {
             Vector3 pointerPosition = Input.mousePosition;
             for (int i = 0; i < settingBindings.Count; i++) {
-                NativeUiFactory.SettingsRowHandle row =
-                    settingBindings[i].Row;
-                if (row == null || row.Root == null)
+                SettingBinding binding = settingBindings[i];
+                if (binding == null || binding.Row == null ||
+                    binding.Row.Root == null)
                     continue;
                 RectTransform rect =
-                    row.Root.GetComponent<RectTransform>();
-                bool hovered = rect != null &&
+                    binding.Row.Root.GetComponent<RectTransform>();
+                if (rect != null &&
                     RectTransformUtility.RectangleContainsScreenPoint(
-                        rect, pointerPosition);
-                NativeUiFactory.SetSettingsRowVisualState(row,
-                    hovered, row.Root == selected);
-                SettingBinding binding = settingBindings[i];
-                bool editing = binding == editingBinding;
-                bool showLeft = editing && binding.Option != null &&
-                    binding.Option.CanMoveValue(binding.Value, -1);
-                bool showRight = editing && binding.Option != null &&
-                    binding.Option.CanMoveValue(binding.Value, 1);
-                bool leftHovered = showLeft &&
-                    IsPointerInside(row.LeftArrowRect, pointerPosition);
-                bool rightHovered = showRight &&
-                    IsPointerInside(row.RightArrowRect, pointerPosition);
-                NativeUiFactory.SetSettingsRowEditing(row, editing,
-                    showLeft, showRight, leftHovered, rightHovered);
+                        rect, pointerPosition)) {
+                    SetHoveredSettingsBinding(binding);
+                    return;
+                }
             }
+            SetHoveredSettingsBinding(null);
+        }
+
+        internal static void OnSettingsArrowPointerEnter(EventTrigger trigger)
+        {
+            if (!IsOverlayOpen || !IsSettingsPageOpen || trigger == null)
+                return;
+            SettingBinding binding;
+            if (!settingsArrowBindings.TryGetValue(trigger.GetInstanceID(),
+                    out binding) || binding != editingBinding)
+                return;
+            hoveredSettingsArrowId = trigger.GetInstanceID();
+            RefreshEditingBindingVisual();
+        }
+
+        internal static void OnSettingsArrowPointerExit(EventTrigger trigger)
+        {
+            if (trigger == null ||
+                hoveredSettingsArrowId != trigger.GetInstanceID())
+                return;
+            hoveredSettingsArrowId = 0;
+            RefreshEditingBindingVisual();
+        }
+
+        internal static void OnSettingsArrowPointerClick(EventTrigger trigger)
+        {
+            if (!IsOverlayOpen || !IsSettingsPageOpen || trigger == null)
+                return;
+            int id = trigger.GetInstanceID();
+            SettingBinding binding;
+            int direction;
+            if (!settingsArrowBindings.TryGetValue(id, out binding) ||
+                !settingsArrowDirections.TryGetValue(id, out direction) ||
+                binding != editingBinding)
+                return;
+            StepBindingValue(binding, direction);
         }
 
         private static SettingBinding FindBinding(string key)
@@ -1380,7 +1543,7 @@ namespace Cms21UiPlus
                 out next))
                 return false;
             SetBindingValue(binding, next);
-            UpdateSettingsRowVisuals();
+            RefreshEditingBindingVisual();
             return true;
         }
 
@@ -1437,16 +1600,22 @@ namespace Cms21UiPlus
             if (binding == null || binding.Row == null)
                 return;
             editingBinding = binding;
+            hoveredSettingsArrowId = 0;
             SetSelected(binding.Row.Button);
             RefreshSettingsEnterHint();
-            UpdateSettingsRowVisuals();
+            RefreshEditingBindingVisual();
         }
 
         private static void EndSettingsEditing()
         {
+            SettingBinding previous = editingBinding;
             editingBinding = null;
+            hoveredSettingsArrowId = 0;
+            if (previous != null && previous.Row != null) {
+                NativeUiFactory.SetSettingsRowEditing(previous.Row, false,
+                    false, false, false, false);
+            }
             RefreshSettingsEnterHint();
-            UpdateSettingsRowVisuals();
         }
 
         private static SettingBinding FindSelectedBinding()
@@ -1459,28 +1628,6 @@ namespace Cms21UiPlus
                     return binding;
             }
             return null;
-        }
-
-        private static void HandleSettingsArrowPointerInput()
-        {
-            if (editingBinding == null || editingBinding.Row == null ||
-                !Input.GetMouseButtonDown(0))
-                return;
-            Vector3 pointer = Input.mousePosition;
-            if (IsPointerInside(editingBinding.Row.LeftArrowRect, pointer)) {
-                StepBindingValue(editingBinding, -1);
-            } else if (IsPointerInside(
-                editingBinding.Row.RightArrowRect, pointer)) {
-                StepBindingValue(editingBinding, 1);
-            }
-        }
-
-        private static bool IsPointerInside(RectTransform rect,
-            Vector3 pointer)
-        {
-            return rect != null && rect.gameObject.activeInHierarchy &&
-                RectTransformUtility.RectangleContainsScreenPoint(
-                    rect, pointer);
         }
 
         private static void RefreshSettingsEnterHint()
@@ -1608,6 +1755,7 @@ namespace Cms21UiPlus
             settingsStatusText.text = ModLocalization.Get("LOC_DefaultValuesLoadedPressEnterToSave");
             settingsStatusText.color = SecondaryTextColor;
             SelectFirstSettingsRow();
+            UpdateSettingsPointerSelection();
         }
 
         private static void UpdateDirtyStatus()
@@ -1643,13 +1791,13 @@ namespace Cms21UiPlus
             draft = null;
             editingBinding = null;
             settingBindings.Clear();
+            ResetSettingsInteractionState();
             RefreshSettingsEnterHint();
             settingsPageObject.SetActive(false);
             cardsPageObject.SetActive(true);
             SetCardsFooterVisible(true);
             ClearCardSelection();
-            ResetCardPointerTracking();
-            UpdateCardPointerSelection(true);
+            UpdateCardPointerSelection();
         }
 
         private static void ShowDiscardModal(Action action)
@@ -1720,7 +1868,7 @@ namespace Cms21UiPlus
                 return;
 
             string acceptText = ModLocalization.Get("LOC_ApplyAction");
-            string cancelText = ModLocalization.Get("LOC_CancelAction");
+            string cancelText = ModLocalization.Get("LOC_ExitAction");
             bool acceptUpdated = false;
             bool cancelUpdated = false;
             Il2CppReferenceArray<UnityEngine.Object> loaded =
@@ -1860,6 +2008,8 @@ namespace Cms21UiPlus
             if (inputShieldObject != null && IsOverlayOpen &&
                 discardInputShieldWasActive)
                 inputShieldObject.SetActive(true);
+            if (windowObject != null && IsOverlayOpen)
+                windowObject.transform.SetAsLastSibling();
             discardInputShieldWasActive = false;
         }
 
@@ -1892,6 +2042,7 @@ namespace Cms21UiPlus
             draft = null;
             editingBinding = null;
             settingBindings.Clear();
+            ResetSettingsInteractionState();
             RefreshSettingsEnterHint();
             SetCardsFooterVisible(false);
             if (windowObject != null)
@@ -2327,6 +2478,74 @@ namespace Cms21UiPlus
             ModLogger.Log("[ModSettings] In-game settings UI disabled after " +
                 stage + " failure." + Environment.NewLine + exception,
                 Types.LoggingLevels.Warning);
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class ModSettingsPointerSelectionPatch
+    {
+        [HarmonyPatch(typeof(Selectable), nameof(Selectable.OnPointerEnter))]
+        [HarmonyPostfix]
+        private static void OnPointerEnterPostfix(Selectable __instance)
+        {
+            ModSettingsMenuFeature.OnCardPointerEnter(__instance);
+        }
+
+        [HarmonyPatch(typeof(Selectable), nameof(Selectable.OnPointerExit))]
+        [HarmonyPostfix]
+        private static void OnPointerExitPostfix(Selectable __instance)
+        {
+            ModSettingsMenuFeature.OnCardPointerExit(__instance);
+        }
+
+        [HarmonyPatch(typeof(Selectable), nameof(Selectable.OnSelect))]
+        [HarmonyPostfix]
+        private static void OnSelectPostfix(Selectable __instance)
+        {
+            ModSettingsMenuFeature.OnSettingsSelectableSelected(__instance);
+        }
+
+        [HarmonyPatch(typeof(Selectable), nameof(Selectable.OnDeselect))]
+        [HarmonyPostfix]
+        private static void OnDeselectPostfix(Selectable __instance)
+        {
+            ModSettingsMenuFeature.OnSettingsSelectableDeselected(__instance);
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class ModSettingsArrowPointerPatch
+    {
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnPointerEnter))]
+        [HarmonyPostfix]
+        private static void OnPointerEnterPostfix(EventTrigger __instance)
+        {
+            ModSettingsMenuFeature.OnSettingsArrowPointerEnter(__instance);
+        }
+
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnPointerExit))]
+        [HarmonyPostfix]
+        private static void OnPointerExitPostfix(EventTrigger __instance)
+        {
+            ModSettingsMenuFeature.OnSettingsArrowPointerExit(__instance);
+        }
+
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnPointerClick))]
+        [HarmonyPostfix]
+        private static void OnPointerClickPostfix(EventTrigger __instance)
+        {
+            ModSettingsMenuFeature.OnSettingsArrowPointerClick(__instance);
+        }
+    }
+
+    [HarmonyPatch(typeof(LanguageSettingsTab), "OnItemClick")]
+    internal static class ModSettingsLaunchButtonLanguageSelectionPatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(string __1)
+        {
+            ModLocalization.SetGameLanguage(__1);
+            ModSettingsMenuFeature.RefreshLaunchButtonPresentation();
         }
     }
 

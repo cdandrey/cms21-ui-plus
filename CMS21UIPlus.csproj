@@ -49,11 +49,13 @@
     <Compile Include="src\Features\InventorySorting\InventorySortPersistenceFeature.cs" />
     <Compile Include="src\Features\Jobs\BodyPartMarkingFeature.cs" />
     <Compile Include="src\Features\Jobs\FinishedPartUnmarker.cs" />
+    <Compile Include="src\Features\PartSelectionFilters\AssemblyPartSelectionFilterController.cs" />
     <Compile Include="src\Features\PartSelectionFilters\BrakeLatheInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\MountPartSelectionFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\PartSelectionFilterPatches.cs" />
     <Compile Include="src\Features\PartSelectionFilters\RepairInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\ScrapInventoryFilterFeature.cs" />
+    <Compile Include="src\Features\PartSelectionFilters\SimplePartSelectionFilterController.cs" />
     <Compile Include="src\Features\PartSelectionFilters\SpringClampInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\TireChangerInventoryFilterFeature.cs" />
     <Compile Include="src\Features\PartSelectionFilters\WheelBalancerInventoryFilterFeature.cs" />
@@ -67,7 +69,9 @@
     <Compile Include="src\Features\ShoppingList\ShoppingListBulkPurchaseFeature.cs" />
     <Compile Include="src\Features\ShoppingList\ShoppingListPresentationFeature.cs" />
     <Compile Include="src\Features\ShoppingList\ShoppingListQuantityFeature.cs" />
+    <Compile Include="src\Features\ShoppingList\ShoppingListRefresh.cs" />
     <Compile Include="src\Features\ShoppingList\ShoppingListSortingFeature.cs" />
+    <Compile Include="src\Features\ShoppingList\ShoppingListShopFilterFeature.cs" />
     <Compile Include="src\Features\ShoppingList\ShoppingListTwoColumnNavigationFeature.cs" />
     <Compile Include="src\Features\ShoppingList\WheelShopListPurchaseFeature.cs" />
     <Compile Include="src\Features\Startup\StartupIntroSkipFeature.cs" />

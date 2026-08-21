@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,17 +46,9 @@ namespace Cms21UiPlus
             public bool Repairable;
         }
 
-        private static readonly MethodInfo FillItemsMethod =
-            AccessTools.Method(typeof(ShopListWindow), "FillItems");
         private static ShopListWindow activeWindow;
         private static NativeUiFactory.FooterHintHandle sortHint;
         private static NativeUiFactory.SortingWindowHandle sortingWindow;
-        private static RectTransform sortHintBackground;
-        private static Vector2 sortHintBackgroundNativeAnchorMin;
-        private static Vector2 sortHintBackgroundNativeAnchorMax;
-        private static Vector2 sortHintBackgroundNativePivot;
-        private static Vector2 sortHintBackgroundNativePosition;
-        private static Vector2 sortHintBackgroundNativeSize;
 
         private static bool IsEnabled {
             get {
@@ -110,11 +101,6 @@ namespace Cms21UiPlus
                 activeWindow.uiDescription == null)
                 return;
 
-            if (sortHint != null && sortHint.Root != null) {
-                UpdateSortHintText();
-                return;
-            }
-
             sortHint = WindowFooterHintController.RequestNativeHint(
                 new WindowFooterHintController.NativeHintRequest {
                     WindowId = FooterWindowId,
@@ -125,8 +111,9 @@ namespace Cms21UiPlus
                     Text = ModLocalization.Get(
                         "LOC_ShoppingListSortAction"),
                     Action = new Action(ToggleSortingWindow),
-                    Row = 0,
+                    Row = 1,
                     AllowAutomaticRowWrap = false,
+                    ExtendFooterBackground = true,
                     Order = 5,
                     Profile = WindowFooterHintController
                         .NativeFooterProfile.Automatic,
@@ -145,7 +132,6 @@ namespace Cms21UiPlus
             }
             ConfigureSortHintGeometry();
             UpdateSortHintText();
-            EnsureSortHintFooterBackground();
         }
 
         private static string GetSortHintText()
@@ -242,84 +228,6 @@ namespace Cms21UiPlus
             WindowFooterHintController.RemoveHint(
                 FooterWindowId, SortHintId);
             sortHint = null;
-            RestoreSortHintFooterBackground();
-        }
-
-        private static void EnsureSortHintFooterBackground()
-        {
-            if (sortHint == null || sortHint.Root == null ||
-                sortHint.Rect == null || sortHint.Rect.parent == null ||
-                activeWindow == null)
-                return;
-
-            RectTransform parent = sortHint.Rect.parent
-                .GetComponent<RectTransform>();
-            if (parent == null)
-                return;
-
-            Transform backgroundTransform = parent.Find("BG");
-            RectTransform background = backgroundTransform != null
-                ? backgroundTransform.GetComponent<RectTransform>() : null;
-            Transform windowBackgroundTransform =
-                activeWindow.transform.Find("BG");
-            RectTransform windowBackground = windowBackgroundTransform != null
-                ? windowBackgroundTransform.GetComponent<RectTransform>()
-                : null;
-            if (background == null || windowBackground == null)
-                return;
-
-            if (sortHintBackground != background) {
-                RestoreSortHintFooterBackground();
-                sortHintBackground = background;
-                sortHintBackgroundNativeAnchorMin = background.anchorMin;
-                sortHintBackgroundNativeAnchorMax = background.anchorMax;
-                sortHintBackgroundNativePivot = background.pivot;
-                sortHintBackgroundNativePosition =
-                    background.anchoredPosition;
-                sortHintBackgroundNativeSize = background.sizeDelta;
-            }
-
-            Bounds windowBounds;
-            if (!NativeUiFactory.TryGetRectTransformBounds(
-                    windowBackground, parent, out windowBounds))
-                return;
-
-            Vector2 anchorMin = background.anchorMin;
-            Vector2 anchorMax = background.anchorMax;
-            Vector2 pivot = background.pivot;
-            Vector2 position = background.anchoredPosition;
-            Vector2 size = background.sizeDelta;
-            anchorMin.x = 0f;
-            anchorMax.x = 0f;
-            pivot.x = 0f;
-            position.x = windowBounds.min.x;
-            size.x = windowBounds.size.x;
-            background.anchorMin = anchorMin;
-            background.anchorMax = anchorMax;
-            background.pivot = pivot;
-            background.anchoredPosition = position;
-            background.sizeDelta = size;
-        }
-
-        private static void RestoreSortHintFooterBackground()
-        {
-            if (sortHintBackground != null) {
-                sortHintBackground.anchorMin =
-                    sortHintBackgroundNativeAnchorMin;
-                sortHintBackground.anchorMax =
-                    sortHintBackgroundNativeAnchorMax;
-                sortHintBackground.pivot = sortHintBackgroundNativePivot;
-                sortHintBackground.anchoredPosition =
-                    sortHintBackgroundNativePosition;
-                sortHintBackground.sizeDelta =
-                    sortHintBackgroundNativeSize;
-            }
-            sortHintBackground = null;
-            sortHintBackgroundNativeAnchorMin = Vector2.zero;
-            sortHintBackgroundNativeAnchorMax = Vector2.zero;
-            sortHintBackgroundNativePivot = Vector2.zero;
-            sortHintBackgroundNativePosition = Vector2.zero;
-            sortHintBackgroundNativeSize = Vector2.zero;
         }
 
         private static bool IsSortingWindowOpen()
@@ -448,7 +356,9 @@ namespace Cms21UiPlus
 
                 for (int i = 0; i < entries.Count; i++)
                     window.items[i] = entries[i].Data;
-                RefreshItems(window);
+                ShoppingListShopFilterFeature.
+                    CaptureSortedOrderAndApplyFilters(window);
+                ShoppingListRefresh.RefreshItems(window);
             } catch (Exception exception) {
                 ModLogger.Log("[ShoppingList] Sorting failed." +
                     Environment.NewLine + exception,
@@ -572,14 +482,6 @@ namespace Cms21UiPlus
             return StringComparer.CurrentCultureIgnoreCase.Compare(
                 left != null ? left.Name : string.Empty,
                 right != null ? right.Name : string.Empty);
-        }
-
-        private static void RefreshItems(ShopListWindow window)
-        {
-            if (window == null || FillItemsMethod == null)
-                return;
-            FillItemsMethod.Invoke(window, null);
-            ShoppingListTwoColumnNavigationFeature.RefreshRowsNow(window);
         }
 
         private static bool CanSort(ShopListWindow window)

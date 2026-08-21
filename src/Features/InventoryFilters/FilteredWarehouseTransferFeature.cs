@@ -41,13 +41,13 @@ namespace Cms21UiPlus
             }
         }
 
-        public static void Update()
+        internal static void TryHandleKeyboardShortcut()
         {
-            if (!IsEnabled || bulkMoveInProgress || activeWindow == null ||
-                !activeWindow.gameObject.activeInHierarchy ||
-                handledFrame == Time.frameCount ||
+            if (!KeyBindingsConfig.IsFilteredTransferActionPressed() ||
                 !KeyBindingsConfig.IsFilteredTransferModifierPressed() ||
-                !KeyBindingsConfig.IsFilteredTransferActionPressed())
+                !IsEnabled || bulkMoveInProgress || activeWindow == null ||
+                !activeWindow.gameObject.activeInHierarchy ||
+                handledFrame == Time.frameCount)
                 return;
 
             TryInvokeActiveMoveAction();

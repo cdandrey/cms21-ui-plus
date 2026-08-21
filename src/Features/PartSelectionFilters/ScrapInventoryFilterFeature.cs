@@ -81,6 +81,7 @@ namespace Cms21UiPlus
             RepairabilityQuickFilterMode.Off;
         private static QualityQuickFilterMode qualityMode =
             QualityQuickFilterMode.Off;
+        private static string searchText = string.Empty;
         private static bool applyingFilteredList;
         private static bool pendingFilteredBulkScrap;
         private static bool filteredBulkScrapInProgress;
@@ -91,12 +92,8 @@ namespace Cms21UiPlus
         private static bool scrapMiniGameHidden;
         private static bool scrapUpgradeUiHidden;
         private static bool upgradeTabTransitionPending;
+        private static bool productionSelectionActive;
         private static bool scrapResultPending;
-        private static bool nativeBulkInitializationPending;
-        private static readonly Canvas.WillRenderCanvases
-            NativeBulkInitializationHandler =
-                DelegateSupport.ConvertDelegate<Canvas.WillRenderCanvases>(
-                    new Action(OnNativeBulkInitializationRender));
 
         private sealed class ScrapMiniGameObjectState
         {
@@ -137,6 +134,7 @@ namespace Cms21UiPlus
             ResolveScrapProduction();
             bool enteringUpgrade = upgradeTabTransitionPending;
             upgradeTabTransitionPending = false;
+            productionSelectionActive = !enteringUpgrade;
             bool includeConditionFilter = !enteringUpgrade &&
                 !IsScrapUpgradeMode();
             bool preFilteredUpgrade = IsPreFilteredUpgradeList(itemsToShow);
@@ -151,6 +149,7 @@ namespace Cms21UiPlus
                     CycleConditionFilterReverse,
                     CycleRepairabilityFilterReverse,
                     CycleQualityFilterReverse)) {
+                    Panel.SetSearchText(searchText);
                     Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
                     if (!enteringUpgrade)
                         CreateResetHint();
@@ -209,6 +208,7 @@ namespace Cms21UiPlus
             }
 
             upgradeTabTransitionPending = true;
+            productionSelectionActive = false;
             if (items != null) {
                 CaptureNativeItems(items);
                 preFilteredUpgradeList = items;
@@ -222,7 +222,8 @@ namespace Cms21UiPlus
 
         public static void OnScrapWindowHidden()
         {
-            ResetFilterState();
+            if (ShouldResetOnExit())
+                ResetFilterState();
             DeactivateWindow();
         }
 
@@ -282,32 +283,14 @@ namespace Cms21UiPlus
                 WindowFooterHintController.ResumeWindow("Scrap");
         }
 
-        public static void Update()
+        internal static bool TryResetFromKeyboardShortcut()
         {
-            if (activeWindow == null) {
-                DestroyResetHint();
-                CancelNativeBulkInteraction();
-                return;
-            }
+            if (!AreScrapFiltersEnabled() || activeWindow == null ||
+                !IsScrapWindowActive())
+                return false;
 
-            if (!IsScrapWindowActive()) {
-                DestroyResetHint();
-                CancelNativeBulkInteraction();
-                SetNativeBulkDescriptionActive(false);
-                return;
-            }
-
-            if (AreScrapFiltersEnabled()) {
-                if (Input.GetKeyDown(KeyCode.LeftAlt))
-                    ResetFilters();
-            } else {
-                DestroyResetHint();
-            }
-
-            if (!IsBulkScrapShortcutEnabled()) {
-                CancelNativeBulkInitialization();
-                DestroyNativeBulkDescription();
-            }
+            ResetFilters();
+            return true;
         }
 
         private static void ResetFilterState()
@@ -315,6 +298,7 @@ namespace Cms21UiPlus
             conditionMode = GarageConditionFilterMode.Off;
             repairabilityMode = RepairabilityQuickFilterMode.Off;
             qualityMode = QualityQuickFilterMode.Off;
+            searchText = string.Empty;
             Panel.ResetSearch();
             Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
         }
@@ -358,7 +342,7 @@ namespace Cms21UiPlus
 
         private static void RebuildUpgradeFooterHints(int itemCount)
         {
-            CancelNativeBulkInitialization();
+            productionSelectionActive = false;
             DestroyNativeBulkDescription();
             DestroyResetHint();
             if (!AreScrapFiltersEnabled() || itemCount == 0)
@@ -542,11 +526,18 @@ namespace Cms21UiPlus
             conditionMode = GarageConditionFilterMode.Off;
             repairabilityMode = RepairabilityQuickFilterMode.Off;
             qualityMode = QualityQuickFilterMode.Off;
+            searchText = string.Empty;
             applyingFilteredList = false;
             filteredBulkScrapInProgress = false;
             suppressNativeScrapInputUntilFrame = -1;
             CancelNativeBulkInteraction();
             CancelPendingFilteredBulkScrap();
+        }
+
+        private static bool ShouldResetOnExit()
+        {
+            return Main.SettingsEntry != null &&
+                Main.SettingsEntry.Value.resetScrapInventoryFiltersOnExit;
         }
 
         private static bool AreScrapFiltersEnabled()
@@ -716,8 +707,9 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        private static void OnSearchChanged(string searchText)
+        private static void OnSearchChanged(string value)
         {
+            searchText = value ?? string.Empty;
             ApplyCurrentFilters(true);
         }
 
@@ -725,7 +717,7 @@ namespace Cms21UiPlus
         {
             PartFilterCriteria criteria = new PartFilterCriteria();
             criteria.Context = PartFilterContext.Garage;
-            criteria.SearchText = Panel.SearchText;
+            criteria.SearchText = searchText;
             criteria.GarageConditionMode = conditionMode;
             criteria.RepairabilityMode = repairabilityMode;
             criteria.QualityMode = qualityMode;
@@ -1248,66 +1240,19 @@ namespace Cms21UiPlus
 
         private static void UpdateNativeBulkDescriptionForCurrentMode()
         {
-            if (!IsBulkScrapShortcutEnabled()) {
-                CancelNativeBulkInitialization();
+            if (!IsBulkScrapShortcutEnabled() ||
+                !productionSelectionActive) {
                 DestroyNativeBulkDescription();
                 return;
             }
 
-            if (IsScrapProductionMode()) {
-                CancelNativeBulkInitialization();
-                UpdateNativeBulkDescription();
-                return;
-            }
-
-            DestroyNativeBulkDescription();
-            if (activeWindow != null && IsScrapWindowActive() &&
-                !IsScrapUpgradeMode())
-                ScheduleNativeBulkInitialization();
-            else
-                CancelNativeBulkInitialization();
-        }
-
-        private static void ScheduleNativeBulkInitialization()
-        {
-            if (nativeBulkInitializationPending)
-                return;
-            Canvas.add_willRenderCanvases(
-                NativeBulkInitializationHandler);
-            nativeBulkInitializationPending = true;
-        }
-
-        private static void CancelNativeBulkInitialization()
-        {
-            if (!nativeBulkInitializationPending)
-                return;
-            Canvas.remove_willRenderCanvases(
-                NativeBulkInitializationHandler);
-            nativeBulkInitializationPending = false;
-        }
-
-        private static void OnNativeBulkInitializationRender()
-        {
-            if (!nativeBulkInitializationPending)
-                return;
-            if (activeWindow == null || !IsScrapWindowActive() ||
-                !IsBulkScrapShortcutEnabled()) {
-                CancelNativeBulkInitialization();
-                return;
-            }
-            if (IsScrapProductionMode()) {
-                CancelNativeBulkInitialization();
-                UpdateNativeBulkDescription();
-                return;
-            }
-            if (IsScrapUpgradeMode())
-                CancelNativeBulkInitialization();
+            UpdateNativeBulkDescription();
         }
 
         private static WindowFooterHintController.NativeFooterProfile
             GetScrapFooterProfile(bool isEmpty)
         {
-            if (IsScrapUpgradeMode())
+            if (!productionSelectionActive && IsScrapUpgradeMode())
                 return isEmpty
                     ? WindowFooterHintController.NativeFooterProfile
                         .ScrapUpgradeEmpty
@@ -1440,28 +1385,19 @@ namespace Cms21UiPlus
                 return;
 
             nativeBulkDescription.SetText(nativeBulkBaseLabel);
-
-            var texts = nativeBulkDescription.texts;
-            if (texts == null || texts.Length == 0 || texts[0] == null)
-                return;
-
-            Text label = texts[0];
-            Color holdColor = nativeBulkDescription.buttonFill != null
-                ? nativeBulkDescription.buttonFill.color
-                : nativeBulkDescription.hoverColor;
-            string holdColorHex = ColorUtility.ToHtmlStringRGB(holdColor);
-            string holdLabel = ModLocalization.Get("LOC_HoldAction");
-
-            label.supportRichText = true;
-            label.text = nativeBulkBaseLabel +
-                " <color=#" + holdColorHex + ">[" + holdLabel +
-                "]</color>";
-            nativeBulkDescription.RefreshLayout();
+            NativeUiFactory.ApplyNativeHoldSuffix(
+                nativeBulkHint, nativeBulkBaseLabel,
+                ModLocalization.Get("LOC_HoldAction"));
         }
 
         private static void UpdateNativeBulkDescription()
         {
-            if (!IsScrapProductionMode()) {
+            if (!productionSelectionActive) {
+                DestroyNativeBulkDescription();
+                return;
+            }
+            ResolveScrapProduction();
+            if (activeScrapProduction == null) {
                 DestroyNativeBulkDescription();
                 return;
             }
@@ -1610,7 +1546,6 @@ namespace Cms21UiPlus
 
         private static void DeactivateWindow()
         {
-            CancelNativeBulkInitialization();
             RestoreScrapMiniGameUi();
             RestoreScrapUpgradeUi();
             Panel.Detach();
@@ -1621,6 +1556,7 @@ namespace Cms21UiPlus
             activeScrapProduction = null;
             preFilteredUpgradeList = null;
             upgradeTabTransitionPending = false;
+            productionSelectionActive = false;
             OriginalItems.Clear();
             FilteredItems.Clear();
             applyingFilteredList = false;

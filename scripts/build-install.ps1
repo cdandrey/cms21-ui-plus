@@ -7,7 +7,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$scriptRevision = "r014"
+$scriptRevision = "r015"
 $configuration = "Release"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectFile = Join-Path $repoRoot "CMS21UIPlus.csproj"
@@ -51,7 +51,19 @@ $releaseResourceFiles = @(
     "InventoryIndicators/RepairabilityOrange.png",
     "InventoryIndicators/RepairabilityRed.png",
     "InventoryIndicators/RepairabilityWhite.png",
-    "InventoryIndicators/RepairabilityYellow.png"
+    "InventoryIndicators/RepairabilityYellow.png",
+    "ShoppingListIndicators/SL_Addons.png",
+    "ShoppingListIndicators/SL_Body.png",
+    "ShoppingListIndicators/SL_BodyTuning.png",
+    "ShoppingListIndicators/SL_Community.png",
+    "ShoppingListIndicators/SL_Electronics.png",
+    "ShoppingListIndicators/SL_Gearbox.png",
+    "ShoppingListIndicators/SL_Interior.png",
+    "ShoppingListIndicators/SL_LicensePlate.png",
+    "ShoppingListIndicators/SL_Main.png",
+    "ShoppingListIndicators/SL_Rims.png",
+    "ShoppingListIndicators/SL_Tires.png",
+    "ShoppingListIndicators/SL_Tuning.png"
 )
 
 function Get-ProjectLibraryReferences {

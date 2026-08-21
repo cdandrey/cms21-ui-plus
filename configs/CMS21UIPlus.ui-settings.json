@@ -67,7 +67,7 @@
       "group": "inventory",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 15,
       "nameKey": "LOC_SettingHideBodyPartPaintColorBadgesName",
       "descriptionKey": "LOC_SettingHideBodyPartPaintColorBadgesDescription"
@@ -84,6 +84,17 @@
       "descriptionKey": "LOC_SettingAddInventoryQuickFiltersDescription"
     },
     {
+      "id": "FID_ResetInventoryQuickFiltersOnExit",
+      "key": "resetInventoryQuickFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 20,
+      "nameKey": "LOC_SettingResetInventoryQuickFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
+    },
+    {
       "id": "FID_AddScrapInventoryFilters",
       "key": "addScrapInventoryFilters",
       "group": "inventoryFilters",
@@ -93,6 +104,17 @@
       "order": 21,
       "nameKey": "LOC_SettingAddScrapInventoryFiltersName",
       "descriptionKey": "LOC_SettingAddScrapInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_ResetScrapInventoryFiltersOnExit",
+      "key": "resetScrapInventoryFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 21,
+      "nameKey": "LOC_SettingResetScrapInventoryFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
     {
       "id": "FID_AddRepairInventoryFilters",
@@ -106,6 +128,17 @@
       "descriptionKey": "LOC_SettingAddRepairInventoryFiltersDescription"
     },
     {
+      "id": "FID_ResetRepairInventoryFiltersOnExit",
+      "key": "resetRepairInventoryFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 22,
+      "nameKey": "LOC_SettingResetRepairInventoryFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
+    },
+    {
       "id": "FID_AddSpringClampInventoryFilters",
       "key": "addSpringClampInventoryFilters",
       "group": "inventoryFilters",
@@ -115,6 +148,17 @@
       "order": 23,
       "nameKey": "LOC_SettingAddSpringClampInventoryFiltersName",
       "descriptionKey": "LOC_SettingAddSpringClampInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_ResetSpringClampInventoryFiltersOnExit",
+      "key": "resetSpringClampInventoryFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": false,
+      "applyMode": "immediate",
+      "order": 23,
+      "nameKey": "LOC_SettingResetSpringClampInventoryFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
     {
       "id": "FID_AddTireChangerInventoryFilters",
@@ -128,6 +172,17 @@
       "descriptionKey": "LOC_SettingAddTireChangerInventoryFiltersDescription"
     },
     {
+      "id": "FID_ResetTireChangerInventoryFiltersOnExit",
+      "key": "resetTireChangerInventoryFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": false,
+      "applyMode": "immediate",
+      "order": 24,
+      "nameKey": "LOC_SettingResetTireChangerInventoryFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
+    },
+    {
       "id": "FID_AddWheelBalancerInventoryFilters",
       "key": "addWheelBalancerInventoryFilters",
       "group": "inventoryFilters",
@@ -137,6 +192,17 @@
       "order": 25,
       "nameKey": "LOC_SettingAddWheelBalancerInventoryFiltersName",
       "descriptionKey": "LOC_SettingAddWheelBalancerInventoryFiltersDescription"
+    },
+    {
+      "id": "FID_ResetWheelBalancerInventoryFiltersOnExit",
+      "key": "resetWheelBalancerInventoryFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": false,
+      "applyMode": "immediate",
+      "order": 25,
+      "nameKey": "LOC_SettingResetWheelBalancerInventoryFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
     {
       "id": "FID_AddBrakeLatheInventoryFilters",
@@ -150,6 +216,17 @@
       "descriptionKey": "LOC_SettingAddBrakeLatheInventoryFiltersDescription"
     },
     {
+      "id": "FID_ResetBrakeLatheInventoryFiltersOnExit",
+      "key": "resetBrakeLatheInventoryFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": false,
+      "applyMode": "immediate",
+      "order": 26,
+      "nameKey": "LOC_SettingResetBrakeLatheInventoryFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
+    },
+    {
       "id": "FID_AddMountPartSelectionFilters",
       "key": "addMountPartSelectionFilters",
       "group": "inventoryFilters",
@@ -161,12 +238,23 @@
       "descriptionKey": "LOC_SettingAddMountPartSelectionFiltersDescription"
     },
     {
+      "id": "FID_ResetMountPartSelectionFiltersOnExit",
+      "key": "resetMountPartSelectionFiltersOnExit",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": false,
+      "applyMode": "immediate",
+      "order": 27,
+      "nameKey": "LOC_SettingResetMountPartSelectionFiltersOnExitName",
+      "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
+    },
+    {
       "id": "FID_MoveFilteredPartsBetweenInventoryAndWarehouse",
       "key": "moveFilteredPartsBetweenInventoryAndWarehouse",
       "group": "inventory",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 25,
       "nameKey": "LOC_SettingMoveFilteredPartsBetweenInventoryAndWarehouseName",
       "descriptionKey": "LOC_SettingMoveFilteredPartsBetweenInventoryAndWarehouseDescription"
@@ -177,7 +265,7 @@
       "group": "inventory",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 26,
       "nameKey": "LOC_SettingAddBulkScrapShortcutName",
       "descriptionKey": "LOC_SettingAddBulkScrapShortcutDescription"
@@ -188,7 +276,7 @@
       "group": "inventory",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 60,
       "nameKey": "LOC_SettingRememberInventorySortingName",
       "descriptionKey": "LOC_SettingRememberInventorySortingDescription"
@@ -199,7 +287,7 @@
       "group": "shopping",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 10,
       "nameKey": "LOC_SettingRemovePartsFromShoppingListName",
       "descriptionKey": "LOC_SettingRemovePartsFromShoppingListDescription"
@@ -210,7 +298,7 @@
       "group": "shopping",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 20,
       "nameKey": "LOC_SettingWheelShopListPurchaseHelperName",
       "descriptionKey": "LOC_SettingWheelShopListPurchaseHelperDescription"
@@ -221,10 +309,21 @@
       "group": "shopping",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 30,
       "nameKey": "LOC_SettingAddShoppingListSortingName",
       "descriptionKey": "LOC_SettingAddShoppingListSortingDescription"
+    },
+    {
+      "id": "FID_FilterShoppingListByCurrentShopOnOpen",
+      "key": "filterShoppingListByCurrentShopOnOpen",
+      "group": "shopping",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 30,
+      "nameKey": "LOC_SettingFilterShoppingListByCurrentShopOnOpenName",
+      "descriptionKey": "LOC_SettingFilterShoppingListByCurrentShopOnOpenDescription"
     },
     {
       "id": "FID_UnmarkFinishedParts",
@@ -232,7 +331,7 @@
       "group": "jobs",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 10,
       "nameKey": "LOC_SettingUnmarkFinishedPartsName",
       "descriptionKey": "LOC_SettingUnmarkFinishedPartsDescription"
@@ -243,7 +342,7 @@
       "group": "jobs",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 20,
       "nameKey": "LOC_SettingMarkBodyPartsName",
       "descriptionKey": "LOC_SettingMarkBodyPartsDescription"
@@ -254,7 +353,7 @@
       "group": "jobs",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 30,
       "nameKey": "LOC_SettingQuickSwitchMountModesName",
       "descriptionKey": "LOC_SettingQuickSwitchMountModesDescription"
@@ -265,7 +364,7 @@
       "group": "interface",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 20,
       "nameKey": "LOC_SettingShowLiveryFileNamesName",
       "descriptionKey": "LOC_SettingShowLiveryFileNamesDescription"
@@ -276,7 +375,7 @@
       "group": "interface",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 30,
       "nameKey": "LOC_SettingShowCarConditionOnMapName",
       "descriptionKey": "LOC_SettingShowCarConditionOnMapDescription"
@@ -287,7 +386,7 @@
       "group": "interface",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 35,
       "nameKey": "LOC_SettingAddParkingSortingName",
       "descriptionKey": "LOC_SettingAddParkingSortingDescription"
@@ -298,7 +397,7 @@
       "group": "interface",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 40,
       "nameKey": "LOC_SettingAutoConfirmDynoStartName",
       "descriptionKey": "LOC_SettingAutoConfirmDynoStartDescription"
@@ -309,7 +408,7 @@
       "group": "interface",
       "type": "boolean",
       "default": true,
-      "applyMode": "restartGame",
+      "applyMode": "immediate",
       "order": 50,
       "nameKey": "LOC_SettingAddExitGameToGaragePauseMenuName",
       "descriptionKey": "LOC_SettingAddExitGameToGaragePauseMenuDescription"

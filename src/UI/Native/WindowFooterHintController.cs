@@ -25,6 +25,7 @@ namespace Cms21UiPlus
     internal static class WindowFooterHintController
     {
         private const float SecondRowVerticalPadding = 5f;
+        private const float FooterBackgroundBottomPadding = 5f;
         private const float FallbackHorizontalSpacing = 15f;
 
         internal enum NativeFooterProfile
@@ -67,6 +68,8 @@ namespace Cms21UiPlus
             public float TimeToHold;
             public bool OnlyHandleMouseClickInput = true;
             public bool AllowAutomaticRowWrap = true;
+            public bool ExtendFooterBackground;
+            public string HoldSuffixText;
         }
 
         private sealed class HintEntry
@@ -77,6 +80,9 @@ namespace Cms21UiPlus
             public NativeUiFactory.ControlHintRowHandle FactoryRow;
             public NativeUiFactory.FooterHintHandle Hint;
             public bool AllowAutomaticRowWrap;
+            public bool ExtendFooterBackground;
+            public string Text;
+            public string HoldSuffixText;
         }
 
         private sealed class WindowState
@@ -93,6 +99,12 @@ namespace Cms21UiPlus
             public bool PendingRenderAudit;
             public int EarliestLayoutFrame;
             public bool NativeLayoutChangedWhileSuspended;
+            public RectTransform FooterBackground;
+            public Vector2 FooterBackgroundNativeAnchorMin;
+            public Vector2 FooterBackgroundNativeAnchorMax;
+            public Vector2 FooterBackgroundNativePivot;
+            public Vector2 FooterBackgroundNativePosition;
+            public Vector2 FooterBackgroundNativeSize;
         }
 
         private sealed class NativeRowMetrics
@@ -168,6 +180,20 @@ namespace Cms21UiPlus
             renderAuditSubscribed = true;
         }
 
+        private static void TryReleaseRenderAuditSubscription()
+        {
+            if (!renderAuditSubscribed)
+                return;
+            foreach (WindowState state in Windows.Values) {
+                if (state != null && state.PendingRenderAudit &&
+                    !state.Suspended && state.Root != null &&
+                    state.Root.gameObject.activeInHierarchy)
+                    return;
+            }
+            Canvas.remove_willRenderCanvases(RenderAuditHandler);
+            renderAuditSubscribed = false;
+        }
+
         internal static NativeUiFactory.FooterHintHandle RequestStyledHint(
             string windowId, RectTransform parent, string hintId,
             string[] keys, string text, Action action, int order)
@@ -240,8 +266,6 @@ namespace Cms21UiPlus
                 request.WindowRoot == null)
                 return null;
 
-            EnsureRenderAuditSubscribed();
-
             WindowState state;
             if (!Windows.TryGetValue(request.WindowId, out state) ||
                 state.Root != request.WindowRoot) {
@@ -295,6 +319,7 @@ namespace Cms21UiPlus
                 if (layout == null)
                     layout = hint.Root.AddComponent<LayoutElement>();
                 layout.ignoreLayout = true;
+                hint.Rect.pivot = new Vector2(0f, hint.Rect.pivot.y);
                 entry = new HintEntry {
                     Id = request.HintId,
                     FactoryRow = factoryRow,
@@ -303,11 +328,20 @@ namespace Cms21UiPlus
                 state.Entries.Add(entry);
                 layoutChanged = true;
             } else {
-                layoutChanged = !string.Equals(entry.Hint.Text,
+                layoutChanged = !string.Equals(entry.Text,
                     request.Text, StringComparison.Ordinal);
                 NativeUiFactory.UpdateFooterHint(entry.Hint, request.Text,
                     true);
             }
+
+            layoutChanged |= entry.ExtendFooterBackground !=
+                request.ExtendFooterBackground ||
+                !string.Equals(entry.HoldSuffixText, request.HoldSuffixText,
+                    StringComparison.Ordinal);
+            entry.ExtendFooterBackground = request.ExtendFooterBackground;
+            entry.Text = request.Text;
+            entry.HoldSuffixText = request.HoldSuffixText;
+            ApplyHoldSuffix(entry);
 
             if (request.Profile != NativeFooterProfile.Automatic)
                 state.Profile = request.Profile;
@@ -322,6 +356,8 @@ namespace Cms21UiPlus
             entry.AllowAutomaticRowWrap = request.AllowAutomaticRowWrap;
             if (layoutChanged)
                 ScheduleLayout(state);
+            else if (state.PendingRenderAudit && !state.Suspended)
+                EnsureRenderAuditSubscribed();
             return entry.Hint;
         }
 
@@ -335,10 +371,13 @@ namespace Cms21UiPlus
                 return;
             NativeUiFactory.DestroyControlHintRow(entry.FactoryRow);
             state.Entries.Remove(entry);
-            if (state.Entries.Count == 0)
+            if (state.Entries.Count == 0) {
+                RestoreFooterBackground(state);
                 Windows.Remove(windowId);
-            else
+            } else {
                 ScheduleLayout(state);
+            }
+            TryReleaseRenderAuditSubscription();
         }
 
         internal static void OnNativeDescriptionLayoutChanged(
@@ -402,6 +441,7 @@ namespace Cms21UiPlus
                 return;
             state.Suspended = true;
             SetHintsVisible(state, false);
+            TryReleaseRenderAuditSubscription();
         }
 
         internal static void ResumeWindow(string windowId)
@@ -417,6 +457,8 @@ namespace Cms21UiPlus
             } else {
                 SetHintsVisible(state, true);
             }
+            if (state.PendingRenderAudit)
+                EnsureRenderAuditSubscribed();
         }
 
         internal static void ClearWindow(string windowId)
@@ -428,7 +470,9 @@ namespace Cms21UiPlus
                 NativeUiFactory.DestroyControlHintRow(
                     state.Entries[i].FactoryRow);
             state.Entries.Clear();
+            RestoreFooterBackground(state);
             Windows.Remove(windowId);
+            TryReleaseRenderAuditSubscription();
         }
 
         internal static void UpdateLayouts()
@@ -452,6 +496,7 @@ namespace Cms21UiPlus
             state.EarliestLayoutFrame = Mathf.Max(
                 state.EarliestLayoutFrame, earliestFrame);
             SetHintsVisible(state, false);
+            EnsureRenderAuditSubscribed();
         }
 
         private static void OnWillRenderCanvases()
@@ -472,6 +517,7 @@ namespace Cms21UiPlus
                 }
             } finally {
                 renderAuditPass = false;
+                TryReleaseRenderAuditSubscription();
             }
         }
 
@@ -548,6 +594,8 @@ namespace Cms21UiPlus
             state.Entries.Sort(delegate(HintEntry left, HintEntry right) {
                 return left.Order.CompareTo(right.Order);
             });
+            for (int i = 0; i < state.Entries.Count; i++)
+                ApplyHoldSuffix(state.Entries[i]);
 
             Bounds sourceBounds;
             bool hasSourceBounds = NativeUiFactory
@@ -644,6 +692,136 @@ namespace Cms21UiPlus
                         placement.Bottom - rectBottomLeft.y);
                 }
             }
+
+            UpdateFooterBackground(state, placements);
+        }
+
+        private static void ApplyHoldSuffix(HintEntry entry)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.HoldSuffixText))
+                return;
+            NativeUiFactory.ApplyNativeHoldSuffix(
+                entry.Hint, entry.Text, entry.HoldSuffixText);
+        }
+
+        private static void UpdateFooterBackground(WindowState state,
+            List<FooterHintPlacement> placements)
+        {
+            bool shouldExtend = false;
+            bool hasSecondRow = false;
+            for (int i = 0; i < state.Entries.Count; i++) {
+                if (state.Entries[i].ExtendFooterBackground) {
+                    shouldExtend = true;
+                    break;
+                }
+            }
+            if (!shouldExtend || state.Parent == null || state.Root == null) {
+                RestoreFooterBackground(state);
+                return;
+            }
+
+            Transform backgroundTransform = state.Parent.Find("BG");
+            RectTransform background = backgroundTransform != null
+                ? backgroundTransform.GetComponent<RectTransform>() : null;
+            Transform windowBackgroundTransform = state.Root.Find("BG");
+            RectTransform windowBackground = windowBackgroundTransform != null
+                ? windowBackgroundTransform.GetComponent<RectTransform>()
+                : null;
+            if (background == null || windowBackground == null) {
+                RestoreFooterBackground(state);
+                return;
+            }
+
+            if (state.FooterBackground != background) {
+                RestoreFooterBackground(state);
+                state.FooterBackground = background;
+                state.FooterBackgroundNativeAnchorMin = background.anchorMin;
+                state.FooterBackgroundNativeAnchorMax = background.anchorMax;
+                state.FooterBackgroundNativePivot = background.pivot;
+                state.FooterBackgroundNativePosition =
+                    background.anchoredPosition;
+                state.FooterBackgroundNativeSize = background.sizeDelta;
+            }
+
+            background.anchorMin = state.FooterBackgroundNativeAnchorMin;
+            background.anchorMax = state.FooterBackgroundNativeAnchorMax;
+            background.pivot = state.FooterBackgroundNativePivot;
+            background.anchoredPosition =
+                state.FooterBackgroundNativePosition;
+            background.sizeDelta = state.FooterBackgroundNativeSize;
+
+            Bounds windowBounds;
+            if (!NativeUiFactory.TryGetRectTransformBounds(
+                    windowBackground, state.Parent, out windowBounds))
+                return;
+
+            Vector2 anchorMin = background.anchorMin;
+            Vector2 anchorMax = background.anchorMax;
+            Vector2 pivot = background.pivot;
+            Vector2 position = background.anchoredPosition;
+            Vector2 size = background.sizeDelta;
+            anchorMin.x = 0f;
+            anchorMax.x = 0f;
+            pivot.x = 0f;
+            position.x = windowBounds.min.x;
+            size.x = windowBounds.size.x;
+            background.anchorMin = anchorMin;
+            background.anchorMax = anchorMax;
+            background.pivot = pivot;
+            background.anchoredPosition = position;
+            background.sizeDelta = size;
+
+            float lowestHintY = float.MaxValue;
+            for (int i = 0; i < placements.Count; i++) {
+                FooterHintPlacement placement = placements[i];
+                if (placement == null || placement.Row < 2 ||
+                    placement.Hint == null ||
+                    !placement.Hint.Entry.ExtendFooterBackground)
+                    continue;
+                hasSecondRow = true;
+                Bounds hintBounds;
+                if (NativeUiFactory.TryGetControlHintVisualBounds(
+                        placement.Hint.Entry.Hint, state.Parent,
+                        out hintBounds))
+                    lowestHintY = Mathf.Min(lowestHintY, hintBounds.min.y);
+            }
+            if (!hasSecondRow || lowestHintY == float.MaxValue)
+                return;
+
+            Bounds backgroundBounds;
+            if (!NativeUiFactory.TryGetRectTransformBounds(
+                    background, state.Parent, out backgroundBounds))
+                return;
+
+            float extraHeight = Mathf.Max(0f,
+                backgroundBounds.min.y - lowestHintY +
+                FooterBackgroundBottomPadding);
+            if (extraHeight <= 0.01f)
+                return;
+
+            position = background.anchoredPosition;
+            size = background.sizeDelta;
+            position.y -= (1f - background.pivot.y) * extraHeight;
+            size.y += extraHeight;
+            background.anchoredPosition = position;
+            background.sizeDelta = size;
+        }
+
+        private static void RestoreFooterBackground(WindowState state)
+        {
+            if (state == null || state.FooterBackground == null)
+                return;
+            state.FooterBackground.anchorMin =
+                state.FooterBackgroundNativeAnchorMin;
+            state.FooterBackground.anchorMax =
+                state.FooterBackgroundNativeAnchorMax;
+            state.FooterBackground.pivot =
+                state.FooterBackgroundNativePivot;
+            state.FooterBackground.anchoredPosition =
+                state.FooterBackgroundNativePosition;
+            state.FooterBackground.sizeDelta =
+                state.FooterBackgroundNativeSize;
+            state.FooterBackground = null;
         }
 
         private static List<FooterHintPlacement> CalculateHintPositions(

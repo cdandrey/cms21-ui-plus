@@ -45,6 +45,7 @@ namespace Cms21UiPlus
             GarageConditionFilterMode.Off;
         private static QualityQuickFilterMode qualityMode =
             QualityQuickFilterMode.Off;
+        private static string searchText = string.Empty;
         private static bool applyingFilteredList;
         private static bool filteredEmptyState;
         private static int activationGeneration;
@@ -136,9 +137,8 @@ namespace Cms21UiPlus
 
         public static void OnRepairWindowHidden()
         {
-            conditionMode = GarageConditionFilterMode.Off;
-            qualityMode = QualityQuickFilterMode.Off;
-            Panel.ResetSearch();
+            if (ShouldResetOnExit())
+                ResetFilterState();
             DeactivateWindow();
         }
 
@@ -179,7 +179,14 @@ namespace Cms21UiPlus
             OriginalItems.Clear();
             conditionMode = GarageConditionFilterMode.Off;
             qualityMode = QualityQuickFilterMode.Off;
+            searchText = string.Empty;
             applyingFilteredList = false;
+        }
+
+        private static bool ShouldResetOnExit()
+        {
+            return Main.SettingsEntry != null &&
+                Main.SettingsEntry.Value.resetRepairInventoryFiltersOnExit;
         }
 
         private static bool IsEnabled()
@@ -217,6 +224,7 @@ namespace Cms21UiPlus
                     yield break;
                 }
 
+                Panel.SetSearchText(searchText);
                 Panel.UpdateVisuals(conditionMode,
                     RepairabilityQuickFilterMode.Off, qualityMode);
                 CreateResetHint();
@@ -305,21 +313,27 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        public static void Update()
+        internal static bool TryResetFromKeyboardShortcut()
         {
             if (activeRepairWindow == null ||
                 activeRepairWindow.gameObject == null ||
                 !activeRepairWindow.gameObject.activeInHierarchy)
-                return;
+                return false;
 
-            if (Input.GetKeyDown(KeyCode.LeftAlt))
-                ResetFilters();
+            ResetFilters();
+            return true;
+        }
+
+        private static void ResetFilterState()
+        {
+            conditionMode = GarageConditionFilterMode.Off;
+            qualityMode = QualityQuickFilterMode.Off;
+            searchText = string.Empty;
         }
 
         private static void ResetFilters()
         {
-            conditionMode = GarageConditionFilterMode.Off;
-            qualityMode = QualityQuickFilterMode.Off;
+            ResetFilterState();
             Panel.ResetSearch();
             Panel.UpdateVisuals(conditionMode,
                 RepairabilityQuickFilterMode.Off, qualityMode);
@@ -351,8 +365,9 @@ namespace Cms21UiPlus
                 });
         }
 
-        private static void OnSearchChanged(string searchText)
+        private static void OnSearchChanged(string value)
         {
+            searchText = value ?? string.Empty;
             ApplyCurrentFilters(true);
         }
 
@@ -360,7 +375,7 @@ namespace Cms21UiPlus
         {
             PartFilterCriteria criteria = new PartFilterCriteria();
             criteria.Context = PartFilterContext.Garage;
-            criteria.SearchText = Panel.SearchText;
+            criteria.SearchText = searchText;
             criteria.GarageConditionMode = conditionMode;
             criteria.RepairabilityMode = RepairabilityQuickFilterMode.Off;
             criteria.QualityMode = qualityMode;

@@ -237,11 +237,16 @@ namespace Cms21UiPlus
 
             int visibleRows = Math.Max(1, Mathf.FloorToInt(
                 (viewport.rect.height + grid.spacing.y + 0.01f) / rowStride));
-            int itemCount = Math.Min(window.items.Count, window.shopListItems.Count);
+            int itemCount = Math.Min(
+                ShoppingListShopFilterFeature.GetVisibleItemCount(window),
+                window.shopListItems.Count);
             int requiredRows = Math.Max(visibleRows,
                 (itemCount + VisualColumns - 1) / VisualColumns);
-            int activeSlots = Math.Min(window.shopListItems.Count,
-                requiredRows * VisualColumns);
+            int activeSlots =
+                ShoppingListShopFilterFeature.IsFiltering(window)
+                    ? itemCount
+                    : Math.Min(window.shopListItems.Count,
+                        requiredRows * VisualColumns);
             bool showRepairability = IsEnabled;
             bool showOwnedCount = IsEnabled;
 
@@ -256,6 +261,10 @@ namespace Cms21UiPlus
 
                 if (index < itemCount) {
                     ShopListItemData data = window.items[index];
+                    if (item.itemName != null)
+                        item.itemName.gameObject.SetActive(true);
+                    if (item.amount != null)
+                        item.amount.gameObject.SetActive(true);
                     ShoppingListQuantityFeature.UpdateRow(window, item, data);
                     bool showRepairabilityIndicator = showRepairability &&
                         data != null && !string.IsNullOrEmpty(data.ID);
@@ -272,9 +281,7 @@ namespace Cms21UiPlus
                         HideOwnedPartIndicator(item);
                     }
                 } else {
-                    ShoppingListQuantityFeature.HideRow(item);
-                    HideRepairabilityIndicator(item);
-                    HideOwnedPartIndicator(item);
+                    HideUnusedRow(item);
                 }
 
                 if (!shouldBeActive || item.background == null)
@@ -284,6 +291,25 @@ namespace Cms21UiPlus
                 if (item.background.activeSelf != showBackground)
                     item.background.SetActive(showBackground);
             }
+        }
+
+        private static void HideUnusedRow(ShopListItem row)
+        {
+            if (row == null)
+                return;
+
+            ShoppingListQuantityFeature.HideRow(row);
+            if (row.itemName != null)
+                row.itemName.gameObject.SetActive(false);
+            if (row.amount != null)
+                row.amount.gameObject.SetActive(false);
+            if (row.background != null)
+                row.background.SetActive(false);
+            Transform selected = row.transform.Find("Selected");
+            if (selected != null)
+                selected.gameObject.SetActive(false);
+            HideRepairabilityIndicator(row);
+            HideOwnedPartIndicator(row);
         }
 
         private static void UpdateRepairabilityIndicator(
@@ -669,7 +695,9 @@ namespace Cms21UiPlus
                 window.shopListItems == null || window.items == null)
                 return;
 
-            int itemCount = Math.Min(window.items.Count, window.shopListItems.Count);
+            int itemCount = Math.Min(
+                ShoppingListShopFilterFeature.GetVisibleItemCount(window),
+                window.shopListItems.Count);
             int visualRowCount =
                 (itemCount + VisualColumns - 1) / VisualColumns;
             int navigationColumnCount = Math.Min(VisualColumns, itemCount);
@@ -734,7 +762,9 @@ namespace Cms21UiPlus
                 window.shopListItems == null || window.items == null)
                 return false;
 
-            int itemCount = Math.Min(window.items.Count, window.shopListItems.Count);
+            int itemCount = Math.Min(
+                ShoppingListShopFilterFeature.GetVisibleItemCount(window),
+                window.shopListItems.Count);
             int visualRowCount =
                 (itemCount + VisualColumns - 1) / VisualColumns;
             int expectedColumnCount = Math.Min(VisualColumns, itemCount);

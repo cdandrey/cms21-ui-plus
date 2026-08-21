@@ -117,9 +117,14 @@ namespace Cms21UiPlus
             int requestedProfile, int requestedSize, int requestedWidth,
             bool allowTuningVariant)
         {
-            return IsCompatibleItemID(purchasedItemID, requestedItemID,
-                    allowTuningVariant) &&
-                (requestedET == 0 || requestedET == purchasedET) &&
+            if (!IsCompatibleItemID(purchasedItemID, requestedItemID,
+                    allowTuningVariant))
+                return false;
+
+            if (!HasWheelParameters(requestedItemID))
+                return true;
+
+            return (requestedET == 0 || requestedET == purchasedET) &&
                 (requestedProfile == 0 || requestedProfile == purchasedProfile) &&
                 (requestedSize == 0 || requestedSize == purchasedSize) &&
                 (requestedWidth == 0 || requestedWidth == purchasedWidth);

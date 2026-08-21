@@ -476,6 +476,7 @@ namespace Cms21UiPlus
         private static void Postfix(string __0)
         {
             ModLocalization.SetGameLanguage(__0);
+            ModSettingsMenuFeature.OnLanguageChanged();
         }
     }
 }

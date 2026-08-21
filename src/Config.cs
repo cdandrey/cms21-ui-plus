@@ -23,8 +23,10 @@ namespace Cms21UiPlus
         public bool removePartsFromShoppingList = true;
         [Tomlet.Attributes.TomlInlineComment("Prefill purchase amount and wheel dimensions from the shopping list")]
         public bool wheelShopListPurchaseHelper = true;
-        [Tomlet.Attributes.TomlInlineComment("Enable the improved shopping list with two-column layout, quantity controls, indicators, sorting and bulk purchase")]
+        [Tomlet.Attributes.TomlInlineComment("Enable the improved shopping list with shop filters, two-column layout, quantity controls, indicators, sorting and bulk purchase")]
         public bool addShoppingListSorting = true;
+        [Tomlet.Attributes.TomlInlineComment("Filter the shopping list to the current specialized shop when it opens")]
+        public bool filterShoppingListByCurrentShopOnOpen = true;
         [Tomlet.Attributes.TomlInlineComment("Quickly switch between matching mount and unmount modes")]
         public bool quickSwitchMountModes = true;
         [Tomlet.Attributes.TomlInlineComment("Add an exit-game action to the garage pause menu")]
@@ -51,24 +53,40 @@ namespace Cms21UiPlus
         public bool hideBodyPartPaintColorBadges = true;
         [Tomlet.Attributes.TomlInlineComment("Enable inventory, warehouse, barn and junkyard quick filters")]
         public bool addInventoryQuickFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset garage inventory and warehouse quick filters when the window closes")]
+        public bool resetInventoryQuickFiltersOnExit = true;
         [Tomlet.Attributes.TomlInlineComment("Enable spring-clamp quick filters")]
         public bool addSpringClampInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset spring-clamp quick filters when the selection window closes")]
+        public bool resetSpringClampInventoryFiltersOnExit = false;
         [Tomlet.Attributes.TomlInlineComment("Enable tire-changer quick filters")]
         public bool addTireChangerInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset tire-changer quick filters when the selection window closes")]
+        public bool resetTireChangerInventoryFiltersOnExit = false;
         [Tomlet.Attributes.TomlInlineComment("Enable wheel-balancer quick filters")]
         public bool addWheelBalancerInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset wheel-balancer quick filters when the selection window closes")]
+        public bool resetWheelBalancerInventoryFiltersOnExit = false;
         [Tomlet.Attributes.TomlInlineComment("Enable brake-lathe quick filters")]
         public bool addBrakeLatheInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset brake-lathe quick filters when the selection window closes")]
+        public bool resetBrakeLatheInventoryFiltersOnExit = false;
         [Tomlet.Attributes.TomlInlineComment("Enable mount part-selection quick filters")]
         public bool addMountPartSelectionFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset mount part-selection quick filters when the selection window closes")]
+        public bool resetMountPartSelectionFiltersOnExit = false;
         [Tomlet.Attributes.TomlInlineComment("Move all filtered parts between inventory and warehouse with the configured shortcut")]
         public bool moveFilteredPartsBetweenInventoryAndWarehouse = true;
         [Tomlet.Attributes.TomlInlineComment("Add search, condition and repairability filters to the scrap inventory")]
         public bool addScrapInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset scrap inventory quick filters when the scrap window closes")]
+        public bool resetScrapInventoryFiltersOnExit = true;
         [Tomlet.Attributes.TomlInlineComment("Hold Space to bulk scrap all or filtered scrap inventory parts")]
         public bool addBulkScrapShortcut = true;
         [Tomlet.Attributes.TomlInlineComment("Add search, condition and repairability filters to part and body repair inventories")]
         public bool addRepairInventoryFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Reset repair inventory quick filters when the repair window closes")]
+        public bool resetRepairInventoryFiltersOnExit = true;
     }
 
     internal static class SettingsMigration

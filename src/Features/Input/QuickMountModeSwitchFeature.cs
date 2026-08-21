@@ -12,8 +12,24 @@ namespace Cms21UiPlus
     {
         public static void Update()
         {
+            if (Input.GetKeyDown(KeyCode.LeftAlt)) {
+                bool handled = false;
+                handled |= ScrapInventoryFilterFeature
+                    .TryResetFromKeyboardShortcut();
+                handled |= RepairInventoryFilterFeature
+                    .TryResetFromKeyboardShortcut();
+                handled |= SpringClampInventoryFilterFeature
+                    .TryResetFromKeyboardShortcut();
+                handled |= InventoryFilterManager
+                    .TryResetFromKeyboardShortcut();
+                if (handled)
+                    return;
+            }
+
             if (!GlobalState.IsGarageSceneActive)
                 return;
+
+            FilteredWarehouseTransferFeature.TryHandleKeyboardShortcut();
 
             if (Input.GetKeyUp(KeyCode.LeftAlt) &&
                 (MountPartSelectionFilterFeature.TryResetFromKeyboardShortcut() ||

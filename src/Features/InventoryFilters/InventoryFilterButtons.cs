@@ -90,17 +90,15 @@ namespace Cms21UiPlus
             }
         }
 
-        public static void UpdateResetShortcut()
+        internal static bool TryResetFromKeyboardShortcut()
         {
             BaseInventory inventory = activeFilteredInventory;
             if (inventory == null || inventory.gameObject == null ||
-                !inventory.gameObject.activeInHierarchy) {
-                ClearResetHint();
-                activeFilteredInventory = null;
-                return;
-            }
-            if (Input.GetKeyDown(KeyCode.LeftAlt))
-                ResetActiveFilters(inventory);
+                !inventory.gameObject.activeInHierarchy)
+                return false;
+
+            ResetActiveFilters(inventory);
+            return true;
         }
 
         private static void SetActiveFilteredInventory(

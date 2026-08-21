@@ -103,14 +103,17 @@ namespace Cms21UiPlus
 
         internal static void ResetGarageFiltersOnWindowClose()
         {
+            ClearResetHint();
+            activeFilteredInventory = null;
             if (!GlobalState.IsGarageSceneActive || IsBarnOrJunkyardScene())
                 return;
 
-            ClearResetHint();
-            activeFilteredInventory = null;
-            garageConditionFilterMode = GarageConditionFilterMode.Off;
-            garageRepairabilityFilterMode = RepairabilityQuickFilterMode.Off;
-            garageQualityFilterMode = QualityQuickFilterMode.Off;
+            if (Main.SettingsEntry != null &&
+                Main.SettingsEntry.Value.resetInventoryQuickFiltersOnExit) {
+                garageConditionFilterMode = GarageConditionFilterMode.Off;
+                garageRepairabilityFilterMode = RepairabilityQuickFilterMode.Off;
+                garageQualityFilterMode = QualityQuickFilterMode.Off;
+            }
             ClearSelectedButton();
         }
 

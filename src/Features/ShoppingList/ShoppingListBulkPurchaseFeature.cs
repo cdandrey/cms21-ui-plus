@@ -65,8 +65,6 @@ namespace Cms21UiPlus
 
         private static readonly MethodInfo TakenItemsGetDiscountMethod =
             AccessTools.Method(typeof(TakenItemsWindow), "GetDiscount");
-        private static readonly MethodInfo FillItemsMethod =
-            AccessTools.Method(typeof(ShopListWindow), "FillItems");
         private static readonly PropertyInfo PartPropertyShopNameProperty =
             AccessTools.Property(typeof(PartProperty), "ShopName");
         private static readonly FieldInfo PartPropertyShopNameField =
@@ -109,17 +107,6 @@ namespace Cms21UiPlus
             DestroyHint();
             ResetInteractionState();
             activeWindow = null;
-        }
-
-        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.FillItems))]
-        [HarmonyPostfix]
-        [HarmonyPriority(Priority.Last)]
-        private static void FillItemsPostfix(ShopListWindow __instance)
-        {
-            if (__instance != activeWindow)
-                return;
-
-            UpdateHint();
         }
 
         [HarmonyPatch(typeof(ShopListWindow), "HandleInput")]
@@ -177,8 +164,10 @@ namespace Cms21UiPlus
                     CanHold = true,
                     TimeToHold = HoldDurationSeconds,
                     OnlyHandleMouseClickInput = true,
-                    Row = 0,
+                    Row = 1,
                     AllowAutomaticRowWrap = false,
+                    ExtendFooterBackground = true,
+                    HoldSuffixText = ModLocalization.Get("LOC_HoldAction"),
                     Order = 4,
                     Profile = WindowFooterHintController
                         .NativeFooterProfile.Automatic,
@@ -352,7 +341,7 @@ namespace Cms21UiPlus
                 if (changed) {
                     window.Save();
                     WheelShopListPurchaseFeature.ClearSelectedEntry();
-                    RefreshItems(window);
+                    ShoppingListRefresh.RefreshItems(window);
                 }
                 if (spent > 0 || changed)
                     CloseShoppingList(window);
@@ -364,17 +353,7 @@ namespace Cms21UiPlus
             } finally {
                 executionScheduled = false;
                 ResetSpaceHold();
-                UpdateHint();
             }
-        }
-
-        private static void RefreshItems(ShopListWindow window)
-        {
-            if (window == null || FillItemsMethod == null)
-                return;
-
-            FillItemsMethod.Invoke(window, null);
-            ShoppingListTwoColumnNavigationFeature.RefreshRowsNow(window);
         }
 
         private static int AddEntryItems(Inventory inventory,

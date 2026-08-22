@@ -46,6 +46,7 @@
     <Compile Include="src\Features\InventoryIndicators\OwnedPartCache.cs" />
     <Compile Include="src\Features\InventoryIndicators\PartIdentityComparer.cs" />
     <Compile Include="src\Features\InventoryIndicators\PartRowIndicators.cs" />
+    <Compile Include="src\Features\InventoryIndicators\MountPartCardIndicatorsFeature.cs" />
     <Compile Include="src\Features\InventorySorting\InventorySortPersistenceFeature.cs" />
     <Compile Include="src\Features\Jobs\BodyPartMarkingFeature.cs" />
     <Compile Include="src\Features\Jobs\FinishedPartUnmarker.cs" />

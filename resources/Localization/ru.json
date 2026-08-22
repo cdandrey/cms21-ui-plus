@@ -58,6 +58,8 @@
   "LOC_SettingRemovePartsFromShoppingListDescription": "Уменьшать количество или удалять соответствующую запись после подтверждённой покупки.",
   "LOC_SettingShowOwnedPartCountIndicatorsName": "Ярлык наличия деталей",
   "LOC_SettingShowOwnedPartCountIndicatorsDescription": "Показывать количество имеющихся деталей с разбивкой по состоянию на поддерживаемых карточках.",
+  "LOC_SettingShowMountPartCardIndicatorsName": "Ярлыки детали при монтаже и демонтаже",
+  "LOC_SettingShowMountPartCardIndicatorsDescription": "Показывать на карточке наведённой детали в режимах монтажа и демонтажа ремонтопригодность и наличие в инвентаре/на складе.",
   "LOC_SettingWheelShopListPurchaseHelperName": "Автозаполнение окна покупки дисков/шин/деталей",
   "LOC_SettingWheelShopListPurchaseHelperDescription": "Подставлять количество и размеры колёс из выбранной записи списка покупок.",
   "LOC_SettingAddInventoryQuickFiltersName": "Быстрые фильтры инвентаря",

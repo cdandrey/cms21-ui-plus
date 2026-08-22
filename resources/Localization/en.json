@@ -58,6 +58,8 @@
   "LOC_SettingRemovePartsFromShoppingListDescription": "Reduce or remove the matching shopping-list entry after a confirmed purchase.",
   "LOC_SettingShowOwnedPartCountIndicatorsName": "Owned-part count badge",
   "LOC_SettingShowOwnedPartCountIndicatorsDescription": "Show owned-part counts grouped by condition on supported part cards.",
+  "LOC_SettingShowMountPartCardIndicatorsName": "Mount/unmount part card badges",
+  "LOC_SettingShowMountPartCardIndicatorsDescription": "Show repairability and owned-part availability on the hovered part card in mount and unmount modes.",
   "LOC_SettingWheelShopListPurchaseHelperName": "Autofill tire/rim/part purchase window",
   "LOC_SettingWheelShopListPurchaseHelperDescription": "Prefill purchase quantity and wheel dimensions from the selected shopping-list entry.",
   "LOC_SettingAddInventoryQuickFiltersName": "Inventory quick filters",

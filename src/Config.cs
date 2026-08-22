@@ -49,6 +49,8 @@ namespace Cms21UiPlus
         public bool showPartRepairabilityIndicators = true;
         [Tomlet.Attributes.TomlInlineComment("Show owned-part count indicators in all supported inventories")]
         public bool showOwnedPartCountIndicators = true;
+        [Tomlet.Attributes.TomlInlineComment("Show repairability and owned-part indicators on the hovered part card in mount/unmount modes")]
+        public bool showMountPartCardIndicators = true;
         [Tomlet.Attributes.TomlInlineComment("Hide the vanilla paint-colour badge on part cards")]
         public bool hideBodyPartPaintColorBadges = true;
         [Tomlet.Attributes.TomlInlineComment("Enable inventory, warehouse, barn and junkyard quick filters")]

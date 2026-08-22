@@ -62,6 +62,17 @@
       "descriptionKey": "LOC_SettingShowOwnedPartCountIndicatorsDescription"
     },
     {
+      "id": "FID_ShowMountPartCardIndicators",
+      "key": "showMountPartCardIndicators",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 12,
+      "nameKey": "LOC_SettingShowMountPartCardIndicatorsName",
+      "descriptionKey": "LOC_SettingShowMountPartCardIndicatorsDescription"
+    },
+    {
       "id": "FID_HideBodyPartPaintColorBadges",
       "key": "hideBodyPartPaintColorBadges",
       "group": "inventory",

@@ -29,8 +29,7 @@ namespace Cms21UiPlus
         private const float AmountGap = 3.5f;
         private static readonly Color HoverColor =
             new Color(1f, 0.65f, 0.04f, 1f);
-        private static ShopListWindow selectedWindow;
-        private static int selectedRowIndex = -1;
+        private static ShopListWindow activeWindow;
 
         private static bool IsEnabled {
             get {
@@ -39,59 +38,61 @@ namespace Cms21UiPlus
             }
         }
 
-        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.OnGridItemSelect))]
+        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Show))]
         [HarmonyPostfix]
-        private static void GridItemSelectPostfix(ShopListWindow __instance,
-            int x, int y)
+        private static void ShowPostfix(ShopListWindow __instance, bool __result)
         {
-            if (!IsEnabled || __instance == null || __instance.items == null)
-                return;
-
-            int index = x + (y * ShopListWindow.Columns);
-            selectedWindow = __instance;
-            selectedRowIndex = index >= 0 && index < __instance.items.Count
-                ? index : -1;
+            if (__result && IsEnabled)
+                activeWindow = __instance;
         }
 
         [HarmonyPatch(typeof(ShopListWindow), "HandleInput")]
-        [HarmonyPostfix]
-        private static void HandleInputPostfix(ShopListWindow __instance)
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static bool HandleInputPrefix(ShopListWindow __instance)
         {
-            if (!IsEnabled)
-                return;
+            bool keypadPlus = Input.GetKeyDown(KeyCode.KeypadPlus);
+            bool plus = Input.GetKeyDown(KeyCode.Plus);
+            bool equals = Input.GetKeyDown(KeyCode.Equals);
+            bool keypadMinus = Input.GetKeyDown(KeyCode.KeypadMinus);
+            bool minus = Input.GetKeyDown(KeyCode.Minus);
+            bool remove = Input.GetKeyDown(KeyCode.X);
+            bool shift = Input.GetKey(KeyCode.LeftShift) ||
+                Input.GetKey(KeyCode.RightShift);
+            if (__instance == null || __instance != activeWindow ||
+                !ShoppingListBackend.IsOpen(__instance))
+                return true;
 
             int delta = 0;
-            if (IsPlusPressed())
-                delta = 1;
-            else if (IsMinusPressed())
-                delta = -1;
-            else
-                return;
+            if (!remove) {
+                if (keypadPlus || plus || (equals && shift))
+                    delta = 1;
+                else if (keypadMinus || minus)
+                    delta = -1;
+                else
+                    return true;
+            }
 
-            int currentRowIndex =
-                ShoppingListTwoColumnNavigationFeature.GetCurrentVisualIndex(
-                    __instance);
-            int targetRowIndex = currentRowIndex >= 0
-                ? currentRowIndex : selectedRowIndex;
-            if (__instance == null || __instance != selectedWindow ||
-                __instance.shopListItems == null || targetRowIndex < 0 ||
-                targetRowIndex >= __instance.shopListItems.Count)
-                return;
+            ShoppingListBackendEntry entry =
+                ShoppingListBackend.GetCurrentSelectedEntry(__instance);
 
-            ShopListItem row = __instance.shopListItems[targetRowIndex];
-            if (row != null)
-                AdjustQuantity(__instance, row, delta);
+            if (entry != null && entry.Data != null) {
+                if (remove)
+                    ShoppingListBackend.Remove(__instance, entry.Data);
+                else
+                    AdjustQuantity(__instance, entry.Data, delta);
+            }
+
+            Input.ResetInputAxes();
+            return false;
         }
 
         [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Hide))]
         [HarmonyPostfix]
         private static void HidePostfix(ShopListWindow __instance)
         {
-            if (__instance != selectedWindow)
-                return;
-
-            selectedWindow = null;
-            selectedRowIndex = -1;
+            if (__instance == activeWindow)
+                activeWindow = null;
         }
 
         private static bool IsPlusPressed()
@@ -124,16 +125,23 @@ namespace Cms21UiPlus
 
             try {
                 Button minusButton = EnsureQuantityButton(
-                    window, row, MinusButtonName, "-", -1);
+                    row, MinusButtonName, "-");
                 Button plusButton = EnsureQuantityButton(
-                    window, row, PlusButtonName, "+", 1);
+                    row, PlusButtonName, "+");
                 if (minusButton == null || plusButton == null) {
                     RestoreNativeDelete(row);
                     return;
                 }
 
-                UpdateAmountText(row, data.Amount);
-                LayoutControls(row, minusButton, plusButton);
+                BindQuantityButton(minusButton, window, row, data, -1);
+                BindQuantityButton(plusButton, window, row, data, 1);
+                if (ShoppingListPresentationFeature.IsCardPresentationActive(row)) {
+                    ShoppingListPresentationFeature.UpdateQuantityText(row, data);
+                    LayoutCardControls(row, minusButton, plusButton);
+                } else {
+                    UpdateAmountText(row, data.Amount);
+                    LayoutControls(row, minusButton, plusButton);
+                }
                 minusButton.interactable = data.Amount > 1;
                 plusButton.interactable = data.Amount < int.MaxValue;
 
@@ -164,8 +172,8 @@ namespace Cms21UiPlus
                 row.trashButton.gameObject.SetActive(false);
         }
 
-        private static Button EnsureQuantityButton(ShopListWindow window,
-            ShopListItem row, string name, string symbol, int delta)
+        private static Button EnsureQuantityButton(ShopListItem row,
+            string name, string symbol)
         {
             Transform existing = row.transform.Find(name);
             Button button = existing != null
@@ -255,15 +263,24 @@ namespace Cms21UiPlus
             colors.colorMultiplier = 1f;
             colors.fadeDuration = 0.06f;
             button.colors = colors;
-            int quantityDelta = delta;
+            buttonObject.SetActive(true);
+            return button;
+        }
+
+        private static void BindQuantityButton(Button button,
+            ShopListWindow window, ShopListItem row, ShopListItemData data,
+            int delta)
+        {
+            if (button == null || data == null)
+                return;
+
+            button.onClick.RemoveAllListeners();
             Action clickAction = delegate () {
-                AdjustQuantity(window, row, quantityDelta);
+                AdjustQuantity(window, data, delta);
             };
             UnityAction unityAction =
                 DelegateSupport.ConvertDelegate<UnityAction>(clickAction);
             button.onClick.AddListener(unityAction);
-            buttonObject.SetActive(true);
-            return button;
         }
 
         private static void CopyTextStyle(Text source, Text target)
@@ -307,6 +324,65 @@ namespace Cms21UiPlus
             Text text = buttonTransform.Find(SymbolName)?.GetComponent<Text>();
             if (text != null && text.text != symbol)
                 text.text = symbol;
+        }
+
+        private static void LayoutCardControls(ShopListItem row,
+            Button minusButton, Button plusButton)
+        {
+            RectTransform rowRect = row.GetComponent<RectTransform>();
+            RectTransform trashRect = row.trashButton != null
+                ? row.trashButton.GetComponent<RectTransform>() : null;
+            RectTransform minusRect = minusButton != null
+                ? minusButton.GetComponent<RectTransform>() : null;
+            RectTransform plusRect = plusButton != null
+                ? plusButton.GetComponent<RectTransform>() : null;
+            RectTransform amountRect = row.amount != null
+                ? row.amount.GetComponent<RectTransform>() : null;
+            if (rowRect == null || trashRect == null || minusRect == null ||
+                plusRect == null || amountRect == null || rowRect.rect.width <= 0f)
+                return;
+
+            const float margin = 2f;
+            const float controlHeight = 18f;
+            const float buttonWidth = 16f;
+            const float gap = 1.5f;
+
+            ConfigureBottomButton(trashRect, margin, buttonWidth,
+                controlHeight);
+            ConfigureBottomButton(plusRect,
+                margin + buttonWidth + gap, buttonWidth, controlHeight);
+            ConfigureBottomButton(minusRect,
+                margin + ((buttonWidth + gap) * 2f), buttonWidth,
+                controlHeight);
+
+            float controlsWidth = margin + (buttonWidth * 3f) + (gap * 2f);
+            amountRect.anchorMin = new Vector2(0f, 0f);
+            amountRect.anchorMax = new Vector2(0f, 0f);
+            amountRect.pivot = new Vector2(0f, 0f);
+            amountRect.anchoredPosition = new Vector2(margin, 0f);
+            amountRect.sizeDelta = new Vector2(
+                Math.Max(1f, rowRect.rect.width - controlsWidth - margin),
+                controlHeight);
+            row.amount.alignment = TextAnchor.MiddleLeft;
+            row.amount.resizeTextForBestFit = true;
+            row.amount.resizeTextMinSize = 6;
+            row.amount.resizeTextMaxSize = Math.Max(8, row.amount.fontSize);
+            row.amount.horizontalOverflow = HorizontalWrapMode.Wrap;
+            row.amount.verticalOverflow = VerticalWrapMode.Truncate;
+        }
+
+        private static void ConfigureBottomButton(RectTransform rect,
+            float rightOffset, float width, float height)
+        {
+            if (rect == null)
+                return;
+
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(1f, 0f);
+            rect.anchoredPosition = new Vector2(-rightOffset, 0f);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.localScale = Vector3.one;
         }
 
         private static void LayoutControls(ShopListItem row,
@@ -382,45 +458,22 @@ namespace Cms21UiPlus
                 : amountText;
         }
 
-        private static void AdjustQuantity(ShopListWindow window,
-            ShopListItem row, int delta)
+        private static bool AdjustQuantity(ShopListWindow window,
+            ShopListItemData entry, int delta)
         {
-            if (window == null || row == null || delta == 0 ||
-                window.shopListItems == null || window.items == null)
-                return;
+            if (window == null || entry == null || delta == 0)
+                return false;
 
             try {
-                int rowIndex = -1;
-                int rowCount = window.shopListItems.Count;
-                for (int i = 0; i < rowCount; i++) {
-                    if (window.shopListItems[i] == row) {
-                        rowIndex = i;
-                        break;
-                    }
-                }
-
-                if (rowIndex < 0 || rowIndex >= window.items.Count)
-                    return;
-
-                ShopListItemData data = window.items[rowIndex];
-                if (data == null || data.Amount < 1)
-                    return;
-                if (delta < 0 && data.Amount <= 1)
-                    return;
-                if (delta > 0 && data.Amount == int.MaxValue)
-                    return;
-
-                data.Amount += delta;
-                window.items[rowIndex] = data;
-                window.Save();
-                WheelShopListPurchaseFeature.RefreshSelectedEntry(data);
-                UpdateAmountText(row, data.Amount);
-                UpdateRow(window, row, data);
+                ShopListItemData current;
+                return ShoppingListBackend.TryAdjustAmount(
+                    window, entry, delta, out current);
             } catch (Exception exception) {
                 ModLogger.Log(
                     "[ShoppingList] Failed to adjust requested quantity." +
                     Environment.NewLine + exception,
                     Types.LoggingLevels.Error);
+                return false;
             }
         }
 

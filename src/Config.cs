@@ -23,7 +23,7 @@ namespace Cms21UiPlus
         public bool removePartsFromShoppingList = true;
         [Tomlet.Attributes.TomlInlineComment("Prefill purchase amount and wheel dimensions from the shopping list")]
         public bool wheelShopListPurchaseHelper = true;
-        [Tomlet.Attributes.TomlInlineComment("Enable the improved shopping list with shop filters, two-column layout, quantity controls, indicators, sorting and bulk purchase")]
+        [Tomlet.Attributes.TomlInlineComment("Enable the improved shopping list with shop filters, compact card grid, quantity controls, indicators, sorting and bulk purchase")]
         public bool addShoppingListSorting = true;
         [Tomlet.Attributes.TomlInlineComment("Filter the shopping list to the current specialized shop when it opens")]
         public bool filterShoppingListByCurrentShopOnOpen = true;

@@ -114,6 +114,7 @@
   "LOC_SettingAddShoppingListSortingDescription": "Включить быстрые фильтры по категориям магазинов, двухколоночный список, сортировку, изменение количества, ярлыки ремонтопригодности и наличия на складе, а также массовую покупку деталей текущего магазина.",
   "LOC_SettingFilterShoppingListByCurrentShopOnOpenName": "Фильтровать по текущему магазину при открытии",
   "LOC_SettingFilterShoppingListByCurrentShopOnOpenDescription": "При открытии списка покупок в специализированном магазине автоматически оставлять включённой только категорию этого магазина.",
+  "LOC_ShoppingListAddedPopupTitle": "Добавлено в список",
   "LOC_ShoppingListBuyAllAction": "КУПИТЬ ВСЁ",
   "LOC_ShoppingListBuyAllTitle": "КУПИТЬ ВСЁ?",
   "LOC_ShoppingListBuyAllConfirmation": "Количество деталей: {0}\nСтоимость: {1}",

@@ -12,7 +12,6 @@ using Il2CppCMS.UI.Controls;
 using Il2CppCMS.UI.Logic;
 using Il2CppCMS.UI.Logic.Shop;
 using Il2CppCMS.UI.Logic.Tune;
-using Il2CppCMS.UI.Logic.Navigation;
 using Il2CppCMS.UI.Windows;
 #else
 using CMS;
@@ -22,137 +21,302 @@ using CMS.UI.Controls;
 using CMS.UI.Logic;
 using CMS.UI.Logic.Shop;
 using CMS.UI.Logic.Tune;
-using CMS.UI.Logic.Navigation;
 using CMS.UI.Windows;
 #endif
 
 namespace Cms21UiPlus
 {
+    internal static class ShoppingListPurchaseController
+    {
+        private static ShoppingListEntrySnapshot activeEntry;
+        private static bool listSearchInProgress;
+
+        internal static bool IsEnabled {
+            get {
+                if (!GlobalState.IsGarageSceneActive || Main.SettingsEntry == null)
+                    return false;
+
+                Settings settings = Main.SettingsEntry.Value;
+                return settings != null &&
+                    (settings.wheelShopListPurchaseHelper ||
+                     settings.removePartsFromShoppingList);
+            }
+        }
+
+        internal static void Invalidate()
+        {
+            activeEntry = null;
+            listSearchInProgress = false;
+        }
+
+        internal static bool BeginListSearch(ShoppingListBackendEntry entry)
+        {
+            if (!IsEnabled || entry == null)
+                return false;
+
+            ShoppingListEntrySnapshot snapshot = entry.CreateSnapshot();
+            activeEntry = snapshot != null ? Clone(snapshot) : null;
+            listSearchInProgress = activeEntry != null;
+            return listSearchInProgress;
+        }
+
+        internal static void EndListSearch()
+        {
+            listSearchInProgress = false;
+        }
+
+        internal static void OnManualSearch()
+        {
+            if (!listSearchInProgress)
+                Invalidate();
+        }
+
+        internal static void OnShopTransition()
+        {
+            if (!listSearchInProgress)
+                Invalidate();
+        }
+
+        internal static bool TryGetEntryForPurchase(ShopBuyWindow window,
+            out ShoppingListEntrySnapshot entry)
+        {
+            entry = null;
+            if (!IsEnabled || window == null)
+                return false;
+
+            if (activeEntry != null) {
+                entry = ShoppingListBackend.FindForPurchase(activeEntry);
+                return entry != null;
+            }
+
+            UIManager manager = UIManager.Get();
+            ShopListWindow listWindow = manager != null
+                ? manager.ShopListWindow : null;
+            bool wheel = window.type == ShopBuyItemType.Tire ||
+                window.type == ShopBuyItemType.Rim;
+            entry = ShoppingListBackend.FindForPurchase(
+                listWindow, window.itemID, wheel);
+            return entry != null;
+        }
+
+        internal static ShoppingListEntrySnapshot CreatePurchasedEntry(
+            ShopBuyWindow window, int amount)
+        {
+            if (window == null || string.IsNullOrEmpty(window.itemID) || amount <= 0)
+                return null;
+
+            ShoppingListEntrySnapshot selected = activeEntry != null
+                ? ShoppingListBackend.FindForPurchase(activeEntry) : null;
+            ShoppingListEntrySnapshot entry = new ShoppingListEntrySnapshot {
+                ID = window.itemID,
+                Name = selected != null ? selected.Name : window.itemID,
+                Amount = amount,
+                Tire = window.type == ShopBuyItemType.Tire,
+                Rim = window.type == ShopBuyItemType.Rim,
+            };
+
+            if (entry.Tire) {
+                entry.Size = GetOptionAmount(window, 1);
+                entry.Width = GetOptionAmount(window, 2);
+                entry.Profile = GetOptionAmount(window, 3);
+            } else if (entry.Rim) {
+                entry.Size = GetOptionAmount(window, 1);
+                entry.ET = GetOptionAmount(window, 2);
+            }
+            return entry;
+        }
+
+        private static ShoppingListEntrySnapshot Clone(
+            ShoppingListEntrySnapshot source)
+        {
+            if (source == null)
+                return null;
+
+            return new ShoppingListEntrySnapshot {
+                ID = source.ID,
+                Name = source.Name,
+                Amount = source.Amount,
+                Tire = source.Tire,
+                Rim = source.Rim,
+                LicensePlate = source.LicensePlate,
+                LicensePlateName = source.LicensePlateName,
+                Size = source.Size,
+                Width = source.Width,
+                Profile = source.Profile,
+                ET = source.ET,
+            };
+        }
+
+        private static int GetOptionAmount(ShopBuyWindow window, int index)
+        {
+            return window != null && window.shopOptions != null &&
+                index >= 0 && index < window.shopOptions.Length &&
+                window.shopOptions[index] != null
+                    ? window.shopOptions[index].currentAmount : 0;
+        }
+    }
+
     /// <summary>
-    /// Shopping-list purchase helper: fills the requested quantity for every part.
-    /// Tires and rims additionally receive their requested dimensions; tire parameters
-    /// are displayed in Width/Profile/Size order. The shopping list is not overlaid.
+    /// Applies shopping-list quantity and wheel dimensions to the native purchase
+    /// window. The purchase controller owns the currently valid list entry.
     /// </summary>
     [HarmonyPatch]
     public static class WheelShopListPurchaseFeature
     {
-        private static string selectedItemID;
-        private static int selectedAmount;
-        private const float SelectionLifetimeSeconds = 15f;
+        private static ShopListItemDataEx lastTireOptions =
+            new ShopListItemDataEx();
 
-        private static ShopListItemDataEx selectedData;
-        private static float selectedAtTime;
-        private static ShopListItemDataEx lastTireOptions = new ShopListItemDataEx();
 
-        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.OnGridItemSelect))]
+        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Show))]
         [HarmonyPostfix]
-        public static void GridItemSelectPostfix(ShopListWindow __instance, int x, int y)
+        private static void ShopListWindowShowPostfix(
+            ShopListWindow __instance, bool __result)
         {
-            if (!IsEnabled())
+            if (!__result)
                 return;
 
-            if (__instance.items == null)
-                return;
+            ShoppingListPurchaseController.Invalidate();
+        }
 
-            int index = x + (y * ShopListWindow.Columns);
-            if (index < 0 || index >= __instance.items.Count)
-                return;
+        [HarmonyPatch(typeof(ShopListWindow), "OnItemClick")]
+        [HarmonyPrefix]
+        private static bool ShopListItemClickPrefix(ShopListWindow __instance)
+        {
+            if (__instance == null || !ShoppingListPurchaseController.IsEnabled ||
+                !ShoppingListBackend.IsOpen(__instance) ||
+                !__instance.isShopActive || !__instance.canSearchInShop ||
+                __instance.shopWindow == null) {
+                return true;
+            }
 
-            ShopListItemData entry = __instance.items[index];
-            if (entry == null)
-                return;
+            ShoppingListBackendEntry entry =
+                ShoppingListBackend.GetCurrentSelectedEntry(__instance);
+            if (entry == null || string.IsNullOrEmpty(entry.ID) ||
+                !ShoppingListPurchaseController.BeginListSearch(entry)) {
+                return true;
+            }
 
-            selectedItemID = entry.ID;
-            selectedAmount = entry.Amount;
-            selectedData = entry.AdditionalData;
-            selectedAtTime = Time.realtimeSinceStartup;
+            string searchText = !string.IsNullOrEmpty(entry.Name)
+                ? entry.Name : entry.ID;
+            try {
+                __instance.shopWindow.SearchForItem(searchText);
+            } finally {
+                ShoppingListPurchaseController.EndListSearch();
+            }
+            return false;
+        }
+
+        [HarmonyPatch(typeof(PartsShopPage), "SubmitSearchAction")]
+        [HarmonyPrefix]
+        private static void ManualShopSearchPrefix()
+        {
+            ShoppingListPurchaseController.OnManualSearch();
+        }
+
+        [HarmonyPatch(typeof(ShopWindow), "OpenShop")]
+        [HarmonyPrefix]
+        private static void OpenShopPrefix()
+        {
+            ShoppingListPurchaseController.OnShopTransition();
+        }
+
+        [HarmonyPatch(typeof(ShopWindow), "OpenLastShop")]
+        [HarmonyPrefix]
+        private static void OpenLastShopPrefix()
+        {
+            ShoppingListPurchaseController.OnShopTransition();
+        }
+
+        [HarmonyPatch(typeof(ShopWindow), nameof(ShopWindow.Hide))]
+        [HarmonyPrefix]
+        private static void ShopWindowHidePrefix()
+        {
+            ShoppingListPurchaseController.OnShopTransition();
         }
 
         [HarmonyPatch(typeof(ShopBuyWindow), nameof(ShopBuyWindow.Show))]
         [HarmonyPostfix]
         public static void ShopBuyWindowShowPostfix(ShopBuyWindow __instance)
         {
+            if (__instance == null || !ShoppingListPurchaseController.IsEnabled)
+                return;
+
+            ShoppingListEntrySnapshot entry;
+            if (!ShoppingListPurchaseController.TryGetEntryForPurchase(
+                    __instance, out entry)) {
+                return;
+            }
+
             if (!IsEnabled()) {
-                ClearSelection();
                 return;
             }
 
             bool isTire = __instance.type == ShopBuyItemType.Tire;
             bool isRim = __instance.type == ShopBuyItemType.Rim;
-
             if (isTire)
                 PrepareTireOptionLayout(__instance);
 
-            if (!HasFreshSelection()) {
-                ClearSelection();
-                return;
-            }
-
-            if (!PartIdentityComparer.IsCompatibleItemID(
-                __instance.itemID, selectedItemID, true)) {
-                ClearSelection();
-                return;
-            }
-
-            string itemID = selectedItemID;
-            int amount = selectedAmount;
-            ShopListItemDataEx data = selectedData;
-            selectedAtTime = Time.realtimeSinceStartup;
-
+            string itemID = entry.ID;
+            int amount = entry.Amount;
             MelonCoroutines.Start(ApplySelectedEntryDeferred(
-                __instance, itemID, amount, data, isTire, isRim));
+                __instance, itemID, amount, entry, isTire, isRim));
         }
 
         private static IEnumerator ApplySelectedEntryDeferred(ShopBuyWindow window,
-            string itemID, int amount, ShopListItemDataEx data,
+            string itemID, int amount, ShoppingListEntrySnapshot data,
             bool isTire, bool isRim)
         {
             yield return new WaitForEndOfFrame();
             yield return new WaitForEndOfFrame();
 
-            if (!IsExpectedWindow(window, itemID, isTire, isRim))
+            if (!IsExpectedWindow(window, itemID, isTire, isRim)) {
                 yield break;
+            }
+
+            if (data != null && (isTire || isRim)) {
+                if (isTire)
+                    ApplyTireData(window, data);
+                else
+                    ApplyRimData(window, data);
+            }
 
             ApplyRequestedAmount(window, amount);
 
-            if (data == null || (!isTire && !isRim))
+            yield return new WaitForFixedUpdate();
+            if (!IsExpectedWindow(window, itemID, isTire, isRim)) {
                 yield break;
+            }
+            ApplyRequestedAmount(window, amount);
 
-            if (isTire)
-                ApplyTireData(window, data);
-            else
-                ApplyRimData(window, data);
+            yield return new WaitForEndOfFrame();
+            if (!IsExpectedWindow(window, itemID, isTire, isRim)) {
+                yield break;
+            }
+            ApplyRequestedAmount(window, amount);
         }
 
-        internal static void RefreshSelectedEntry(ShopListItemData entry)
+        internal static ShoppingListEntrySnapshot CreatePurchasedEntryForPurchase(
+            ShopBuyWindow window, int amount)
         {
-            if (!IsEnabled() || entry == null ||
-                string.IsNullOrEmpty(entry.ID) || entry.Amount <= 0)
-                return;
-
-            selectedItemID = entry.ID;
-            selectedAmount = entry.Amount;
-            selectedData = entry.AdditionalData;
-            selectedAtTime = Time.realtimeSinceStartup;
+            return ShoppingListPurchaseController.CreatePurchasedEntry(
+                window, amount);
         }
 
-        private static bool HasFreshSelection()
+        internal static int GetCurrentPurchaseAmount(ShopBuyWindow window)
         {
-            return !string.IsNullOrEmpty(selectedItemID) && selectedAmount > 0 &&
-                Time.realtimeSinceStartup - selectedAtTime <= SelectionLifetimeSeconds;
+            if (window == null)
+                return 0;
+
+            int optionAmount = GetOptionAmount(window, 0);
+            return optionAmount > 0 ? optionAmount : window.currentAmount;
         }
 
-        internal static void ClearSelectedEntry()
+        private static int GetOptionAmount(ShopBuyWindow window, int index)
         {
-            ClearSelection();
-        }
-
-        private static void ClearSelection()
-        {
-            selectedItemID = null;
-            selectedAmount = 0;
-            selectedData = null;
-            selectedAtTime = 0f;
+            return window != null && window.shopOptions != null &&
+                index >= 0 && index < window.shopOptions.Length &&
+                window.shopOptions[index] != null
+                    ? window.shopOptions[index].currentAmount : 0;
         }
 
         private static bool IsEnabled()
@@ -183,7 +347,7 @@ namespace Cms21UiPlus
             if (window.listNavigationManager != null &&
                 window.listNavigationManager.elements != null &&
                 window.listNavigationManager.elements.Count >= 4) {
-                ListItem sizeElement = window.listNavigationManager.elements[1];
+                var sizeElement = window.listNavigationManager.elements[1];
                 window.listNavigationManager.elements[1] =
                     window.listNavigationManager.elements[2];
                 window.listNavigationManager.elements[2] =
@@ -212,11 +376,13 @@ namespace Cms21UiPlus
             window.shopOptions[3].ValueChangedEvent.AddListener(keepTireValues);
         }
 
-        private static void ApplyRequestedAmount(ShopBuyWindow window, int requestedAmount)
+        private static void ApplyRequestedAmount(ShopBuyWindow window,
+            int requestedAmount)
         {
             if (requestedAmount <= 0 || window.shopOptions == null ||
-                window.shopOptions.Length == 0 || window.shopOptions[0] == null)
+                window.shopOptions.Length == 0 || window.shopOptions[0] == null) {
                 return;
+            }
 
             int minimum = window.shopOptions[0].minAmount;
             int maximum = window.shopOptions[0].maxAmount;
@@ -229,10 +395,10 @@ namespace Cms21UiPlus
 
             int amount = Math.Max(minimum, Math.Min(requestedAmount, maximum));
             ApplyOptionValue(window, 0, amount);
-
         }
 
-        private static void ApplyTireData(ShopBuyWindow window, ShopListItemDataEx data)
+        private static void ApplyTireData(ShopBuyWindow window,
+            ShoppingListEntrySnapshot data)
         {
             if (window.shopOptions == null || window.shopOptions.Length < 4)
                 return;
@@ -243,7 +409,8 @@ namespace Cms21UiPlus
             ApplyOptionValue(window, 3, data.Profile);
         }
 
-        private static void ApplyRimData(ShopBuyWindow window, ShopListItemDataEx data)
+        private static void ApplyRimData(ShopBuyWindow window,
+            ShoppingListEntrySnapshot data)
         {
             if (window.shopOptions == null || window.shopOptions.Length < 3)
                 return;
@@ -252,9 +419,11 @@ namespace Cms21UiPlus
             ApplyOptionValue(window, 2, data.ET);
         }
 
-        private static void ApplyOptionValue(ShopBuyWindow window, int index, int value)
+        private static void ApplyOptionValue(ShopBuyWindow window, int index,
+            int value)
         {
-            if (window.shopOptions == null || index < 0 || index >= window.shopOptions.Length)
+            if (window.shopOptions == null || index < 0 ||
+                index >= window.shopOptions.Length)
                 return;
             if (value == 0 || value == window.shopOptions[index].currentAmount)
                 return;

@@ -4,17 +4,13 @@ using HarmonyLib;
 
 #if NET6_0_OR_GREATER
 using Il2Cpp;
-using Il2CppCMS.Containers;
 using Il2CppCMS.UI;
 using Il2CppCMS.UI.Logic;
-using Il2CppCMS.UI.Logic.Tune;
 using Il2CppCMS.UI.Windows;
 #else
 using CMS;
-using CMS.Containers;
 using CMS.UI;
 using CMS.UI.Logic;
-using CMS.UI.Logic.Tune;
 using CMS.UI.Windows;
 #endif
 
@@ -30,11 +26,9 @@ namespace Cms21UiPlus
             public int PlayerMoney;
             public int Amount;
             public string ItemID;
-            public int ET;
-            public int Profile;
-            public int Size;
-            public int Width;
             public string LicensePlateName;
+            public bool RemoveFromList;
+            public ShoppingListEntrySnapshot PurchasedEntry;
         }
 
         [HarmonyPatch(typeof(ShopLicenseBuyWindow), nameof(ShopLicenseBuyWindow.BuyItem))]
@@ -53,30 +47,16 @@ namespace Cms21UiPlus
                 return;
 
             try {
-                Il2CppSystem.Collections.Generic.List<ShopListItemData> entries =
-                    UIManager.Get().ShopListWindow.items;
-                ShopListItemData matchingEntry = null;
-
-                foreach (ShopListItemData entry in entries) {
-                    if (entry == null || entry.AdditionalData == null)
-                        continue;
-                    if (!string.IsNullOrEmpty(__state.ItemID) &&
-                        !string.Equals(entry.ID, __state.ItemID,
-                            StringComparison.Ordinal))
-                        continue;
-                    if (!string.Equals(entry.AdditionalData.LicensePlateName,
-                        __state.LicensePlateName, StringComparison.Ordinal))
-                        continue;
-
-                    matchingEntry = entry;
-                    break;
-                }
-
-                if (matchingEntry != null)
-                    RemovePurchasedAmount(matchingEntry, __state.Amount);
+                UIManager manager = UIManager.Get();
+                ShopListWindow window = manager != null
+                    ? manager.ShopListWindow : null;
+                ShoppingListBackend.ApplyLicensePurchase(window,
+                    __state.ItemID, __state.LicensePlateName, __state.Amount);
             } catch (Exception exception) {
                 ModLogger.Log("[ShoppingList] Failed to update licence-plate entry." +
                     Environment.NewLine + exception, Types.LoggingLevels.Error);
+            } finally {
+                ShoppingListPurchaseController.Invalidate();
             }
         }
 
@@ -85,15 +65,21 @@ namespace Cms21UiPlus
         private static void BuyPrefix(ShopBuyWindow __instance,
             out PurchaseState __state)
         {
+            bool controllerEnabled = ShoppingListPurchaseController.IsEnabled;
+            bool removeFromList = IsEnabled();
+            int amount = __instance != null
+                ? WheelShopListPurchaseFeature.GetCurrentPurchaseAmount(
+                    __instance) : 0;
             __state = new PurchaseState {
-                Enabled = IsEnabled() && __instance != null,
+                Enabled = __instance != null &&
+                    (controllerEnabled || removeFromList),
+                RemoveFromList = removeFromList,
                 PlayerMoney = GlobalData.PlayerMoney,
-                Amount = __instance != null ? __instance.currentAmount : 0,
+                Amount = amount,
                 ItemID = __instance != null ? __instance.itemID : null,
-                ET = __instance != null ? __instance.currentET : 0,
-                Profile = __instance != null ? __instance.currentProfile : 0,
-                Size = __instance != null ? __instance.currentSize : 0,
-                Width = __instance != null ? __instance.currentWidth : 0
+                PurchasedEntry = removeFromList && __instance != null
+                    ? WheelShopListPurchaseFeature.CreatePurchasedEntryForPurchase(
+                        __instance, amount) : null,
             };
         }
 
@@ -105,34 +91,18 @@ namespace Cms21UiPlus
                 return;
 
             try {
-                Il2CppSystem.Collections.Generic.List<ShopListItemData> entries =
-                    UIManager.Get().ShopListWindow.items;
-
-                foreach (ShopListItemData entry in entries) {
-                    if (entry == null)
-                        continue;
-
-                    ShopListItemDataEx additional = entry.AdditionalData;
-                    if (!PartIdentityComparer.MatchesPurchase(
-                        __state.ItemID,
-                        __state.ET,
-                        __state.Profile,
-                        __state.Size,
-                        __state.Width,
-                        entry.ID,
-                        additional != null ? additional.ET : 0,
-                        additional != null ? additional.Profile : 0,
-                        additional != null ? additional.Size : 0,
-                        additional != null ? additional.Width : 0,
-                        true))
-                        continue;
-
-                    RemovePurchasedAmount(entry, __state.Amount);
-                    break;
+                if (__state.RemoveFromList && __state.PurchasedEntry != null) {
+                    UIManager manager = UIManager.Get();
+                    ShopListWindow window = manager != null
+                        ? manager.ShopListWindow : null;
+                    ShoppingListBackend.ApplyPurchasedAmount(window,
+                        __state.PurchasedEntry, __state.Amount);
                 }
             } catch (Exception exception) {
                 ModLogger.Log("[ShoppingList] Failed to update purchased entry." +
                     Environment.NewLine + exception, Types.LoggingLevels.Error);
+            } finally {
+                ShoppingListPurchaseController.Invalidate();
             }
         }
 
@@ -192,21 +162,5 @@ namespace Cms21UiPlus
                 Main.SettingsEntry.Value.removePartsFromShoppingList;
         }
 
-        private static void RemovePurchasedAmount(ShopListItemData entry,
-            int purchasedAmount)
-        {
-            ShopListWindow window = UIManager.Get().ShopListWindow;
-            if (window == null || entry == null || purchasedAmount <= 0)
-                return;
-
-            if (purchasedAmount >= entry.Amount)
-                window.items.Remove(entry);
-            else
-                entry.Amount -= purchasedAmount;
-
-            window.Save();
-            WheelShopListPurchaseFeature.ClearSelectedEntry();
-            ShoppingListRefresh.RefreshItems(window);
-        }
     }
 }

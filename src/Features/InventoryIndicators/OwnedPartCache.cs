@@ -106,6 +106,7 @@ namespace Cms21UiPlus
             Settings settings = Main.SettingsEntry.Value;
             return settings.showOwnedPartCountIndicators ||
                 settings.showMountPartCardIndicators ||
+                settings.addShoppingListSorting ||
                 settings.addInventoryQuickFilters;
         }
 

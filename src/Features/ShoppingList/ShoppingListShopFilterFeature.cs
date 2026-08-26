@@ -67,18 +67,10 @@ namespace Cms21UiPlus
             new Sprite[FilterOrder.Length];
         private static readonly bool[] FilterSpriteLoadAttempted =
             new bool[FilterOrder.Length];
-        private static readonly List<ShopListItemData> FullOrder =
-            new List<ShopListItemData>();
-        private static readonly List<ShopListItemData> OrderedItems =
-            new List<ShopListItemData>();
-        private static readonly List<ShopListItemData> ReconciledOrder =
-            new List<ShopListItemData>();
         private static readonly Dictionary<string, ShopType> ShopNameToType =
             new Dictionary<string, ShopType>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> ItemShopMaskCache =
             new Dictionary<string, int>(StringComparer.Ordinal);
-        private static readonly MethodInfo FillItemsMethod =
-            AccessTools.Method(typeof(ShopListWindow), "FillItems");
         private static readonly PropertyInfo PartPropertyShopNameProperty =
             AccessTools.Property(typeof(PartProperty), "ShopName");
         private static readonly FieldInfo PartPropertyShopNameField =
@@ -87,7 +79,6 @@ namespace Cms21UiPlus
         private static ShopListWindow activeWindow;
         private static GameObject filterRoot;
         private static NativeUiFactory.FooterHintHandle resetHint;
-        private static int visibleItemCount;
         private static bool shopNamesInitialized;
 
         private static bool IsEnabled {
@@ -99,7 +90,7 @@ namespace Cms21UiPlus
 
         [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Show))]
         [HarmonyPostfix]
-        [HarmonyPriority(Priority.First)]
+        [HarmonyPriority(Priority.Last)]
         private static void ShowPostfix(ShopListWindow __instance,
             bool __result)
         {
@@ -109,12 +100,9 @@ namespace Cms21UiPlus
             try {
                 activeWindow = __instance;
                 ResetFilterState(__instance);
-                CaptureFullOrder(__instance);
                 ApplyFilters(__instance);
                 CreateFilterUi(__instance);
                 CreateResetHint(__instance);
-                if (visibleItemCount < __instance.items.Count)
-                    RefreshItems(__instance);
             } catch (Exception exception) {
                 ModLogger.Log(
                     "[ShoppingList] Failed to initialize shop filters." +
@@ -131,21 +119,8 @@ namespace Cms21UiPlus
             if (__instance == null || __instance != activeWindow)
                 return;
 
-            try {
-                RestoreFullOrder(__instance);
-            } catch (Exception exception) {
-                ModLogger.Log(
-                    "[ShoppingList] Failed to restore shopping-list order." +
-                    Environment.NewLine + exception,
-                    Types.LoggingLevels.Warning);
-            }
-
             DestroyResetHint();
             DestroyFilterUi();
-            FullOrder.Clear();
-            OrderedItems.Clear();
-            ReconciledOrder.Clear();
-            visibleItemCount = 0;
             activeWindow = null;
         }
 
@@ -158,7 +133,6 @@ namespace Cms21UiPlus
                 __instance != activeWindow)
                 return;
 
-            UpdateVisibleItemCount(__instance);
             ShoppingListTwoColumnNavigationFeature.RefreshRowsNow(__instance);
         }
 
@@ -173,33 +147,13 @@ namespace Cms21UiPlus
             ToggleAllFilters(__instance);
         }
 
-        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Save),
-            new Type[] { })]
-        [HarmonyPrefix]
-        private static void SavePrefix(ShopListWindow __instance,
-            out bool __state)
-        {
-            __state = PrepareFullOrderForSave(__instance);
-        }
-
-        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Save),
-            new Type[] { })]
-        [HarmonyPostfix]
-        private static void SavePostfix(ShopListWindow __instance,
-            bool __state)
-        {
-            if (__state)
-                PartitionFromFullOrder(__instance);
-        }
-
         internal static int GetVisibleItemCount(ShopListWindow window)
         {
-            if (!IsEnabled || window == null || window != activeWindow ||
-                window.items == null)
+            if (!IsEnabled || window == null || window != activeWindow)
                 return window != null && window.items != null
                     ? window.items.Count : 0;
 
-            return Math.Min(visibleItemCount, window.items.Count);
+            return ShoppingListBackend.DisplayCount;
         }
 
         internal static bool IsFiltering(ShopListWindow window)
@@ -208,15 +162,13 @@ namespace Cms21UiPlus
                 window == activeWindow && HasDisabledFilters();
         }
 
-        internal static void CaptureSortedOrderAndApplyFilters(
-            ShopListWindow window)
+        internal static bool RefreshFromBackend(ShopListWindow window)
         {
-            if (!IsEnabled || window == null || window != activeWindow ||
-                window.items == null)
-                return;
+            if (!IsEnabled || window == null || window != activeWindow)
+                return false;
 
-            CaptureFullOrder(window);
-            PartitionFromFullOrder(window);
+            ApplyFilters(window);
+            return true;
         }
 
         private static void CreateResetHint(ShopListWindow window)
@@ -494,11 +446,9 @@ namespace Cms21UiPlus
         private static void ToggleAllFilters(ShopListWindow window)
         {
             try {
-                ReconcileFullOrder(window);
                 SetAllFilters(!AreAllFiltersEnabled());
                 ApplyFilters(window);
                 UpdateButtonVisuals();
-                RefreshItems(window);
             } catch (Exception exception) {
                 ModLogger.Log(
                     "[ShoppingList] Failed to toggle all shop filters." +
@@ -530,11 +480,9 @@ namespace Cms21UiPlus
                 return;
 
             try {
-                ReconcileFullOrder(window);
                 FilterEnabled[filterIndex] = !FilterEnabled[filterIndex];
                 ApplyFilters(window);
                 UpdateButtonVisuals();
-                RefreshItems(window);
             } catch (Exception exception) {
                 ModLogger.Log(
                     "[ShoppingList] Failed to apply shop filter." +
@@ -564,185 +512,20 @@ namespace Cms21UiPlus
 
         private static void ApplyFilters(ShopListWindow window)
         {
-            if (window == null || window.items == null)
+            if (window == null || window != activeWindow)
                 return;
 
-            RestoreFullOrder(window);
-            PartitionFromFullOrder(window);
-        }
-
-        private static void PartitionFromFullOrder(ShopListWindow window)
-        {
-            if (window == null || window.items == null ||
-                FullOrder.Count != window.items.Count) {
-                UpdateVisibleItemCount(window);
-                return;
+            ShoppingListBackend.RebuildSourceOrder();
+            List<ShoppingListBackendEntry> source =
+                ShoppingListBackend.GetSourceEntriesSnapshot();
+            List<ShoppingListBackendEntry> filtered =
+                new List<ShoppingListBackendEntry>(source.Count);
+            for (int i = 0; i < source.Count; i++) {
+                ShoppingListBackendEntry entry = source[i];
+                if (entry != null && IsEntryVisible(entry.Data))
+                    filtered.Add(entry);
             }
-
-            OrderedItems.Clear();
-            int count = FullOrder.Count;
-            for (int i = 0; i < count; i++) {
-                ShopListItemData data = FullOrder[i];
-                if (IsEntryVisible(data))
-                    OrderedItems.Add(data);
-            }
-            visibleItemCount = OrderedItems.Count;
-            for (int i = 0; i < count; i++) {
-                ShopListItemData data = FullOrder[i];
-                if (!IsEntryVisible(data))
-                    OrderedItems.Add(data);
-            }
-
-            for (int i = 0; i < count; i++)
-                window.items[i] = OrderedItems[i];
-        }
-
-        private static void UpdateVisibleItemCount(ShopListWindow window)
-        {
-            visibleItemCount = 0;
-            if (window == null || window.items == null)
-                return;
-
-            for (int i = 0; i < window.items.Count; i++) {
-                if (IsEntryVisible(window.items[i]))
-                    visibleItemCount++;
-            }
-        }
-
-        private static bool PrepareFullOrderForSave(ShopListWindow window)
-        {
-            if (!IsEnabled || window == null || window != activeWindow ||
-                window.items == null || !HasDisabledFilters())
-                return false;
-
-            RestoreFullOrder(window);
-            return true;
-        }
-
-        private static void CaptureFullOrder(ShopListWindow window)
-        {
-            FullOrder.Clear();
-            if (window == null || window.items == null)
-                return;
-
-            for (int i = 0; i < window.items.Count; i++)
-                FullOrder.Add(window.items[i]);
-            visibleItemCount = window.items.Count;
-        }
-
-        private static void RestoreFullOrder(ShopListWindow window)
-        {
-            if (window == null || window.items == null)
-                return;
-
-            ReconcileFullOrder(window);
-            if (FullOrder.Count != window.items.Count)
-                return;
-
-            for (int i = 0; i < FullOrder.Count; i++)
-                window.items[i] = FullOrder[i];
-            visibleItemCount = window.items.Count;
-        }
-
-        private static void ReconcileFullOrder(ShopListWindow window)
-        {
-            if (window == null || window.items == null)
-                return;
-            if (FullOrder.Count == 0) {
-                CaptureFullOrder(window);
-                return;
-            }
-
-            int currentCount = window.items.Count;
-            bool[] used = new bool[currentCount];
-            ReconciledOrder.Clear();
-
-            for (int i = 0; i < FullOrder.Count; i++) {
-                ShopListItemData previous = FullOrder[i];
-                int match = FindMatchingEntry(window, previous, used);
-                if (match < 0)
-                    continue;
-                ReconciledOrder.Add(window.items[match]);
-                used[match] = true;
-            }
-
-            for (int i = 0; i < currentCount; i++) {
-                if (!used[i])
-                    ReconciledOrder.Add(window.items[i]);
-            }
-
-            FullOrder.Clear();
-            FullOrder.AddRange(ReconciledOrder);
-        }
-
-        private static int FindMatchingEntry(ShopListWindow window,
-            ShopListItemData target, bool[] used)
-        {
-            if (window == null || window.items == null || used == null)
-                return -1;
-
-            for (int i = 0; i < window.items.Count && i < used.Length; i++) {
-                if (!used[i] && EntriesMatch(target, window.items[i]))
-                    return i;
-            }
-            return -1;
-        }
-
-        private static bool EntriesMatch(ShopListItemData left,
-            ShopListItemData right)
-        {
-            if (object.ReferenceEquals(left, right))
-                return true;
-            if (left == null || right == null ||
-                !string.Equals(left.ID, right.ID, StringComparison.Ordinal))
-                return false;
-
-            ShopListItemDataEx leftAdditional = left.AdditionalData;
-            ShopListItemDataEx rightAdditional = right.AdditionalData;
-            return GetTireFlag(leftAdditional) ==
-                    GetTireFlag(rightAdditional) &&
-                GetRimFlag(leftAdditional) == GetRimFlag(rightAdditional) &&
-                GetLicensePlateFlag(leftAdditional) ==
-                    GetLicensePlateFlag(rightAdditional) &&
-                GetSize(leftAdditional) == GetSize(rightAdditional) &&
-                GetWidth(leftAdditional) == GetWidth(rightAdditional) &&
-                GetProfile(leftAdditional) == GetProfile(rightAdditional) &&
-                GetEt(leftAdditional) == GetEt(rightAdditional);
-        }
-
-        private static bool GetTireFlag(ShopListItemDataEx data)
-        {
-            return data != null && data.Tire;
-        }
-
-        private static bool GetRimFlag(ShopListItemDataEx data)
-        {
-            return data != null && data.Rim;
-        }
-
-        private static bool GetLicensePlateFlag(ShopListItemDataEx data)
-        {
-            return data != null && data.LicensePlate;
-        }
-
-        private static int GetSize(ShopListItemDataEx data)
-        {
-            return data != null ? data.Size : 0;
-        }
-
-        private static int GetWidth(ShopListItemDataEx data)
-        {
-            return data != null ? data.Width : 0;
-        }
-
-        private static int GetProfile(ShopListItemDataEx data)
-        {
-            return data != null ? data.Profile : 0;
-        }
-
-        private static int GetEt(ShopListItemDataEx data)
-        {
-            return data != null ? data.ET : 0;
+            ShoppingListBackend.SetFilteredDisplay(filtered);
         }
 
         private static bool HasDisabledFilters()
@@ -867,10 +650,5 @@ namespace Cms21UiPlus
             }
         }
 
-        private static void RefreshItems(ShopListWindow window)
-        {
-            if (window != null && FillItemsMethod != null)
-                FillItemsMethod.Invoke(window, null);
-        }
     }
 }

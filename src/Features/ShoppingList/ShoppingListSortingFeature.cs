@@ -38,6 +38,7 @@ namespace Cms21UiPlus
 
         private sealed class ShoppingListEntry
         {
+            public ShoppingListBackendEntry BackendEntry;
             public ShopListItemData Data;
             public int OriginalIndex;
             public string Name;
@@ -336,8 +337,7 @@ namespace Cms21UiPlus
             bool ascending)
         {
             ShopListWindow window = activeWindow;
-            if (window == null || window.items == null ||
-                window.items.Count <= 1)
+            if (window == null || ShoppingListBackend.DisplayCount <= 1)
                 return;
 
             try {
@@ -345,7 +345,7 @@ namespace Cms21UiPlus
                     OwnedPartCache.Refresh();
 
                 List<ShoppingListEntry> entries =
-                    BuildEntries(window, sortType);
+                    BuildEntries(sortType);
                 if (entries.Count <= 1)
                     return;
 
@@ -354,11 +354,11 @@ namespace Cms21UiPlus
                     return CompareEntries(left, right, sortType, ascending);
                 });
 
+                List<ShoppingListBackendEntry> ordered =
+                    new List<ShoppingListBackendEntry>(entries.Count);
                 for (int i = 0; i < entries.Count; i++)
-                    window.items[i] = entries[i].Data;
-                ShoppingListShopFilterFeature.
-                    CaptureSortedOrderAndApplyFilters(window);
-                ShoppingListRefresh.RefreshItems(window);
+                    ordered.Add(entries[i].BackendEntry);
+                ShoppingListBackend.SetDisplayOrder(ordered);
             } catch (Exception exception) {
                 ModLogger.Log("[ShoppingList] Sorting failed." +
                     Environment.NewLine + exception,
@@ -367,22 +367,24 @@ namespace Cms21UiPlus
         }
 
         private static List<ShoppingListEntry> BuildEntries(
-            ShopListWindow window, ShoppingListSortType sortType)
+            ShoppingListSortType sortType)
         {
-            int count = window != null && window.items != null
-                ? window.items.Count : 0;
+            List<ShoppingListBackendEntry> backendEntries =
+                ShoppingListBackend.GetDisplayEntriesSnapshot();
             List<ShoppingListEntry> entries =
-                new List<ShoppingListEntry>(count);
+                new List<ShoppingListEntry>(backendEntries.Count);
             GameInventory inventory = Singleton<GameInventory>.Instance;
 
-            for (int i = 0; i < count; i++) {
-                ShopListItemData data = window.items[i];
+            for (int i = 0; i < backendEntries.Count; i++) {
+                ShoppingListBackendEntry backendEntry = backendEntries[i];
+                ShopListItemData data = backendEntry != null
+                    ? backendEntry.Data : null;
                 PartProperty property = GetPartProperty(inventory, data);
                 ShoppingListEntry entry = new ShoppingListEntry {
+                    BackendEntry = backendEntry,
                     Data = data,
                     OriginalIndex = i,
-                    Name = GetDisplayName(window, i, inventory, data,
-                        property),
+                    Name = backendEntry != null ? backendEntry.Name : string.Empty,
                     Price = sortType == ShoppingListSortType.Price &&
                         property != null ? property.Price : int.MaxValue,
                     Repairable = sortType ==
@@ -405,29 +407,6 @@ namespace Cms21UiPlus
                 !inventory.ExistsInPartProperty(data.ID))
                 return null;
             return inventory.GetItemProperty(data.ID);
-        }
-
-        private static string GetDisplayName(ShopListWindow window,
-            int index, GameInventory inventory, ShopListItemData data,
-            PartProperty property)
-        {
-            if (window != null && window.shopListItems != null &&
-                index >= 0 && index < window.shopListItems.Count) {
-                ShopListItem item = window.shopListItems[index];
-                if (item != null && item.itemName != null &&
-                    !string.IsNullOrEmpty(item.itemName.text))
-                    return item.itemName.text;
-            }
-            if (property != null && !string.IsNullOrEmpty(
-                    property.LocalizedName))
-                return property.LocalizedName;
-            if (inventory != null && data != null &&
-                !string.IsNullOrEmpty(data.ID)) {
-                string localized = inventory.GetItemLocalizeName(data.ID);
-                if (!string.IsNullOrEmpty(localized))
-                    return localized;
-            }
-            return data != null ? data.ID ?? string.Empty : string.Empty;
         }
 
         private static bool HasOwnedPart(ShopListItemData data)
@@ -486,8 +465,8 @@ namespace Cms21UiPlus
 
         private static bool CanSort(ShopListWindow window)
         {
-            return window != null && window.items != null &&
-                window.items.Count > 1;
+            return window != null && window == activeWindow &&
+                ShoppingListBackend.DisplayCount > 1;
         }
     }
 

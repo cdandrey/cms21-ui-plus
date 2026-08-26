@@ -14,6 +14,7 @@ using Il2CppCMS;
 using Il2CppCMS.Containers;
 using Il2CppCMS.Helpers;
 using Il2CppCMS.UI;
+using Il2CppCMS.UI.Helpers;
 using Il2CppCMS.UI.Logic;
 using Il2CppCMS.UI.Logic.Shop;
 using Il2CppCMS.UI.Windows;
@@ -24,6 +25,7 @@ using CMS;
 using CMS.Containers;
 using CMS.Helpers;
 using CMS.UI;
+using CMS.UI.Helpers;
 using CMS.UI.Logic;
 using CMS.UI.Logic.Shop;
 using CMS.UI.Windows;
@@ -46,9 +48,9 @@ namespace Cms21UiPlus
 
         private sealed class PurchaseEntry
         {
+            public ShoppingListBackendEntry BackendEntry;
             public ShopListItemData Data;
             public string PurchaseItemID;
-            public int ListIndex;
             public int Amount;
             public int UnitPrice;
             public int StackPrice;
@@ -184,7 +186,7 @@ namespace Cms21UiPlus
         {
             return IsEnabled && GlobalState.IsGarageSceneActive &&
                 window != null &&
-                window.items != null && window.items.Count > 0 &&
+                ShoppingListBackend.DisplayCount > 0 &&
                 window.isShopActive && window.canSearchInShop &&
                 window.shopWindow != null &&
                 window.shopWindow.gameObject != null &&
@@ -243,21 +245,28 @@ namespace Cms21UiPlus
         {
             confirmationOpen = false;
             if (!accepted) {
-                ShopListWindow window = activeWindow;
+                ShopListWindow listWindow = activeWindow;
                 pendingPlan = null;
                 ResetSpaceHold();
-                CloseShoppingList(window);
+                CloseShoppingList(listWindow);
                 return;
             }
 
             if (executionScheduled || pendingPlan == null)
                 return;
 
+            ShopListWindow window = activeWindow;
+            PurchasePlan plan = pendingPlan;
+            pendingPlan = null;
+            CloseShoppingList(window);
+
             executionScheduled = true;
-            MelonCoroutines.Start(ExecutePurchaseAfterConfirmation());
+            MelonCoroutines.Start(ExecutePurchaseAfterConfirmation(
+                window, plan));
         }
 
-        private static IEnumerator ExecutePurchaseAfterConfirmation()
+        private static IEnumerator ExecutePurchaseAfterConfirmation(
+            ShopListWindow window, PurchasePlan plan)
         {
             int frames = AskWindowWaitFrames;
             while (WindowManager.Instance != null &&
@@ -268,11 +277,7 @@ namespace Cms21UiPlus
             yield return new WaitForEndOfFrame();
             yield return new WaitForEndOfFrame();
 
-            ShopListWindow window = activeWindow;
-            PurchasePlan plan = pendingPlan;
-            pendingPlan = null;
-
-            if (window == null || plan == null || !CanBuyAll(window)) {
+            if (window == null || plan == null) {
                 executionScheduled = false;
                 yield break;
             }
@@ -292,67 +297,69 @@ namespace Cms21UiPlus
 
             int spent = 0;
             bool changed = false;
+            bool failed = false;
             try {
-                for (int i = plan.Entries.Count - 1; i >= 0; i--) {
+                for (int i = 0; i < plan.Entries.Count; i++) {
                     PurchaseEntry entry = plan.Entries[i];
                     int added = AddEntryItems(inventory, entry);
                     if (added <= 0)
                         continue;
 
-                    spent += added >= entry.Amount
+                    int entryCost = added >= entry.Amount
                         ? entry.StackPrice
                         : CalculateStackPrice(entry.UnitPrice, added,
                             plan.Discount);
+                    spent += entryCost;
 
-                    int entryIndex = FindEntryIndex(window, entry);
-                    if (entryIndex < 0) {
-                        ModLogger.Log("[ShoppingList] Purchased entry could not " +
-                            "be found in the active list: '" +
-                            entry.Data.ID + "'.", Types.LoggingLevels.Warning);
-                        continue;
-                    }
-
-                    ShopListItemData current = window.items[entryIndex];
-                    if (current == null) {
-                        ModLogger.Log("[ShoppingList] Purchased entry resolved " +
-                            "to null: '" + entry.Data.ID + "'.",
+                    if (added != entry.Amount) {
+                        ModLogger.Log("[ShoppingList] Bulk purchase for '" +
+                            entry.Data.ID + "' completed only " + added + "/" +
+                            entry.Amount + " item(s); backend entry was kept.",
                             Types.LoggingLevels.Warning);
                         continue;
                     }
 
-                    if (added >= entry.Amount) {
-                        window.RemoveFromShopList(current.ID,
-                            current.AdditionalData, true);
-                    } else {
-                        for (int removeIndex = 0; removeIndex < added;
-                            removeIndex++)
-                            window.RemoveFromShopList(current.ID,
-                                current.AdditionalData, false);
+                    ShoppingListEntrySnapshot snapshot =
+                        entry.BackendEntry != null
+                            ? entry.BackendEntry.CreateSnapshot() : null;
+                    if (snapshot == null || !ShoppingListBackend.Remove(
+                            window, snapshot, false)) {
+                        ModLogger.Log("[ShoppingList] Purchased entry could not " +
+                            "be removed from backend: '" + entry.Data.ID + "'.",
+                            Types.LoggingLevels.Warning);
+                        continue;
                     }
+
                     changed = true;
                 }
-
-                if (spent > 0)
-                    GlobalData.AddPlayerMoney(-spent);
-                if (spent > 0 || changed) {
-                    inventory.Save();
-                }
-
-                if (changed) {
-                    window.Save();
-                    WheelShopListPurchaseFeature.ClearSelectedEntry();
-                    ShoppingListRefresh.RefreshItems(window);
-                }
-                if (spent > 0 || changed)
-                    CloseShoppingList(window);
             } catch (Exception exception) {
+                failed = true;
                 ModLogger.Log("[ShoppingList] Buy All failed." +
                     Environment.NewLine + exception,
                     Types.LoggingLevels.Error);
-                ShowInfo("LOC_ShoppingListBuyAllUnavailable");
             } finally {
-                executionScheduled = false;
-                ResetSpaceHold();
+                try {
+                    if (spent > 0)
+                        GlobalData.AddPlayerMoney(-spent);
+                    if (spent > 0 || changed)
+                        inventory.Save();
+                    if (changed)
+                        ShoppingListBackend.PersistState(window);
+                    if (changed)
+                        ShoppingListPurchaseController.Invalidate();
+                    if (spent > 0 || changed)
+                        CloseShoppingList(window);
+                } catch (Exception exception) {
+                    failed = true;
+                    ModLogger.Log("[ShoppingList] Buy All finalization failed." +
+                        Environment.NewLine + exception,
+                        Types.LoggingLevels.Error);
+                } finally {
+                    if (failed)
+                        ShowInfo("LOC_ShoppingListBuyAllUnavailable");
+                    executionScheduled = false;
+                    ResetSpaceHold();
+                }
             }
         }
 
@@ -409,8 +416,8 @@ namespace Cms21UiPlus
         {
             plan = null;
             errorKey = "LOC_ShoppingListBuyAllUnavailable";
-            if (window == null || window.items == null ||
-                window.items.Count == 0 || window.shopWindow == null) {
+            if (window == null || ShoppingListBackend.DisplayCount == 0 ||
+                window.shopWindow == null) {
                 return false;
             }
 
@@ -420,8 +427,7 @@ namespace Cms21UiPlus
             }
 
             string currentShopName;
-            if (!TryGetCurrentShopName(window, gameInventory,
-                out currentShopName)) {
+            if (!TryGetCurrentShopName(window, out currentShopName)) {
                 return false;
             }
 
@@ -434,10 +440,14 @@ namespace Cms21UiPlus
             long totalAmount = 0;
             long totalCost = 0;
 
-            for (int i = 0; i < window.items.Count; i++) {
-                ShopListItemData data = window.items[i];
+            List<ShoppingListBackendEntry> displayEntries =
+                ShoppingListBackend.GetDisplayEntriesSnapshot();
+            for (int i = 0; i < displayEntries.Count; i++) {
+                ShoppingListBackendEntry backendEntry = displayEntries[i];
+                ShopListItemData data = backendEntry != null
+                    ? backendEntry.Data : null;
                 if (data == null || string.IsNullOrEmpty(data.ID) ||
-                    data.Amount <= 0) {
+                    backendEntry.Amount <= 0) {
                     continue;
                 }
 
@@ -460,18 +470,18 @@ namespace Cms21UiPlus
                 }
 
                 int stackPrice = CalculateStackPrice(unitPrice,
-                    data.Amount, discount);
-                totalAmount += data.Amount;
+                    backendEntry.Amount, discount);
+                totalAmount += backendEntry.Amount;
                 totalCost += stackPrice;
                 if (totalAmount > int.MaxValue || totalCost > int.MaxValue) {
                     return false;
                 }
 
                 result.Entries.Add(new PurchaseEntry {
+                    BackendEntry = backendEntry,
                     Data = data,
                     PurchaseItemID = purchaseItemID,
-                    ListIndex = i,
-                    Amount = data.Amount,
+                    Amount = backendEntry.Amount,
                     UnitPrice = unitPrice,
                     StackPrice = stackPrice,
                 });
@@ -489,24 +499,11 @@ namespace Cms21UiPlus
         }
 
         private static bool TryGetCurrentShopName(ShopListWindow window,
-            GameInventory inventory, out string shopName)
+            out string shopName)
         {
-            shopName = null;
-            if (window == null || window.shopWindow == null ||
-                inventory == null)
-                return false;
-
-            ShopItem currentItem = FindShopItemForDiscount(window.shopWindow);
-            if (currentItem == null || currentItem.gameObject == null ||
-                !currentItem.gameObject.activeInHierarchy ||
-                !currentItem.transform.IsChildOf(window.shopWindow.transform) ||
-                string.IsNullOrEmpty(currentItem.ID) ||
-                !inventory.ExistsInPartProperty(currentItem.ID)) {
-                return false;
-            }
-
-            PartProperty property = inventory.GetItemProperty(currentItem.ID);
-            shopName = GetPartPropertyShopName(property);
+            shopName = window != null && window.shopWindow != null
+                ? ShopHelper.ShopToShopName(window.shopWindow.currentShopType)
+                : null;
             return !string.IsNullOrEmpty(shopName);
         }
 
@@ -750,55 +747,6 @@ namespace Cms21UiPlus
             } catch {
             }
             return null;
-        }
-
-        private static int FindEntryIndex(ShopListWindow window,
-            PurchaseEntry entry)
-        {
-            if (window == null || window.items == null || entry == null ||
-                entry.Data == null)
-                return -1;
-
-            if (entry.ListIndex >= 0 && entry.ListIndex < window.items.Count &&
-                MatchesListEntry(window.items[entry.ListIndex], entry.Data))
-                return entry.ListIndex;
-
-            for (int i = 0; i < window.items.Count; i++) {
-                if (MatchesListEntry(window.items[i], entry.Data))
-                    return i;
-            }
-            return -1;
-        }
-
-        private static bool MatchesListEntry(ShopListItemData candidate,
-            ShopListItemData target)
-        {
-            if (candidate == null || target == null ||
-                !string.Equals(candidate.ID, target.ID,
-                    StringComparison.Ordinal))
-                return false;
-
-            ShopListItemDataEx candidateData = candidate.AdditionalData;
-            ShopListItemDataEx targetData = target.AdditionalData;
-            if (targetData == null)
-                return candidateData == null;
-
-            if (targetData.LicensePlate) {
-                return candidateData != null && candidateData.LicensePlate &&
-                    string.Equals(candidateData.LicensePlateName,
-                        targetData.LicensePlateName, StringComparison.Ordinal);
-            }
-
-            if (!targetData.Tire && !targetData.Rim)
-                return true;
-
-            return candidateData != null &&
-                candidateData.Tire == targetData.Tire &&
-                candidateData.Rim == targetData.Rim &&
-                candidateData.Size == targetData.Size &&
-                candidateData.Width == targetData.Width &&
-                candidateData.Profile == targetData.Profile &&
-                candidateData.ET == targetData.ET;
         }
 
         private static void ShowInfo(string key)

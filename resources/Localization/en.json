@@ -114,6 +114,7 @@
   "LOC_SettingAddShoppingListSortingDescription": "Enable shop-category quick filters, the two-column list, sorting, quantity controls, repairability and warehouse-availability badges, and bulk purchase for the current shop.",
   "LOC_SettingFilterShoppingListByCurrentShopOnOpenName": "Filter by current shop on open",
   "LOC_SettingFilterShoppingListByCurrentShopOnOpenDescription": "When the shopping list is opened inside a specialized shop, automatically enable only that shop category.",
+  "LOC_ShoppingListAddedPopupTitle": "Added to list",
   "LOC_ShoppingListBuyAllAction": "BUY ALL",
   "LOC_ShoppingListBuyAllTitle": "BUY ALL?",
   "LOC_ShoppingListBuyAllConfirmation": "Parts: {0}\nTotal cost: {1}",

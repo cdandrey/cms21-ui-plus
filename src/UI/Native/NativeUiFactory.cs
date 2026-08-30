@@ -462,10 +462,6 @@ namespace Cms21UiPlus
             new Color(0.88f, 0.12f, 0.10f, 1f);
         private static Color cardNormalColor =
             new Color(0.50f, 0.50f, 0.50f, 0.88f);
-        private static Color cardHoverColor =
-            new Color(0.68f, 0.68f, 0.68f, 0.94f);
-        private static Color cardPressedColor =
-            new Color(0.76f, 0.76f, 0.76f, 1f);
         private static Color hintNormalColor =
             new Color(0.74f, 0.74f, 0.74f, 1f);
         private static readonly Color HintHoverColor =
@@ -1192,23 +1188,6 @@ namespace Cms21UiPlus
             rect.offsetMax = new Vector2(-right, -Mathf.Max(0f, gap));
             rect.localRotation = Quaternion.identity;
             rect.localScale = Vector3.one;
-            return rect;
-        }
-
-        internal static RectTransform CreateOverlayRoot(
-            Transform parent, string name)
-        {
-            if (parent == null)
-                return null;
-
-            GameObject root = CreateUiObject(name, parent);
-            RectTransform rect = root.GetComponent<RectTransform>();
-            Stretch(rect, 0f, 0f, 0f, 0f);
-            rect.localRotation = Quaternion.identity;
-            rect.localScale = Vector3.one;
-            LayoutElement layout = root.AddComponent<LayoutElement>();
-            layout.ignoreLayout = true;
-            root.transform.SetAsLastSibling();
             return rect;
         }
 
@@ -2835,28 +2814,6 @@ namespace Cms21UiPlus
             }
         }
 
-        internal static void SetControlHintBottomLeft(
-            FooterHintHandle handle, RectTransform parent,
-            Vector2 localBottomLeft)
-        {
-            if (handle == null || handle.Rect == null || parent == null)
-                return;
-
-            if (handle.NormalizeRect)
-                PrepareNormalizedControlHint(handle, false);
-            LayoutRebuilder.ForceRebuildLayoutImmediate(handle.Rect);
-
-            Bounds bounds;
-            if (TryGetControlHintVisualBounds(handle, parent, out bounds)) {
-                Vector2 position = handle.Rect.anchoredPosition;
-                position.x += localBottomLeft.x - bounds.min.x;
-                position.y += localBottomLeft.y - bounds.min.y;
-                handle.Rect.anchoredPosition = position;
-            } else {
-                handle.Rect.anchoredPosition = localBottomLeft -
-                    parent.rect.min;
-            }
-        }
         private static bool ApplyControlHintContent(
             ControlDescription description, ControlDescription source,
             string[] keys, string label)
@@ -3090,47 +3047,6 @@ namespace Cms21UiPlus
             if (width < 1f)
                 width = Mathf.Abs(rect.sizeDelta.x);
             return Mathf.Max(1f, width);
-        }
-
-        internal static float GetControlHintLeftOverhang(
-            FooterHintHandle handle)
-        {
-            if (handle == null || handle.Rect == null ||
-                handle.Description == null ||
-                handle.Description.buttonImage == null)
-                return 0f;
-
-            RectTransform root = handle.Rect;
-            RectTransform mainRect =
-                handle.Description.buttonImage.rectTransform;
-            Transform keyParent = mainRect != null
-                ? mainRect.parent : null;
-            if (mainRect == null || keyParent == null)
-                return 0f;
-
-            float visibleLeft = root.rect.xMin;
-            for (int i = 0; i < keyParent.childCount; i++) {
-                Transform child = keyParent.GetChild(i);
-                if (child == null || child.gameObject == null ||
-                    !child.gameObject.activeSelf ||
-                    !child.gameObject.name.StartsWith(
-                        ModifierKeyObjectPrefix,
-                        StringComparison.Ordinal))
-                    continue;
-
-                RectTransform childRect =
-                    child.GetComponent<RectTransform>();
-                if (childRect == null)
-                    continue;
-
-                Vector3 localLeft = root.InverseTransformPoint(
-                    childRect.TransformPoint(new Vector3(
-                        childRect.rect.xMin,
-                        childRect.rect.center.y, 0f)));
-                visibleLeft = Mathf.Min(visibleLeft, localLeft.x);
-            }
-
-            return Mathf.Max(0f, root.rect.xMin - visibleLeft);
         }
 
         internal static bool TryGetControlHintVisualBounds(
@@ -3765,6 +3681,28 @@ namespace Cms21UiPlus
 
 
 
+        public static Image CreateImage(Transform parent, string name,
+            Sprite sprite, Color color, bool raycastTarget)
+        {
+            GameObject root = CreateUiObject(name, parent);
+            Image image = root.AddComponent<Image>();
+            image.sprite = sprite;
+            image.color = color;
+            image.raycastTarget = raycastTarget;
+            return image;
+        }
+
+        public static Text CloneText(Transform parent, string name, Text source)
+        {
+            if (parent == null || source == null || source.gameObject == null)
+                return null;
+
+            GameObject root = GameObject.Instantiate(source.gameObject, parent);
+            root.name = name;
+            root.transform.localScale = Vector3.one;
+            return root.GetComponent<Text>();
+        }
+
         public static Text CreateText(Transform parent, string name,
             string value, int fontSize, TextAnchor alignment, Color color)
         {
@@ -3948,8 +3886,6 @@ namespace Cms21UiPlus
             CardSelected.Capture(selected);
             CardSelectedRect.Capture(selected != null
                 ? selected.rectTransform : null);
-            if (selected != null)
-                cardHoverColor = selected.color;
 
             Text title = FindFirstText(template.transform, "Text");
             CardText.Capture(title);
@@ -4332,56 +4268,6 @@ namespace Cms21UiPlus
                 BaseText.Capture(hintText);
         }
 
-        private static Vector2 GetRenderedSizeInCanvas(
-            RectTransform rect)
-        {
-            if (rect == null)
-                return Vector2.zero;
-            Canvas canvas = rect.GetComponentInParent<Canvas>();
-            Transform reference = canvas != null
-                ? canvas.transform : rect.root;
-            Vector3[] corners = new Vector3[4];
-            rect.GetWorldCorners(corners);
-            Vector3 bottomLeft = reference.InverseTransformPoint(corners[0]);
-            Vector3 topRight = reference.InverseTransformPoint(corners[2]);
-            return new Vector2(Mathf.Abs(topRight.x - bottomLeft.x),
-                Mathf.Abs(topRight.y - bottomLeft.y));
-        }
-
-
-        private static float GetScaleRelativeToCanvas(Transform item)
-        {
-            if (item == null)
-                return 1f;
-            Canvas canvas = item.GetComponentInParent<Canvas>();
-            float canvasScale = canvas != null
-                ? Mathf.Abs(canvas.transform.lossyScale.x) : 1f;
-            if (canvasScale < 0.0001f)
-                canvasScale = 1f;
-            return Mathf.Abs(item.lossyScale.x) / canvasScale;
-        }
-
-
-        private static float GetHorizontalGapInCanvas(
-            RectTransform left, RectTransform right)
-        {
-            if (left == null || right == null)
-                return 0f;
-            Canvas canvas = left.GetComponentInParent<Canvas>();
-            Transform reference = canvas != null
-                ? canvas.transform : left.root;
-            Vector3[] leftCorners = new Vector3[4];
-            Vector3[] rightCorners = new Vector3[4];
-            left.GetWorldCorners(leftCorners);
-            right.GetWorldCorners(rightCorners);
-            float leftRight = reference.InverseTransformPoint(
-                leftCorners[2]).x;
-            float rightLeft = reference.InverseTransformPoint(
-                rightCorners[0]).x;
-            return rightLeft - leftRight;
-        }
-
-
         private static int ScoreHint(ControlDescription candidate,
             bool local)
         {
@@ -4590,6 +4476,14 @@ namespace Cms21UiPlus
             else if (string.Equals(key, "Space",
                 StringComparison.OrdinalIgnoreCase))
                 names = new string[] { "spacebar", "space" };
+            else if (string.Equals(key, "MouseRight",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(key, "RMB",
+                    StringComparison.OrdinalIgnoreCase))
+                names = new string[] { "mouseright", "rightmouse",
+                    "mouserightbutton", "rightmousebutton",
+                    "mousebuttonright", "mouserightclick", "rightclick",
+                    "rmb" };
             else
                 names = new string[] { key };
 

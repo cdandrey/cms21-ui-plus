@@ -6,6 +6,7 @@ using UnityEngine.UI;
 
 #if NET6_0_OR_GREATER
 using Il2Cpp;
+using Il2CppCMS.UI;
 using Il2CppCMS.UI.Description;
 using Il2CppCMS.Containers;
 using Il2CppCMS.UI.Logic.Warehouse;
@@ -14,6 +15,7 @@ using Il2CppCMS.UI.Windows.Base;
 #else
 using CMS;
 using CMS.Containers;
+using CMS.UI;
 using CMS.UI.Description;
 using CMS.UI.Logic.Warehouse;
 using CMS.UI.Windows;
@@ -144,7 +146,7 @@ namespace Cms21UiPlus
         private static bool MoveItemPrefix(NotificationCenter __instance,
             Item __0, bool __1, string __2)
         {
-            return HandleNativeMove(__1);
+            return HandleNativeMove(__0, __1);
         }
 
         [HarmonyPatch(typeof(NotificationCenter), "MoveItem",
@@ -161,7 +163,7 @@ namespace Cms21UiPlus
         private static bool MoveGroupPrefix(NotificationCenter __instance,
             GroupItem __0, bool __1, string __2)
         {
-            return HandleNativeMove(__1);
+            return HandleNativeMove(__0, __1);
         }
 
         [HarmonyPatch(typeof(NotificationCenter), "MoveItem",
@@ -172,10 +174,10 @@ namespace Cms21UiPlus
             UpdateHintAfterMove();
         }
 
-        private static bool HandleNativeMove(bool toWarehouse)
+        private static bool HandleNativeMove(BaseItem selectedItem,
+            bool toWarehouse)
         {
-            if (bulkMoveInProgress || !IsEnabled || activeWindow == null ||
-                !KeyBindingsConfig.IsFilteredTransferModifierPressed())
+            if (bulkMoveInProgress || activeWindow == null)
                 return true;
 
             BaseInventory inventory =
@@ -183,11 +185,24 @@ namespace Cms21UiPlus
             if (inventory == null || IsSearchFieldFocused(inventory))
                 return true;
 
+            if (IsEnabled &&
+                KeyBindingsConfig.IsFilteredTransferModifierPressed()) {
+                if (handledFrame == Time.frameCount)
+                    return false;
+                handledFrame = Time.frameCount;
+                return !TryMoveFilteredItems(toWarehouse);
+            }
+
+            List<BaseItem> packageMembers;
+            if (!InventoryFilterManager.TryGetPackageMembersForTransfer(
+                    inventory, selectedItem, out packageMembers))
+                return true;
             if (handledFrame == Time.frameCount)
                 return false;
 
             handledFrame = Time.frameCount;
-            return !TryMoveFilteredItems(toWarehouse);
+            return !TryMoveItems(toWarehouse, packageMembers,
+                selectedItem != null ? selectedItem.GetLocalizedName() : null);
         }
 
         private static bool TryMoveFilteredItems(bool toWarehouse)
@@ -198,7 +213,14 @@ namespace Cms21UiPlus
             List<BaseItem> candidates =
                 InventoryFilterManager.GetFilteredWarehouseTransferCandidates(
                     activeWindow);
-            if (candidates.Count == 0)
+            return TryMoveItems(toWarehouse, candidates, null);
+        }
+
+        private static bool TryMoveItems(bool toWarehouse,
+            List<BaseItem> candidates, string summaryName)
+        {
+            if (activeWindow == null || bulkMoveInProgress ||
+                candidates == null || candidates.Count == 0)
                 return false;
 
             Inventory inventory = Singleton<Inventory>.Instance;
@@ -329,8 +351,29 @@ namespace Cms21UiPlus
                 }
             }
 
+            if (moved > 0)
+                ShowMovePopup(summaryName, moved);
             UpdateHintAfterMove();
             return moved > 0 || mutationStarted;
+        }
+
+        private static void ShowMovePopup(string itemName, int moved)
+        {
+            UIManager uiManager = UIManager.Get();
+            PopupManager popupManager = uiManager != null
+                ? uiManager.PopupManager : null;
+            if (popupManager == null || moved <= 0)
+                return;
+
+            string displayName = string.IsNullOrWhiteSpace(itemName)
+                ? ModLocalization.Get("LOC_WarehouseTransferMultipleItems")
+                : itemName;
+            string description = string.Format(
+                ModLocalization.Get("LOC_WarehouseTransferPopupBody"),
+                displayName, moved);
+            popupManager.ShowPopup(
+                ModLocalization.Get("LOC_WarehouseTransferPopupTitle"),
+                description);
         }
 
         private static bool IsSearchFieldFocused(BaseInventory inventory)
@@ -518,6 +561,8 @@ namespace Cms21UiPlus
                 : null;
 
             foreach (BaseItem baseItem in source) {
+                if (!MatchesExpandedInventoryGroup(inventory, baseItem))
+                    continue;
                 if (criteria == null || !criteria.HasAnyFilter ||
                     PartFilterRules.Matches(baseItem, criteria))
                     result.Add(baseItem);

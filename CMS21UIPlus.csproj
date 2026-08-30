@@ -39,6 +39,7 @@
     <Compile Include="src\Features\InventoryFilters\InventoryFilterButtons.cs" />
     <Compile Include="src\Features\InventoryFilters\InventoryFilterManager.cs" />
     <Compile Include="src\Features\InventoryFilters\InventoryFilterPatches.cs" />
+    <Compile Include="src\Features\InventoryFilters\InventoryGroupingFeature.cs" />
     <Compile Include="src\Features\InventoryFilters\InventoryFilterPipeline.cs" />
     <Compile Include="src\Features\InventoryFilters\PartFilterCore.cs" />
     <Compile Include="src\Features\InventoryFilters\PartFilterPanelController.cs" />

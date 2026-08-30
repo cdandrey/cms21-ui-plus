@@ -256,7 +256,7 @@ namespace Cms21UiPlus
             }
         }
 
-        private static bool IsSpecialInventoryItem(Item item)
+        internal static bool IsSpecialInventoryItem(Item item)
         {
             return item != null &&
                 (string.Equals(item.ID, "specialMap", StringComparison.Ordinal) ||

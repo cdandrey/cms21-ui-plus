@@ -221,18 +221,6 @@ namespace Cms21UiPlus
             PositionButtons();
         }
 
-        internal void EnsureVisible()
-        {
-            if (searchField != null && !searchField.gameObject.activeSelf)
-                searchField.gameObject.SetActive(true);
-            if (conditionButton != null && !conditionButton.gameObject.activeSelf)
-                conditionButton.gameObject.SetActive(true);
-            if (repairButton != null && !repairButton.gameObject.activeSelf)
-                repairButton.gameObject.SetActive(true);
-            if (qualityButton != null && !qualityButton.gameObject.activeSelf)
-                qualityButton.gameObject.SetActive(true);
-        }
-
         internal bool IsUiUnder(Transform root)
         {
             if (root == null)

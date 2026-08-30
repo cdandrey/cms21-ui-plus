@@ -60,10 +60,15 @@ namespace Cms21UiPlus
         Missing = 2,
     }
 
+    public enum PackageQuickFilterMode
+    {
+        Off = 0,
+        Packages = 1,
+        Singles = 2,
+    }
+
     public static partial class InventoryFilterManager
     {
-        // Revision marker: tri-state repairability filter, 2026-08-01.6
-
         private static JunkyardConditionFilterMode junkyardConditionFilterMode =
             JunkyardConditionFilterMode.Off;
         private static GarageConditionFilterMode garageConditionFilterMode =
@@ -77,11 +82,25 @@ namespace Cms21UiPlus
         private static QualityQuickFilterMode garageQualityFilterMode =
             QualityQuickFilterMode.Off;
         private static OwnedQuickFilterMode ownedFilterMode = OwnedQuickFilterMode.Off;
+        private static PackageQuickFilterMode packageFilterMode =
+            PackageQuickFilterMode.Off;
 
         public static void ResetAll()
         {
             ClearResetHint();
+            ClearInventoryGroupingHint();
             activeFilteredInventory = null;
+            GroupingStates.Clear();
+            PackageRows.Clear();
+            GroupingListTriggers.Clear();
+            suppressedBetterButtonActionId = 0;
+            currentPackageSaleCandidate = null;
+            pendingPackageSale = null;
+            pendingPackageSaleMoney = 0;
+            ClearPackageSalePopup();
+            packageSaleInProgress = false;
+            ItemGroupingKeys.Clear();
+            GroupGroupingKeys.Clear();
             foreach (DrawSnapshot snapshot in DrawSnapshots.Values) {
                 try {
                     snapshot.Restore();
@@ -99,6 +118,7 @@ namespace Cms21UiPlus
             junkyardQualityFilterMode = QualityQuickFilterMode.Off;
             garageQualityFilterMode = QualityQuickFilterMode.Off;
             ownedFilterMode = OwnedQuickFilterMode.Off;
+            packageFilterMode = PackageQuickFilterMode.Off;
         }
 
         internal static void ResetGarageFiltersOnWindowClose()
@@ -113,17 +133,24 @@ namespace Cms21UiPlus
                 garageConditionFilterMode = GarageConditionFilterMode.Off;
                 garageRepairabilityFilterMode = RepairabilityQuickFilterMode.Off;
                 garageQualityFilterMode = QualityQuickFilterMode.Off;
+                packageFilterMode = PackageQuickFilterMode.Off;
             }
             ClearSelectedButton();
         }
 
         private static bool ShouldHandleWindow(BaseInventory inventory)
         {
-            if (inventory == null || !IsFeatureEnabled())
+            if (inventory == null)
+                return false;
+
+            bool filtersEnabled = IsFeatureEnabled();
+            bool groupingEnabled = IsInventoryGroupingEnabled() &&
+                SupportsInventoryGrouping(inventory);
+            if (!filtersEnabled && !groupingEnabled)
                 return false;
 
             if (IsBarnOrJunkyardScene())
-                return true;
+                return filtersEnabled;
 
             if (inventory.TryCast<InventoryWindow>() != null)
                 return true;

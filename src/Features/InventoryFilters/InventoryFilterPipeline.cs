@@ -66,14 +66,21 @@ namespace Cms21UiPlus
             if (original == null)
                 return;
 
-            PartFilterCriteria criteria = CreateCurrentCriteria();
-            if (!criteria.HasAnyFilter) {
+            PartFilterCriteria criteria = IsFeatureEnabled()
+                ? CreateCurrentCriteria() : null;
+            bool groupingEnabled = IsInventoryGroupingEnabled() &&
+                SupportsInventoryGrouping(inventory);
+            if (!groupingEnabled && GetGroupingState(inventory, false) != null)
+                ResetInventoryGrouping(inventory);
+            if (!groupingEnabled && (criteria == null || !criteria.HasAnyFilter)) {
                 UpdatePaginationCount(inventory, original.Count);
                 return;
             }
 
             Il2CppSystem.Collections.Generic.List<BaseItem> filtered =
-                FilterCopy(original, criteria);
+                groupingEnabled
+                    ? BuildGroupedDisplay(inventory, original, criteria)
+                    : FilterCopy(original, criteria);
 
             DrawSnapshot snapshot = new DrawSnapshot();
             snapshot.Inventory = inventory;
@@ -187,8 +194,16 @@ namespace Cms21UiPlus
                     binding.Get(inventory);
                 if (items == null)
                     return 0;
-                PartFilterCriteria criteria = CreateCurrentCriteria();
-                return criteria.HasAnyFilter
+                PartFilterCriteria criteria = IsFeatureEnabled()
+                    ? CreateCurrentCriteria() : null;
+                if (IsInventoryGroupingEnabled() &&
+                    SupportsInventoryGrouping(inventory)) {
+                    int expandedCount = GetExpandedFilteredCount(inventory,
+                        items, criteria);
+                    if (expandedCount >= 0)
+                        return expandedCount;
+                }
+                return criteria != null && criteria.HasAnyFilter
                     ? FilterCopy(items, criteria).Count : items.Count;
             } catch (Exception exception) {
                 ModLogger.Log("[InventoryFilter] Failed to count the current " +

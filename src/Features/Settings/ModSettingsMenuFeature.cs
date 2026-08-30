@@ -82,7 +82,6 @@ namespace Cms21UiPlus
         private static RectTransform cardsFooterRoot;
         private static RectTransform footerRoot;
         private static NativeUiFactory.FooterHintHandle cardsSelectHint;
-        private static NativeUiFactory.FooterHintHandle cardsCloseHint;
         private static NativeUiFactory.FooterHintHandle settingsEnterHint;
         private static float settingsFooterHintsWidth;
         private static bool discardConfirmationOpen;
@@ -447,7 +446,6 @@ namespace Cms21UiPlus
             WindowFooterHintController.ClearStyledWindow("ModSettings");
             settingsFooterHintsWidth = 0f;
             cardsSelectHint = null;
-            cardsCloseHint = null;
             settingsEnterHint = null;
             discardConfirmationOpen = false;
             discardOverlayCanvasGroup = null;
@@ -1114,7 +1112,7 @@ namespace Cms21UiPlus
                 ModLocalization.Get("LOC_SelectAction"),
                 new Action(ActivateSelectedCard), 0);
 
-            cardsCloseHint = WindowFooterHintController.RequestStyledHint(
+            WindowFooterHintController.RequestStyledHint(
                 "ModsCards", cardsFooterRoot, "Close",
                 new string[] { "Esc" },
                 ModLocalization.Get("LOC_CloseAction"),

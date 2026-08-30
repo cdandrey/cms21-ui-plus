@@ -53,6 +53,8 @@ namespace Cms21UiPlus
         public bool showMountPartCardIndicators = true;
         [Tomlet.Attributes.TomlInlineComment("Hide the vanilla paint-colour badge on part cards")]
         public bool hideBodyPartPaintColorBadges = true;
+        [Tomlet.Attributes.TomlInlineComment("Group identical parts into expandable inventory and warehouse packages")]
+        public bool groupInventoryParts = true;
         [Tomlet.Attributes.TomlInlineComment("Enable inventory, warehouse, barn and junkyard quick filters")]
         public bool addInventoryQuickFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset garage inventory and warehouse quick filters when the window closes")]

@@ -81,6 +81,7 @@ namespace Cms21UiPlus
             return Load(ref whiteWarehouseIcon, "OwnershipWhite.png", "warehouse-white");
         }
 
+
         public static Sprite GetWhiteConditionIcon()
         {
             return Load(ref whiteConditionIcon, "ConditionWhite.png", "condition-white");

@@ -166,7 +166,7 @@ namespace Cms21UiPlus
             }
 
             savedValues = merged;
-            status = ModLocalization.Get("LOC_SettingSaved") +
+            status = ModLocalization.Get("LOC_SettingSaved") + " " +
                 ModLocalization.GetApplyModeStatus(applyMode);
             return true;
         }
@@ -206,7 +206,7 @@ namespace Cms21UiPlus
             }
 
             savedValues = CloneValues(candidate.Values);
-            status = ModLocalization.Get("LOC_SettingsSaved") +
+            status = ModLocalization.Get("LOC_SettingsSaved") + " " +
                 ModLocalization.GetApplyModeStatus(highestApplyMode);
             return true;
         }

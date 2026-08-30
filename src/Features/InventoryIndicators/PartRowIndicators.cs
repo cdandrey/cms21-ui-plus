@@ -14,6 +14,7 @@ using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppCMS.Containers;
 using Il2CppCMS.UI;
 using Il2CppCMS.UI.Logic;
+using Il2CppCMS.UI.Logic.Warehouse;
 using Il2CppCMS.UI.Helpers;
 using Il2CppCMS.UI.Windows;
 using Il2CppCMS.UI.Windows.Base;
@@ -24,6 +25,7 @@ using CMS;
 using CMS.Containers;
 using CMS.UI;
 using CMS.UI.Logic;
+using CMS.UI.Logic.Warehouse;
 using CMS.UI.Helpers;
 using CMS.UI.Windows;
 using CMS.UI.Windows.Base;
@@ -40,6 +42,24 @@ namespace Cms21UiPlus
         private const string Condition15To49Color = "FF9900";
         private const string ConditionBelow15Color = "FF0000";
         private static readonly HashSet<int> PendingUpdates = new HashSet<int>();
+        private const string PackageStackName = "QpackageStack";
+
+        private sealed class PackageVisualState
+        {
+            public RectTransform Source;
+            public Transform Stack;
+            public Transform Back;
+            public Transform Middle;
+            public bool IsApplied;
+            public bool SourceIsGroup;
+            public long SourceUid;
+            public int SourceHash;
+            public Vector3 Scale;
+            public Vector2 Position;
+        }
+
+        private static readonly Dictionary<int, PackageVisualState>
+            PackageVisualStates = new Dictionary<int, PackageVisualState>();
 
         public static void ScheduleUpdate(Transform inventoryWindow)
         {
@@ -92,7 +112,7 @@ namespace Cms21UiPlus
                     if (showOwnedCount) {
                         UpdateOwnedIcon(row,
                             OwnedPartCache.GetConditionBreakdown(group),
-                            InventoryIconProvider.GetWhiteWarehouseIcon());
+                            InventoryIconProvider.GetWhiteWarehouseIcon(), true);
                     }
                     return;
                 }
@@ -104,7 +124,7 @@ namespace Cms21UiPlus
                 if (showOwnedCount) {
                     UpdateOwnedIcon(row,
                         OwnedPartCache.GetConditionBreakdown(item),
-                        InventoryIconProvider.GetWhiteWarehouseIcon());
+                        InventoryIconProvider.GetWhiteWarehouseIcon(), true);
                 }
 
                 if (!showRepairability || repairIcon == null ||
@@ -116,8 +136,7 @@ namespace Cms21UiPlus
                     return;
 
                 repairImage.sprite =
-                    InventoryIconProvider.GetRepairWrenchIconForCondition(
-                        item.ConditionToShow);
+                    InventoryIconProvider.GetWhiteRepairWrenchIcon();
                 if (repairImage.sprite == null) {
                     repairIcon.SetActive(false);
                     return;
@@ -131,6 +150,470 @@ namespace Cms21UiPlus
                     "failed." + Environment.NewLine + exception,
                     Types.LoggingLevels.Error);
             }
+        }
+
+        public static void ResetInventoryRowGroupingPresentation(
+            InventoryItem row)
+        {
+            if (row == null)
+                return;
+
+            Transform condition = row.transform.Find("Condition");
+            if (condition != null)
+                condition.gameObject.SetActive(true);
+            Transform quality = row.transform.Find("Quality");
+            if (quality != null)
+                quality.gameObject.SetActive(true);
+            ResetPackageCascade(row);
+        }
+
+        public static void UpdateInventoryRow(BaseInventory inventory,
+            BaseItem baseItem, InventoryItem row)
+        {
+            if (inventory == null || baseItem == null || row == null)
+                return;
+
+            ApplyGroupingPresentation(inventory, baseItem, row);
+        }
+
+        private static bool ApplyGroupingPresentation(BaseInventory inventory,
+            BaseItem baseItem, InventoryItem row)
+        {
+            ResetPackageCascade(row);
+            if (!InventoryFilterManager.IsInventoryGroupingEnabled() ||
+                !InventoryFilterManager.SupportsInventoryGrouping(inventory))
+                return false;
+
+            int packageCount;
+            bool packageRepairable;
+            bool isPackage = InventoryFilterManager.TryGetPackageInfo(
+                inventory, baseItem, out packageCount, out packageRepairable);
+
+            if (isPackage) {
+                Transform condition = row.transform.Find("Condition");
+                if (condition != null)
+                    condition.gameObject.SetActive(false);
+                Transform quality = row.transform.Find("Quality");
+                if (quality != null)
+                    quality.gameObject.SetActive(false);
+                ApplyPackageCascade(baseItem, row);
+            }
+
+            bool expanded =
+                InventoryFilterManager.IsExpandedInventoryPackage(inventory);
+            if (expanded)
+                HideOwnedCountIndicator(row);
+            return expanded;
+        }
+
+        private static void ResetPackageCascade(InventoryItem row)
+        {
+            if (row == null)
+                return;
+
+            PackageVisualState state;
+            if (!PackageVisualStates.TryGetValue(row.GetInstanceID(), out state))
+                return;
+
+            if (state.IsApplied && state.Source != null) {
+                state.Source.localScale = state.Scale;
+                state.Source.anchoredPosition = state.Position;
+            }
+            state.IsApplied = false;
+            if (state.Stack != null)
+                state.Stack.gameObject.SetActive(false);
+        }
+
+        private static void ApplyPackageCascade(BaseItem baseItem,
+            InventoryItem row)
+        {
+            if (baseItem == null || row == null)
+                return;
+
+            bool isGroup = baseItem.TryCast<GroupItem>() != null;
+            Transform sourceTransform = row.transform.Find(isGroup
+                ? "InventoryItemGroup" : "InventoryItem");
+            RectTransform source = sourceTransform != null
+                ? sourceTransform.GetComponent<RectTransform>() : null;
+            if (source == null)
+                return;
+
+            int rowId = row.GetInstanceID();
+            long sourceUid = GetBaseItemUid(baseItem);
+            int sourceHash = sourceUid == 0L ? baseItem.GetHashCode() : 0;
+            PackageVisualState state;
+            bool sourceChanged = !PackageVisualStates.TryGetValue(rowId,
+                out state) || state.Source != source;
+            bool itemChanged = sourceChanged || state.SourceUid != sourceUid ||
+                state.SourceHash != sourceHash ||
+                state.SourceIsGroup != isGroup;
+            if (sourceChanged) {
+                if (state != null)
+                    DestroyPackageStack(state);
+                state = new PackageVisualState();
+                state.Source = source;
+                PackageVisualStates[rowId] = state;
+            }
+            if (itemChanged) {
+                state.SourceUid = sourceUid;
+                state.SourceHash = sourceHash;
+                state.SourceIsGroup = isGroup;
+                state.Scale = source.localScale;
+                state.Position = source.anchoredPosition;
+            }
+
+            if (!EnsurePackageStack(row, state))
+                return;
+
+            Vector3 packageScale = state.Scale * 0.58f;
+            ConfigurePackageStackCopy(state.Back, source,
+                state.Position + new Vector2(-18f, 18f), packageScale);
+            ConfigurePackageStackCopy(state.Middle, source,
+                state.Position + new Vector2(-9f, 9f), packageScale);
+
+            source.localScale = packageScale;
+            source.anchoredPosition = state.Position;
+            state.Stack.gameObject.SetActive(true);
+            state.IsApplied = true;
+        }
+
+        private static bool EnsurePackageStack(InventoryItem row,
+            PackageVisualState state)
+        {
+            if (row == null || state == null || state.Source == null)
+                return false;
+
+            if (state.Stack != null && state.Back != null &&
+                state.Middle != null) {
+                bool backHasVisual;
+                bool middleHasVisual;
+                if (SyncPackageVisualNode(state.Source, state.Back,
+                        out backHasVisual) &&
+                    SyncPackageVisualNode(state.Source, state.Middle,
+                        out middleHasVisual)) {
+                    state.Back.SetSiblingIndex(0);
+                    state.Middle.SetSiblingIndex(1);
+                    return backHasVisual || middleHasVisual;
+                }
+                DestroyPackageStack(state);
+            }
+
+            Transform stack = RecreatePackageStack(row, state.Source);
+            if (stack == null)
+                return false;
+
+            state.Stack = stack;
+            state.Back = stack.Find("Back");
+            state.Middle = stack.Find("Middle");
+            return state.Back != null && state.Middle != null;
+        }
+
+        private static void DestroyPackageStack(PackageVisualState state)
+        {
+            if (state == null)
+                return;
+
+            if (state.IsApplied && state.Source != null) {
+                state.Source.localScale = state.Scale;
+                state.Source.anchoredPosition = state.Position;
+            }
+            state.IsApplied = false;
+            if (state.Stack != null) {
+                state.Stack.gameObject.SetActive(false);
+                state.Stack.name = PackageStackName + "_old";
+                state.Stack.SetParent(null, false);
+                UnityEngine.Object.Destroy(state.Stack.gameObject);
+            }
+            state.Stack = null;
+            state.Back = null;
+            state.Middle = null;
+        }
+
+        private static bool SyncPackageVisualNode(RectTransform source,
+            Transform target, out bool hasVisual)
+        {
+            hasVisual = false;
+            if (source == null || target == null)
+                return false;
+
+            RectTransform targetRect = target.GetComponent<RectTransform>();
+            if (targetRect == null)
+                return false;
+
+            Image sourceImage = source.GetComponent<Image>();
+            RawImage sourceRawImage = sourceImage == null
+                ? source.GetComponent<RawImage>() : null;
+            Image targetImage = target.GetComponent<Image>();
+            RawImage targetRawImage = targetImage == null
+                ? target.GetComponent<RawImage>() : null;
+            if ((sourceImage != null) != (targetImage != null) ||
+                (sourceRawImage != null) != (targetRawImage != null))
+                return false;
+
+            CopyRectTransform(source, targetRect);
+            if (sourceImage != null) {
+                CopyImage(sourceImage, targetImage);
+                hasVisual = sourceImage.sprite != null ||
+                    sourceImage.overrideSprite != null;
+            } else if (sourceRawImage != null) {
+                CopyRawImage(sourceRawImage, targetRawImage);
+                hasVisual = sourceRawImage.texture != null;
+            }
+
+            int targetChildIndex = 0;
+            for (int i = 0; i < source.childCount; i++) {
+                RectTransform childSource = source.GetChild(i)
+                    .GetComponent<RectTransform>();
+                if (childSource == null)
+                    continue;
+                if (targetChildIndex >= target.childCount)
+                    return false;
+
+                Transform childTarget = target.GetChild(targetChildIndex++);
+                if (!string.Equals(childTarget.name, childSource.name,
+                        StringComparison.Ordinal))
+                    return false;
+
+                bool childHasVisual;
+                if (!SyncPackageVisualNode(childSource, childTarget,
+                        out childHasVisual))
+                    return false;
+                childTarget.gameObject.SetActive(
+                    childSource.gameObject.activeSelf);
+                hasVisual |= childHasVisual;
+            }
+
+            return targetChildIndex == target.childCount;
+        }
+
+        private static GameObject CreatePackageStack(Transform parent)
+        {
+#if NET6_0_OR_GREATER
+            GameObject stack = new GameObject(PackageStackName,
+                typeof(RectTransform));
+#else
+            Il2CppReferenceArray<Il2CppSystem.Type> componentTypes =
+                new Il2CppReferenceArray<Il2CppSystem.Type>(1);
+            componentTypes[0] = Il2CppType.Of<RectTransform>();
+            GameObject stack = new GameObject(PackageStackName, componentTypes);
+#endif
+            stack.transform.SetParent(parent, false);
+            stack.layer = parent.gameObject.layer;
+            return stack;
+        }
+
+        private static Transform RecreatePackageStack(InventoryItem row,
+            RectTransform source)
+        {
+            if (row == null || source == null)
+                return null;
+
+            Transform stack = CreatePackageStack(row.transform).transform;
+            stack.gameObject.SetActive(false);
+            stack.SetSiblingIndex(source.GetSiblingIndex());
+            RectTransform stackRect = stack.GetComponent<RectTransform>();
+            if (stackRect != null) {
+                stackRect.anchorMin = Vector2.zero;
+                stackRect.anchorMax = Vector2.one;
+                stackRect.offsetMin = Vector2.zero;
+                stackRect.offsetMax = Vector2.zero;
+                stackRect.localScale = Vector3.one;
+            }
+
+            if (!CreatePackageStackCopy(stack, "Back", source) ||
+                !CreatePackageStackCopy(stack, "Middle", source)) {
+                stack.SetParent(null, false);
+                UnityEngine.Object.Destroy(stack.gameObject);
+                return null;
+            }
+            return stack;
+        }
+
+        private static void ConfigurePackageStackCopy(Transform copy,
+            RectTransform source, Vector2 position, Vector3 scale)
+        {
+            if (copy == null || source == null)
+                return;
+
+            RectTransform rect = copy.GetComponent<RectTransform>();
+            if (rect == null)
+                return;
+
+            rect.anchorMin = source.anchorMin;
+            rect.anchorMax = source.anchorMax;
+            rect.pivot = source.pivot;
+            rect.sizeDelta = source.sizeDelta;
+            rect.anchoredPosition = position;
+            rect.localRotation = source.localRotation;
+            rect.localScale = scale;
+            copy.gameObject.SetActive(true);
+        }
+
+        private static bool CreatePackageStackCopy(Transform parent,
+            string name, RectTransform source)
+        {
+            if (parent == null || source == null)
+                return false;
+
+            bool hasVisual;
+            Transform copy = CreatePackageVisualNode(parent, name, source,
+                out hasVisual);
+            if (copy == null || !hasVisual) {
+                if (copy != null)
+                    UnityEngine.Object.Destroy(copy.gameObject);
+                return false;
+            }
+
+            copy.gameObject.SetActive(false);
+            return true;
+        }
+
+        private static Transform CreatePackageVisualNode(Transform parent,
+            string name, RectTransform source, out bool hasVisual)
+        {
+            hasVisual = false;
+            if (parent == null || source == null)
+                return null;
+
+            Image sourceImage = source.GetComponent<Image>();
+            RawImage sourceRawImage = sourceImage == null
+                ? source.GetComponent<RawImage>() : null;
+            GameObject copy = CreatePackageVisualObject(name, sourceImage,
+                sourceRawImage);
+            if (copy == null)
+                return null;
+
+            copy.transform.SetParent(parent, false);
+            copy.layer = parent.gameObject.layer;
+            RectTransform rect = copy.GetComponent<RectTransform>();
+            CopyRectTransform(source, rect);
+
+            if (sourceImage != null) {
+                Image image = copy.GetComponent<Image>();
+                CopyImage(sourceImage, image);
+                hasVisual = image != null &&
+                    (image.sprite != null || image.overrideSprite != null);
+            } else if (sourceRawImage != null) {
+                RawImage rawImage = copy.GetComponent<RawImage>();
+                CopyRawImage(sourceRawImage, rawImage);
+                hasVisual = rawImage != null && rawImage.texture != null;
+            }
+
+            for (int i = 0; i < source.childCount; i++) {
+                RectTransform childSource = source.GetChild(i)
+                    .GetComponent<RectTransform>();
+                if (childSource == null)
+                    continue;
+
+                bool childHasVisual;
+                Transform childCopy = CreatePackageVisualNode(copy.transform,
+                    childSource.name, childSource, out childHasVisual);
+                if (childCopy != null)
+                    childCopy.gameObject.SetActive(
+                        childSource.gameObject.activeSelf);
+                hasVisual |= childHasVisual;
+            }
+
+            return copy.transform;
+        }
+
+        private static GameObject CreatePackageVisualObject(string name,
+            Image sourceImage, RawImage sourceRawImage)
+        {
+#if NET6_0_OR_GREATER
+            if (sourceImage != null)
+                return new GameObject(name, typeof(RectTransform),
+                    typeof(CanvasRenderer), typeof(Image));
+            if (sourceRawImage != null)
+                return new GameObject(name, typeof(RectTransform),
+                    typeof(CanvasRenderer), typeof(RawImage));
+            return new GameObject(name, typeof(RectTransform));
+#else
+            int componentCount = sourceImage != null || sourceRawImage != null
+                ? 3 : 1;
+            Il2CppReferenceArray<Il2CppSystem.Type> componentTypes =
+                new Il2CppReferenceArray<Il2CppSystem.Type>(componentCount);
+            componentTypes[0] = Il2CppType.Of<RectTransform>();
+            if (componentCount == 3) {
+                componentTypes[1] = Il2CppType.Of<CanvasRenderer>();
+                componentTypes[2] = sourceImage != null
+                    ? Il2CppType.Of<Image>() : Il2CppType.Of<RawImage>();
+            }
+            return new GameObject(name, componentTypes);
+#endif
+        }
+
+        private static void CopyRectTransform(RectTransform source,
+            RectTransform target)
+        {
+            if (source == null || target == null)
+                return;
+
+            target.anchorMin = source.anchorMin;
+            target.anchorMax = source.anchorMax;
+            target.pivot = source.pivot;
+            target.sizeDelta = source.sizeDelta;
+            target.anchoredPosition = source.anchoredPosition;
+            target.localRotation = source.localRotation;
+            target.localScale = source.localScale;
+        }
+
+        private static void CopyImage(Image source, Image target)
+        {
+            if (source == null || target == null)
+                return;
+
+            target.sprite = source.sprite;
+            target.overrideSprite = source.overrideSprite;
+            target.color = source.color;
+            target.material = source.material;
+            target.type = source.type;
+            target.preserveAspect = source.preserveAspect;
+            target.fillCenter = source.fillCenter;
+            target.fillMethod = source.fillMethod;
+            target.fillAmount = source.fillAmount;
+            target.fillClockwise = source.fillClockwise;
+            target.fillOrigin = source.fillOrigin;
+            target.enabled = source.enabled;
+            target.raycastTarget = false;
+        }
+
+        private static void CopyRawImage(RawImage source, RawImage target)
+        {
+            if (source == null || target == null)
+                return;
+
+            target.texture = source.texture;
+            target.uvRect = source.uvRect;
+            target.color = source.color;
+            target.material = source.material;
+            target.enabled = source.enabled;
+            target.raycastTarget = false;
+        }
+
+        private static long GetBaseItemUid(BaseItem baseItem)
+        {
+            Item item = baseItem != null ? baseItem.TryCast<Item>() : null;
+            if (item != null)
+                return item.UID;
+            GroupItem group = baseItem != null
+                ? baseItem.TryCast<GroupItem>() : null;
+            return group != null ? group.UID : 0L;
+        }
+
+        private static BaseItem GetRowBaseItem(InventoryItem row)
+        {
+            if (row == null || row.ButtonAction == null ||
+                row.ButtonAction.hash == null)
+                return null;
+
+            Il2CppSystem.Object value = row.ButtonAction.hash.GetFromKey("Item");
+            if (value == null)
+                return null;
+            Item item = value.TryCast<Item>();
+            if (item != null)
+                return item;
+            return value.TryCast<GroupItem>();
         }
 
         private static bool IsSupportedChoosePartDownContext(
@@ -228,6 +711,13 @@ namespace Cms21UiPlus
                 if (hidePaintColorBadges)
                     HideNativePaintColorBadge(row);
 
+                BaseInventory baseInventory =
+                    row.GetComponentInParent<BaseInventory>();
+                BaseItem baseItem = GetRowBaseItem(row);
+                bool suppressOwnedCount = baseInventory != null &&
+                    baseItem != null && ApplyGroupingPresentation(
+                        baseInventory, baseItem, row);
+
                 GameObject repairIcon = showRepairability
                     ? PrepareRepairIcon(row) : null;
                 if (!showRepairability)
@@ -237,7 +727,8 @@ namespace Cms21UiPlus
                 if (row.IsGroup) {
                     GroupItem group = row.ButtonAction?.hash?.GetFromKey("Item")
                         ?.TryCast<GroupItem>();
-                    if (group == null || !showOwnedCount)
+                    if (group == null || !showOwnedCount ||
+                        suppressOwnedCount)
                         continue;
 
                     try {
@@ -249,7 +740,10 @@ namespace Cms21UiPlus
                                 OwnedPartCache.GetConditionBreakdown(group);
                             pageCounts[groupKey] = groupBreakdown;
                         }
-                        UpdateOwnedIcon(row, groupBreakdown, ownedSprite);
+                        if (groupBreakdown.Total != 1 ||
+                            !InventoryFilterManager.ShouldHideSingleOwnedCountBadge(
+                                baseInventory))
+                            UpdateOwnedIcon(row, groupBreakdown, ownedSprite);
                     } catch (Exception exception) {
                         UpdateOwnedIcon(row,
                             default(OwnedPartCache.ConditionBreakdown),
@@ -265,7 +759,7 @@ namespace Cms21UiPlus
                 if (item == null)
                     continue;
 
-                if (showOwnedCount) {
+                if (showOwnedCount && !suppressOwnedCount) {
                     try {
                         string key = PartIdentityComparer.GetKey(item);
                         OwnedPartCache.ConditionBreakdown breakdown;
@@ -273,7 +767,10 @@ namespace Cms21UiPlus
                             breakdown = OwnedPartCache.GetConditionBreakdown(item);
                             pageCounts[key] = breakdown;
                         }
-                        UpdateOwnedIcon(row, breakdown, ownedSprite);
+                        if (breakdown.Total != 1 ||
+                            !InventoryFilterManager.ShouldHideSingleOwnedCountBadge(
+                                baseInventory))
+                            UpdateOwnedIcon(row, breakdown, ownedSprite);
                     } catch (Exception exception) {
                         UpdateOwnedIcon(row,
                             default(OwnedPartCache.ConditionBreakdown),
@@ -292,8 +789,7 @@ namespace Cms21UiPlus
                 if (repairImage == null)
                     continue;
 
-                repairImage.sprite = InventoryIconProvider.GetRepairWrenchIconForCondition(
-                    item.ConditionToShow);
+                repairImage.sprite = InventoryIconProvider.GetWhiteRepairWrenchIcon();
                 if (repairImage.sprite == null) {
                     repairIcon.SetActive(false);
                     continue;
@@ -311,7 +807,7 @@ namespace Cms21UiPlus
                 icon = CreateIconObject(row, "QrepairIcon");
                 Image image = icon.GetComponent<Image>();
                 if (image != null)
-                    image.sprite = InventoryIconProvider.GetGreenRepairWrenchIcon();
+                    image.sprite = InventoryIconProvider.GetWhiteRepairWrenchIcon();
             }
 
             RectTransform rect = icon.GetComponent<RectTransform>();
@@ -329,30 +825,19 @@ namespace Cms21UiPlus
 
         private static GameObject CreateIconObject(InventoryItem row, string name)
         {
-#if NET6_0_OR_GREATER
-            GameObject icon = new GameObject(name, typeof(RectTransform),
-                typeof(CanvasRenderer), typeof(Image));
-#else
-            Il2CppReferenceArray<Il2CppSystem.Type> componentTypes =
-                new Il2CppReferenceArray<Il2CppSystem.Type>(3);
-            componentTypes[0] = Il2CppType.Of<RectTransform>();
-            componentTypes[1] = Il2CppType.Of<CanvasRenderer>();
-            componentTypes[2] = Il2CppType.Of<Image>();
-            GameObject icon = new GameObject(name, componentTypes);
-#endif
-            icon.transform.SetParent(row.transform, false);
-            icon.layer = row.gameObject.layer;
-            Image image = icon.GetComponent<Image>();
-            if (image != null) {
-                image.color = Color.white;
-                image.preserveAspect = true;
-                image.raycastTarget = false;
-            }
-            return icon;
+            if (row == null)
+                return null;
+            Image image = NativeUiFactory.CreateImage(row.transform, name,
+                null, Color.white, false);
+            if (image == null)
+                return null;
+            image.preserveAspect = true;
+            return image.gameObject;
         }
 
         private static void UpdateOwnedIcon(InventoryItem row,
-            OwnedPartCache.ConditionBreakdown breakdown, Sprite sprite)
+            OwnedPartCache.ConditionBreakdown breakdown, Sprite sprite,
+            bool alwaysShowTotal = false)
         {
             GameObject icon = row.transform.Find("QownedCount")?.gameObject;
             if (breakdown.Total <= 0 || sprite == null) {
@@ -371,20 +856,17 @@ namespace Cms21UiPlus
                 image.raycastTarget = false;
 
                 Text sourceText = row.GetComponentInChildren<Text>();
-                if (sourceText == null) {
+                Text countText = NativeUiFactory.CloneText(icon.transform,
+                    "Count", sourceText);
+                if (countText == null) {
                     icon.SetActive(false);
                     return;
                 }
 
-                GameObject countObject = GameObject.Instantiate(sourceText.gameObject, icon.transform);
-                countObject.name = "Count";
-                countObject.transform.localScale = Vector3.one;
-
-                TextLocalize localize = countObject.GetComponent<TextLocalize>();
+                TextLocalize localize = countText.GetComponent<TextLocalize>();
                 if (localize != null)
                     GameObject.Destroy(localize);
 
-                Text countText = countObject.GetComponent<Text>();
                 countText.text = string.Empty;
                 countText.fontSize = 9;
                 countText.resizeTextForBestFit = false;
@@ -422,25 +904,27 @@ namespace Cms21UiPlus
             textRect.anchoredPosition = new Vector2(0f, -7f);
             textRect.sizeDelta = new Vector2(36f, 64f);
 
-            text.text = BuildOwnedCountText(breakdown);
+            text.text = BuildOwnedCountText(breakdown, alwaysShowTotal);
             icon.SetActive(true);
         }
 
         private static string BuildOwnedCountText(
-            OwnedPartCache.ConditionBreakdown breakdown)
+            OwnedPartCache.ConditionBreakdown breakdown, bool alwaysShowTotal)
         {
             int populatedConditionGroups = 0;
-            if (breakdown.Perfect > 0)
-                populatedConditionGroups++;
-            if (breakdown.Condition50To99 > 0)
-                populatedConditionGroups++;
-            if (breakdown.Condition15To49 > 0)
-                populatedConditionGroups++;
-            if (breakdown.ConditionBelow15 > 0)
-                populatedConditionGroups++;
+            if (!alwaysShowTotal) {
+                if (breakdown.Perfect > 0)
+                    populatedConditionGroups++;
+                if (breakdown.Condition50To99 > 0)
+                    populatedConditionGroups++;
+                if (breakdown.Condition15To49 > 0)
+                    populatedConditionGroups++;
+                if (breakdown.ConditionBelow15 > 0)
+                    populatedConditionGroups++;
+            }
 
             StringBuilder text = new StringBuilder(96);
-            if (populatedConditionGroups > 1)
+            if (alwaysShowTotal || populatedConditionGroups > 1)
                 AppendCountLine(text, breakdown.Total, TotalCountColor);
 
             AppendCountLine(text, breakdown.Perfect, PerfectCountColor);

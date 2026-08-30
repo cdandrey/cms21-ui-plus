@@ -234,12 +234,6 @@ namespace Cms21UiPlus
             return new List<ShoppingListBackendEntry>(SourceOrder);
         }
 
-        internal static ShoppingListBackendEntry GetDisplayEntry(int index)
-        {
-            return index >= 0 && index < SourceOrder.Count
-                ? SourceOrder[index] : null;
-        }
-
         internal static void BindRenderedRows(ShopListWindow window)
         {
             RenderedRows.Clear();

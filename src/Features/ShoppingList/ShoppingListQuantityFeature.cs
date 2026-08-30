@@ -95,23 +95,6 @@ namespace Cms21UiPlus
                 activeWindow = null;
         }
 
-        private static bool IsPlusPressed()
-        {
-            if (Input.GetKeyDown(KeyCode.KeypadPlus) ||
-                Input.GetKeyDown(KeyCode.Plus))
-                return true;
-
-            return Input.GetKeyDown(KeyCode.Equals) &&
-                (Input.GetKey(KeyCode.LeftShift) ||
-                    Input.GetKey(KeyCode.RightShift));
-        }
-
-        private static bool IsMinusPressed()
-        {
-            return Input.GetKeyDown(KeyCode.KeypadMinus) ||
-                Input.GetKeyDown(KeyCode.Minus);
-        }
-
         internal static void UpdateRow(ShopListWindow window,
             ShopListItem row, ShopListItemData data)
         {

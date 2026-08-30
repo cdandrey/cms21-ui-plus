@@ -1191,105 +1191,6 @@ namespace Cms21UiPlus
             }
             return path;
         }
-        private static float GetNativeHintsRight(WindowState state,
-            RectTransform sourceRect, float availableRight)
-        {
-            HorizontalLayoutGroup layout = state.Parent
-                .GetComponent<HorizontalLayoutGroup>();
-            if (layout != null) {
-                float cursor = state.Parent.rect.xMin + layout.padding.left;
-                int count = 0;
-                ControlDescription[] layoutDescriptions = state.HintRoot
-                    .GetComponentsInChildren<ControlDescription>(true);
-                for (int i = 0; i < layoutDescriptions.Length; i++) {
-                    ControlDescription description = layoutDescriptions[i];
-                    if (description == null || description.gameObject == null ||
-                        !description.gameObject.activeInHierarchy ||
-                        IsManagedHint(state, description) ||
-                        description.gameObject.name.StartsWith("Hint_",
-                            StringComparison.Ordinal))
-                        continue;
-                    RectTransform rect = description
-                        .GetComponent<RectTransform>();
-                    if (rect == null || rect.parent != state.Parent)
-                        continue;
-                    float width = LayoutUtility.GetPreferredWidth(rect);
-                    if (width < 1f) {
-                        Bounds bounds;
-                        width = NativeUiFactory
-                            .TryGetControlDescriptionVisualBounds(description,
-                                state.Parent, out bounds)
-                            ? Mathf.Max(1f, bounds.size.x)
-                            : Mathf.Max(1f, Mathf.Abs(rect.rect.width));
-                    }
-                    if (count > 0)
-                        cursor += layout.spacing;
-                    cursor += width;
-                    count++;
-                }
-                if (count > 0)
-                    return cursor;
-            }
-
-            Bounds sourceBounds;
-            bool hasSourceBounds = NativeUiFactory
-                .TryGetControlDescriptionVisualBounds(state.Source,
-                    state.Parent, out sourceBounds);
-            float right = hasSourceBounds
-                ? sourceBounds.max.x
-                : state.Parent.InverseTransformPoint(
-                    sourceRect.TransformPoint(new Vector3(
-                        sourceRect.rect.xMax,
-                        sourceRect.rect.center.y, 0f))).x;
-            ControlDescription[] descriptions =
-                state.HintRoot.GetComponentsInChildren<ControlDescription>(true);
-            for (int i = 0; i < descriptions.Length; i++) {
-                ControlDescription description = descriptions[i];
-                if (description == null || description.gameObject == null ||
-                    !description.gameObject.activeInHierarchy ||
-                    IsManagedHint(state, description) ||
-                    description.gameObject.name.StartsWith("Hint_",
-                        StringComparison.Ordinal))
-                    continue;
-                RectTransform rect = description.GetComponent<RectTransform>();
-                if (rect == null || rect.parent != state.Parent)
-                    continue;
-                Bounds candidateBounds;
-                bool hasCandidateBounds = NativeUiFactory
-                    .TryGetControlDescriptionVisualBounds(description,
-                        state.Parent, out candidateBounds);
-                Vector3 candidateMin = hasCandidateBounds
-                    ? candidateBounds.min
-                    : state.Parent.InverseTransformPoint(
-                        rect.TransformPoint(new Vector3(rect.rect.xMin,
-                            rect.rect.yMin, 0f)));
-                Vector3 candidateMax = hasCandidateBounds
-                    ? candidateBounds.max
-                    : state.Parent.InverseTransformPoint(
-                        rect.TransformPoint(new Vector3(rect.rect.xMax,
-                            rect.rect.yMax, 0f)));
-                float sourceMinY = hasSourceBounds
-                    ? sourceBounds.min.y
-                    : state.Parent.InverseTransformPoint(
-                        sourceRect.TransformPoint(new Vector3(
-                            sourceRect.rect.xMin,
-                            sourceRect.rect.yMin, 0f))).y;
-                float sourceMaxY = hasSourceBounds
-                    ? sourceBounds.max.y
-                    : state.Parent.InverseTransformPoint(
-                        sourceRect.TransformPoint(new Vector3(
-                            sourceRect.rect.xMax,
-                            sourceRect.rect.yMax, 0f))).y;
-                bool overlapsFirstRow = candidateMax.y >= sourceMinY &&
-                    candidateMin.y <= sourceMaxY;
-                if (!overlapsFirstRow || candidateMin.x >= availableRight)
-                    continue;
-                float candidate = candidateMax.x;
-                if (candidate <= availableRight)
-                    right = Mathf.Max(right, candidate);
-            }
-            return right;
-        }
 
         private static bool IsManagedHint(WindowState state,
             ControlDescription description)
@@ -1303,55 +1204,6 @@ namespace Cms21UiPlus
                     return true;
             }
             return false;
-        }
-
-        private static float GetFirstRowRightBoundary(WindowState state,
-            RectTransform sourceRect, float nativeRight)
-        {
-            float boundary = GetWindowRight(state);
-            Text[] texts = state.Root.GetComponentsInChildren<Text>(true);
-            for (int i = 0; i < texts.Length; i++) {
-                Text text = texts[i];
-                if (text == null || text.gameObject == null ||
-                    !text.gameObject.activeInHierarchy ||
-                    (text.text ?? string.Empty).IndexOf('/') < 0)
-                    continue;
-                ReduceBoundaryForObstacle(state, sourceRect,
-                    text.rectTransform, nativeRight, ref boundary);
-            }
-            Slider[] sliders = state.Root.GetComponentsInChildren<Slider>(true);
-            for (int i = 0; i < sliders.Length; i++) {
-                if (sliders[i] != null)
-                    ReduceBoundaryForObstacle(state, sourceRect,
-                        sliders[i].GetComponent<RectTransform>(), nativeRight,
-                        ref boundary);
-            }
-            ToggleGroup[] groups =
-                state.Root.GetComponentsInChildren<ToggleGroup>(true);
-            for (int i = 0; i < groups.Length; i++) {
-                if (groups[i] != null)
-                    ReduceBoundaryForObstacle(state, sourceRect,
-                        groups[i].GetComponent<RectTransform>(), nativeRight,
-                        ref boundary);
-            }
-            RectTransform[] rects =
-                state.Root.GetComponentsInChildren<RectTransform>(true);
-            for (int i = 0; i < rects.Length; i++) {
-                RectTransform rect = rects[i];
-                if (rect == null || rect.gameObject == null)
-                    continue;
-                string name = rect.gameObject.name ?? string.Empty;
-                if (name.IndexOf("slider",
-                        StringComparison.OrdinalIgnoreCase) < 0 &&
-                    name.IndexOf("page",
-                        StringComparison.OrdinalIgnoreCase) < 0 &&
-                    name.IndexOf("pagination",
-                        StringComparison.OrdinalIgnoreCase) < 0)
-                    continue;
-                ReduceBoundaryForObstacle(state, sourceRect, rect,
-                    nativeRight, ref boundary);
-            }
-            return boundary - 10f;
         }
 
         private static float GetWindowRight(WindowState state)
@@ -1371,30 +1223,6 @@ namespace Cms21UiPlus
                 current = current.parent;
             }
             return right;
-        }
-
-        private static void ReduceBoundaryForObstacle(WindowState state,
-            RectTransform sourceRect, RectTransform obstacle,
-            float nativeRight, ref float boundary)
-        {
-            if (obstacle == null || !obstacle.gameObject.activeInHierarchy)
-                return;
-            Vector3 sourceMin = state.Parent.InverseTransformPoint(
-                sourceRect.TransformPoint(new Vector3(sourceRect.rect.xMin,
-                    sourceRect.rect.yMin, 0f)));
-            Vector3 sourceMax = state.Parent.InverseTransformPoint(
-                sourceRect.TransformPoint(new Vector3(sourceRect.rect.xMax,
-                    sourceRect.rect.yMax, 0f)));
-            Vector3 obstacleMin = state.Parent.InverseTransformPoint(
-                obstacle.TransformPoint(new Vector3(obstacle.rect.xMin,
-                    obstacle.rect.yMin, 0f)));
-            Vector3 obstacleMax = state.Parent.InverseTransformPoint(
-                obstacle.TransformPoint(new Vector3(obstacle.rect.xMax,
-                    obstacle.rect.yMax, 0f)));
-            bool overlapsRow = obstacleMax.y >= sourceMin.y &&
-                obstacleMin.y <= sourceMax.y;
-            if (overlapsRow && obstacleMin.x > nativeRight)
-                boundary = Mathf.Min(boundary, obstacleMin.x);
         }
 
         private static void LayoutStyledRow(StyledState state)

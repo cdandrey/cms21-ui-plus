@@ -24,6 +24,7 @@ namespace Cms21UiPlus
         private const string RepairButtonName = "QInventoryQuickFilterRepair";
         private const string QualityButtonName = "QInventoryQuickFilterQuality";
         private const string OwnedButtonName = "QInventoryQuickFilterOwned";
+        private const string PackageButtonName = "QInventoryQuickFilterPackage";
         private const string ResetHintName = "Hint_ResetInventoryFilters";
 
 
@@ -35,6 +36,7 @@ namespace Cms21UiPlus
         private const float FallbackRepairX = -300f;
         private const float FallbackQualityX = -272f;
         private const float FallbackOwnedX = -244f;
+        private const float FallbackPackageX = -244f;
 
         private static readonly Dictionary<int, Action> ReverseQuickFilterClicks =
             new Dictionary<int, Action>();
@@ -54,6 +56,7 @@ namespace Cms21UiPlus
             Repairability,
             Quality,
             Owned,
+            Package,
         }
 
         public static void EnsureButtons(BaseInventory inventory)
@@ -61,6 +64,7 @@ namespace Cms21UiPlus
             try {
                 EnsureButtonsUnsafe(inventory);
                 SetActiveFilteredInventory(inventory);
+                EnsureInventoryGroupingHint(inventory);
             } catch (Exception exception) {
                 ModLogger.Log("[InventoryFilter] Failed to create or position quick-filter buttons." +
                     Environment.NewLine + exception, Types.LoggingLevels.Warning);
@@ -137,6 +141,7 @@ namespace Cms21UiPlus
                 garageRepairabilityFilterMode =
                     RepairabilityQuickFilterMode.Off;
                 garageQualityFilterMode = QualityQuickFilterMode.Off;
+                packageFilterMode = PackageQuickFilterMode.Off;
             }
 
             InputField searchField = FindSearchField(inventory, true);
@@ -160,57 +165,14 @@ namespace Cms21UiPlus
                 return;
             }
 
-            WarehouseWindow warehouse =
-                inventory.GetComponentInParent<WarehouseWindow>();
-            Transform windowRoot = warehouse != null
-                ? warehouse.transform : null;
-            Transform descriptionRoot = warehouse != null &&
-                warehouse.uiDescription != null
-                    ? warehouse.uiDescription.transform : null;
-            if (descriptionRoot == null) {
-                InventoryWindow inventoryWindow =
-                    inventory.GetComponentInParent<InventoryWindow>();
-                if (inventoryWindow == null) {
-                    InventoryWindow discovered = UnityEngine.Object
-                        .FindObjectOfType<InventoryWindow>();
-                    if (discovered != null && discovered.gameObject != null &&
-                        discovered.gameObject.activeInHierarchy)
-                        inventoryWindow = discovered;
-                }
-                if (inventoryWindow != null &&
-                    inventoryWindow.uiDescription != null) {
-                    descriptionRoot =
-                        inventoryWindow.uiDescription.transform;
-                    windowRoot = inventoryWindow.transform;
-                }
-            }
-            if (descriptionRoot == null || windowRoot == null)
-            {
-                if (IsBarnOrJunkyardScene()) {
-                    Transform current = inventory.transform;
-                    while (current != null &&
-                            current.name != "ItemsExchangeWindow")
-                        current = current.parent;
-                    UIDescription[] descriptions = UnityEngine.Object
-                        .FindObjectsOfType<UIDescription>();
-                    for (int i = 0; i < descriptions.Length; i++) {
-                        UIDescription candidate = descriptions[i];
-                        if (candidate != null && candidate.gameObject != null &&
-                            candidate.gameObject.activeInHierarchy &&
-                            candidate.name == "ItemsExchangeWindow") {
-                            descriptionRoot = candidate.transform;
-                            break;
-                        }
-                    }
-                    windowRoot = current;
-                }
-                if (descriptionRoot == null || windowRoot == null)
-                    return;
-            }
+            string windowId;
+            Transform windowRoot;
+            Transform descriptionRoot;
+            if (!TryResolveInventoryFooter(inventory, out windowId,
+                    out windowRoot, out descriptionRoot))
+                return;
 
-            resetHintWindowId = IsBarnOrJunkyardScene()
-                ? "TravelInventory"
-                : warehouse != null ? "Warehouse" : "Inventory";
+            resetHintWindowId = windowId;
             int itemCount = GetCurrentFilteredItemCount(inventory);
             WindowFooterHintController.NativeFooterProfile footerProfile =
                 ResolveFooterProfile(inventory, itemCount == 0);
@@ -230,6 +192,70 @@ namespace Cms21UiPlus
                     Profile = footerProfile,
                     ItemCount = itemCount,
                 });
+        }
+
+        private static bool TryResolveInventoryFooter(
+            BaseInventory inventory, out string windowId,
+            out Transform windowRoot, out Transform descriptionRoot)
+        {
+            windowId = null;
+            windowRoot = null;
+            descriptionRoot = null;
+            if (inventory == null)
+                return false;
+
+            WarehouseWindow warehouse =
+                inventory.GetComponentInParent<WarehouseWindow>();
+            if (warehouse != null) {
+                windowRoot = warehouse.transform;
+                if (warehouse.uiDescription != null)
+                    descriptionRoot = warehouse.uiDescription.transform;
+            }
+
+            if (descriptionRoot == null) {
+                InventoryWindow inventoryWindow =
+                    inventory.GetComponentInParent<InventoryWindow>();
+                if (inventoryWindow == null) {
+                    InventoryWindow discovered = UnityEngine.Object
+                        .FindObjectOfType<InventoryWindow>();
+                    if (discovered != null && discovered.gameObject != null &&
+                        discovered.gameObject.activeInHierarchy)
+                        inventoryWindow = discovered;
+                }
+                if (inventoryWindow != null &&
+                    inventoryWindow.uiDescription != null) {
+                    descriptionRoot = inventoryWindow.uiDescription.transform;
+                    windowRoot = inventoryWindow.transform;
+                }
+            }
+
+            if (descriptionRoot == null || windowRoot == null) {
+                if (IsBarnOrJunkyardScene()) {
+                    Transform current = inventory.transform;
+                    while (current != null &&
+                            current.name != "ItemsExchangeWindow")
+                        current = current.parent;
+                    UIDescription[] descriptions = UnityEngine.Object
+                        .FindObjectsOfType<UIDescription>();
+                    for (int i = 0; i < descriptions.Length; i++) {
+                        UIDescription candidate = descriptions[i];
+                        if (candidate != null && candidate.gameObject != null &&
+                            candidate.gameObject.activeInHierarchy &&
+                            candidate.name == "ItemsExchangeWindow") {
+                            descriptionRoot = candidate.transform;
+                            break;
+                        }
+                    }
+                    windowRoot = current;
+                }
+                if (descriptionRoot == null || windowRoot == null)
+                    return false;
+            }
+
+            windowId = IsBarnOrJunkyardScene()
+                ? "TravelInventory"
+                : warehouse != null ? "Warehouse" : "Inventory";
+            return true;
         }
 
         private static WindowFooterHintController.NativeFooterProfile
@@ -277,10 +303,14 @@ namespace Cms21UiPlus
 
             Transform buttonRoot = GetButtonRoot(inventory);
             bool junkyardContext = IsBarnOrJunkyardScene();
+            bool packageContext = !junkyardContext &&
+                IsInventoryGroupingEnabled() && SupportsInventoryGrouping(inventory) &&
+                !IsExpandedInventoryPackage(inventory);
             Transform conditionButton = FindSingleButton(buttonRoot, ConditionButtonName);
             Transform repairButton = FindSingleButton(buttonRoot, RepairButtonName);
             Transform qualityButton = FindSingleButton(buttonRoot, QualityButtonName);
             Transform ownedButton = FindSingleButton(buttonRoot, OwnedButtonName);
+            Transform packageButton = FindSingleButton(buttonRoot, PackageButtonName);
 
             if (conditionButton == null)
                 conditionButton = CreateButton(inventory, buttonRoot,
@@ -291,6 +321,18 @@ namespace Cms21UiPlus
             if (qualityButton == null)
                 qualityButton = CreateButton(inventory, buttonRoot,
                     QualityButtonName, QuickFilterButtonKind.Quality);
+
+            if (packageContext) {
+                if (packageButton == null)
+                    packageButton = CreateButton(inventory, buttonRoot,
+                        PackageButtonName, QuickFilterButtonKind.Package);
+            } else if (packageButton != null) {
+                UnregisterReverseQuickFilterClick(
+                    packageButton.GetComponent<Button>());
+                packageButton.gameObject.SetActive(false);
+                UnityEngine.Object.Destroy(packageButton.gameObject);
+                packageButton = null;
+            }
 
             if (junkyardContext) {
                 if (ownedButton == null)
@@ -309,11 +351,14 @@ namespace Cms21UiPlus
             ConfigureButton(qualityButton, inventory, QuickFilterButtonKind.Quality);
             if (junkyardContext)
                 ConfigureButton(ownedButton, inventory, QuickFilterButtonKind.Owned);
+            if (packageContext)
+                ConfigureButton(packageButton, inventory, QuickFilterButtonKind.Package);
 
             ApplyButtonLayout(inventory, conditionButton, repairButton,
-                qualityButton, ownedButton, junkyardContext);
+                qualityButton, ownedButton, packageButton, junkyardContext,
+                packageContext);
             UpdateButtonVisuals(conditionButton, repairButton, qualityButton,
-                ownedButton, junkyardContext);
+                ownedButton, packageButton, junkyardContext, packageContext);
         }
 
         private static Transform CreateButton(BaseInventory inventory,
@@ -372,6 +417,7 @@ namespace Cms21UiPlus
                 case QuickFilterButtonKind.Quality:
                     return InventoryIconProvider.GetQualityIcon();
                 case QuickFilterButtonKind.Owned:
+                case QuickFilterButtonKind.Package:
                     return InventoryIconProvider.GetWhiteWarehouseIcon();
                 default:
                     return InventoryIconProvider.GetWhiteRepairWrenchIcon();
@@ -423,7 +469,7 @@ namespace Cms21UiPlus
                 reverseClickAction = delegate () {
                     CycleQualityFilterReverse(ResolveActiveInventory(inventory));
                 };
-            } else {
+            } else if (kind == QuickFilterButtonKind.Owned) {
                 Action clickAction = delegate () {
                     CycleOwnedFilter(ResolveActiveInventory(inventory));
                 };
@@ -431,13 +477,22 @@ namespace Cms21UiPlus
                 reverseClickAction = delegate () {
                     CycleOwnedFilterReverse(ResolveActiveInventory(inventory));
                 };
+            } else {
+                Action clickAction = delegate () {
+                    CyclePackageFilter(ResolveActiveInventory(inventory));
+                };
+                button.onClick.AddListener(clickAction);
+                reverseClickAction = delegate () {
+                    CyclePackageFilterReverse(ResolveActiveInventory(inventory));
+                };
             }
             RegisterReverseQuickFilterClick(button, reverseClickAction);
         }
 
         private static void ApplyButtonLayout(BaseInventory inventory,
             Transform conditionButton, Transform repairButton,
-            Transform qualityButton, Transform ownedButton, bool junkyardContext)
+            Transform qualityButton, Transform ownedButton,
+            Transform packageButton, bool junkyardContext, bool packageContext)
         {
             if (conditionButton == null || repairButton == null ||
                 qualityButton == null)
@@ -458,10 +513,14 @@ namespace Cms21UiPlus
                 if (parentWarehouse != null) {
                     Transform parent = parentWarehouse.transform;
                     float centerY = searchRect.rect.center.y + SearchRowYOffset;
-                    float qualityOffset = 18f;
+                    float packageOffset = 18f;
+                    float qualityOffset = packageContext
+                        ? packageOffset + ButtonSpacing : packageOffset;
                     float repairOffset = qualityOffset + ButtonSpacing;
                     float conditionOffset = repairOffset + ButtonSpacing;
 
+                    Vector3 packageWorld = searchRect.TransformPoint(new Vector3(
+                        searchRect.rect.xMin - packageOffset, centerY, 0f));
                     Vector3 qualityWorld = searchRect.TransformPoint(new Vector3(
                         searchRect.rect.xMin - qualityOffset, centerY, 0f));
                     Vector3 repairWorld = searchRect.TransformPoint(new Vector3(
@@ -472,6 +531,8 @@ namespace Cms21UiPlus
                     SetButtonWorldPosition(conditionButton, parent, conditionWorld);
                     SetButtonWorldPosition(repairButton, parent, repairWorld);
                     SetButtonWorldPosition(qualityButton, parent, qualityWorld);
+                    if (packageContext)
+                        SetButtonWorldPosition(packageButton, parent, packageWorld);
                     return;
                 }
 
@@ -489,6 +550,15 @@ namespace Cms21UiPlus
                     SetButtonPosition(qualityButton, normalParent, searchRect,
                         rightButtonX - ButtonSpacing, y);
                     SetButtonPosition(ownedButton, normalParent, searchRect,
+                        rightButtonX, y);
+                } else if (packageContext) {
+                    SetButtonPosition(conditionButton, normalParent, searchRect,
+                        rightButtonX - (ButtonSpacing * 3f), y);
+                    SetButtonPosition(repairButton, normalParent, searchRect,
+                        rightButtonX - (ButtonSpacing * 2f), y);
+                    SetButtonPosition(qualityButton, normalParent, searchRect,
+                        rightButtonX - ButtonSpacing, y);
+                    SetButtonPosition(packageButton, normalParent, searchRect,
                         rightButtonX, y);
                 } else {
                     SetButtonPosition(conditionButton, normalParent, searchRect,
@@ -510,6 +580,9 @@ namespace Cms21UiPlus
             if (junkyardContext)
                 SetFallbackPosition(ownedButton, inventory.transform,
                     FallbackOwnedX, FallbackY);
+            else if (packageContext)
+                SetFallbackPosition(packageButton, inventory.transform,
+                    FallbackPackageX, FallbackY);
         }
 
         private static InputField FindSearchField(BaseInventory inventory, bool activeOnly)
@@ -894,6 +967,52 @@ namespace Cms21UiPlus
             RedrawInventory(inventory);
         }
 
+        private static void CyclePackageFilter(BaseInventory inventory)
+        {
+            if (inventory == null || !IsInventoryGroupingEnabled() ||
+                !SupportsInventoryGrouping(inventory))
+                return;
+
+            CollapseExpandedPackageWithoutRedraw(inventory);
+            switch (packageFilterMode) {
+                case PackageQuickFilterMode.Off:
+                    packageFilterMode = PackageQuickFilterMode.Packages;
+                    break;
+                case PackageQuickFilterMode.Packages:
+                    packageFilterMode = PackageQuickFilterMode.Singles;
+                    break;
+                default:
+                    packageFilterMode = PackageQuickFilterMode.Off;
+                    break;
+            }
+
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        private static void CyclePackageFilterReverse(BaseInventory inventory)
+        {
+            if (inventory == null || !IsInventoryGroupingEnabled() ||
+                !SupportsInventoryGrouping(inventory))
+                return;
+
+            CollapseExpandedPackageWithoutRedraw(inventory);
+            switch (packageFilterMode) {
+                case PackageQuickFilterMode.Off:
+                    packageFilterMode = PackageQuickFilterMode.Singles;
+                    break;
+                case PackageQuickFilterMode.Singles:
+                    packageFilterMode = PackageQuickFilterMode.Packages;
+                    break;
+                default:
+                    packageFilterMode = PackageQuickFilterMode.Off;
+                    break;
+            }
+
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
         internal static void RegisterReverseQuickFilterClick(
             Button button, Action action)
         {
@@ -942,7 +1061,10 @@ namespace Cms21UiPlus
                     FindDeepChild(buttonRoot, RepairButtonName),
                     FindDeepChild(buttonRoot, QualityButtonName),
                     FindDeepChild(buttonRoot, OwnedButtonName),
-                    IsBarnOrJunkyardScene());
+                    FindDeepChild(buttonRoot, PackageButtonName),
+                    IsBarnOrJunkyardScene(),
+                    IsInventoryGroupingEnabled() &&
+                        SupportsInventoryGrouping(inventory));
 
                 InputField activeSearchField = FindSearchField(inventory, true);
                 if (activeSearchField != null && !IsBarnOrJunkyardScene()) {
@@ -963,7 +1085,7 @@ namespace Cms21UiPlus
 
         private static void UpdateButtonVisuals(Transform conditionButton,
             Transform repairButton, Transform qualityButton, Transform ownedButton,
-            bool junkyardContext)
+            Transform packageButton, bool junkyardContext, bool packageContext)
         {
             if (conditionButton != null) {
                 Image conditionImage = conditionButton.GetComponent<Image>();
@@ -1111,6 +1233,29 @@ namespace Cms21UiPlus
                             ownedImage.sprite =
                                 InventoryIconProvider.GetWhiteWarehouseIcon();
                             ownedImage.color = DisabledButtonColor;
+                            break;
+                    }
+                }
+            }
+
+            if (packageContext && packageButton != null) {
+                Image packageImage = packageButton.GetComponent<Image>();
+                if (packageImage != null) {
+                    switch (packageFilterMode) {
+                        case PackageQuickFilterMode.Packages:
+                            packageImage.sprite =
+                                InventoryIconProvider.GetWhiteWarehouseIcon();
+                            packageImage.color = ActiveButtonColor;
+                            break;
+                        case PackageQuickFilterMode.Singles:
+                            packageImage.sprite =
+                                InventoryIconProvider.GetRedWarehouseIcon();
+                            packageImage.color = ActiveButtonColor;
+                            break;
+                        default:
+                            packageImage.sprite =
+                                InventoryIconProvider.GetWhiteWarehouseIcon();
+                            packageImage.color = DisabledButtonColor;
                             break;
                     }
                 }

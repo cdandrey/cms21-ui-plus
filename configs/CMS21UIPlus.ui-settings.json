@@ -84,6 +84,17 @@
       "descriptionKey": "LOC_SettingHideBodyPartPaintColorBadgesDescription"
     },
     {
+      "id": "FID_GroupInventoryParts",
+      "key": "groupInventoryParts",
+      "group": "inventory",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 16,
+      "nameKey": "LOC_SettingGroupInventoryPartsName",
+      "descriptionKey": "LOC_SettingGroupInventoryPartsDescription"
+    },
+    {
       "id": "FID_AddInventoryQuickFilters",
       "key": "addInventoryQuickFilters",
       "group": "inventoryFilters",

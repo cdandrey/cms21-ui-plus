@@ -144,33 +144,6 @@ namespace Cms21UiPlus
                 visualRow < 0 || visualRow >= target.items.Count;
         }
 
-        internal static int GetCurrentVisualIndex(ShopListWindow window)
-        {
-            if (window == null || window.gridNavigationManager == null ||
-                window.gridNavigationManager.elements == null ||
-                window.items == null || !HasExpectedNavigation(window))
-                return -1;
-
-            GridNavigationManager manager = window.gridNavigationManager;
-            int visualColumn = manager.GetCurrentRow();
-            int visualRow = manager.GetCurrentColumn();
-            int visualColumns = GetVisualColumns(window);
-            if (visualColumns <= 0 || visualColumn < 0 || visualRow < 0 ||
-                visualColumn >= manager.elements.Count)
-                return -1;
-
-            GridItems column = manager.elements[visualColumn];
-            if (column == null || column.items == null ||
-                visualRow >= column.items.Count)
-                return -1;
-
-            int index = visualColumn + (visualRow * visualColumns);
-            int visibleCount = Math.Min(
-                ShoppingListShopFilterFeature.GetVisibleItemCount(window),
-                window.items.Count);
-            return index >= 0 && index < visibleCount ? index : -1;
-        }
-
         private static void ScheduleTwoColumnRowNormalization(ShopListWindow window)
         {
             rowNormalizationWindow = window;

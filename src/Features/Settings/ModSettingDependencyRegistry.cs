@@ -59,16 +59,6 @@ namespace Cms21UiPlus
                 ? value : Available;
         }
 
-        internal static bool IsAvailable(string providerId,
-            string dependencyId)
-        {
-            string status = GetStatus(providerId, dependencyId);
-            return !string.Equals(status, Unavailable,
-                       StringComparison.OrdinalIgnoreCase) &&
-                   !string.Equals(status, UnavailableByDefault,
-                       StringComparison.OrdinalIgnoreCase);
-        }
-
         private static bool TryNormalizeStatus(string status,
             out string normalized)
         {

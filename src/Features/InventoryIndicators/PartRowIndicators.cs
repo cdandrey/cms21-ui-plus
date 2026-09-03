@@ -75,7 +75,7 @@ namespace Cms21UiPlus
 
         /// <summary>
         /// Applies the same indicators to rows populated by ChoosePartDownWindow.
-        /// These rows are used by scrap production, scrap upgrades and repair tables.
+        /// These rows are shared by repair, scrap, upgrade and workshop tools.
         /// </summary>
         public static void UpdateChoosePartDownRow(ChoosePartDownItem entry,
             InventoryItem row)
@@ -94,8 +94,13 @@ namespace Cms21UiPlus
 
                 Settings settings = Main.SettingsEntry.Value;
                 bool showRepairability =
-                    settings.showPartRepairabilityIndicators;
+                    settings.showPartRepairabilityIndicators &&
+                    !ShouldSuppressRepairIndicators(row);
                 bool showOwnedCount = settings.showOwnedPartCountIndicators;
+
+                GroupItem group = entry.BaseItem.TryCast<GroupItem>();
+                Item item = group == null
+                    ? entry.BaseItem.TryCast<Item>() : null;
                 if (!showRepairability && !showOwnedCount) {
                     HideIndicators(row);
                     return;
@@ -107,24 +112,22 @@ namespace Cms21UiPlus
                     HideRepairabilityIndicator(row);
                 HideOwnedCountIndicator(row);
 
-                GroupItem group = entry.BaseItem.TryCast<GroupItem>();
                 if (group != null) {
                     if (showOwnedCount) {
                         UpdateOwnedIcon(row,
                             OwnedPartCache.GetConditionBreakdown(group),
-                            InventoryIconProvider.GetWhiteWarehouseIcon(), true);
+                            InventoryIconProvider.GetWhiteWarehouseIcon());
                     }
                     return;
                 }
 
-                Item item = entry.BaseItem.TryCast<Item>();
                 if (item == null)
                     return;
 
                 if (showOwnedCount) {
                     UpdateOwnedIcon(row,
                         OwnedPartCache.GetConditionBreakdown(item),
-                        InventoryIconProvider.GetWhiteWarehouseIcon(), true);
+                        InventoryIconProvider.GetWhiteWarehouseIcon());
                 }
 
                 if (!showRepairability || repairIcon == null ||
@@ -144,12 +147,49 @@ namespace Cms21UiPlus
 
                 repairImage.color = Color.white;
                 repairIcon.SetActive(true);
+                Text textTemplate = row.GetComponentInChildren<Text>();
+                RepairSkillIndicator.Update(repairIcon, item.ID, textTemplate);
             } catch (Exception exception) {
                 HideIndicators(row);
                 ModLogger.Log("[InventoryIndicators] Choose-part row update " +
                     "failed." + Environment.NewLine + exception,
                     Types.LoggingLevels.Error);
             }
+        }
+
+        internal static void UpdateInventoryRepairabilityRow(BaseItem baseItem,
+            InventoryItem row)
+        {
+            if (baseItem == null || row == null || Main.SettingsEntry == null)
+                return;
+
+            if (!Main.SettingsEntry.Value.showPartRepairabilityIndicators) {
+                HideRepairabilityIndicator(row);
+                return;
+            }
+
+            Item item = baseItem.TryCast<Item>();
+            if (item == null || !PartRepairabilityRules.IsRepairable(item)) {
+                HideRepairabilityIndicator(row);
+                return;
+            }
+
+            GameObject repairIcon = PrepareRepairIcon(row);
+            Image repairImage = repairIcon != null
+                ? repairIcon.GetComponent<Image>() : null;
+            if (repairImage == null)
+                return;
+
+            repairImage.sprite = InventoryIconProvider.GetWhiteRepairWrenchIcon();
+            if (repairImage.sprite == null) {
+                repairIcon.SetActive(false);
+                return;
+            }
+
+            repairImage.color = Color.white;
+            repairIcon.SetActive(true);
+            RepairSkillIndicator.Update(repairIcon, item.ID,
+                row.GetComponentInChildren<Text>());
         }
 
         public static void ResetInventoryRowGroupingPresentation(
@@ -616,10 +656,25 @@ namespace Cms21UiPlus
             return value.TryCast<GroupItem>();
         }
 
+        private static bool ShouldSuppressRepairIndicators(InventoryItem row)
+        {
+            if (row == null)
+                return true;
+
+            ChoosePartDownWindow window =
+                row.GetComponentInParent<ChoosePartDownWindow>();
+            return window != null &&
+                (TireChangerInventoryFilterFeature.IsSelectionWindow(window) ||
+                 WheelBalancerInventoryFilterFeature.IsSelectionWindow(window));
+        }
+
         private static bool IsSupportedChoosePartDownContext(
             InventoryItem row)
         {
-            if (row.GetComponentInParent<ScrapWindow>() != null ||
+            if (row == null)
+                return false;
+            if (row.GetComponentInParent<ChoosePartDownWindow>() != null ||
+                row.GetComponentInParent<ScrapWindow>() != null ||
                 row.GetComponentInParent<RepairPartWindow>() != null)
                 return true;
 
@@ -797,6 +852,8 @@ namespace Cms21UiPlus
 
                 repairImage.color = Color.white;
                 repairIcon.SetActive(true);
+                RepairSkillIndicator.Update(repairIcon, item.ID,
+                    row.GetComponentInChildren<Text>());
             }
         }
 
@@ -836,8 +893,7 @@ namespace Cms21UiPlus
         }
 
         private static void UpdateOwnedIcon(InventoryItem row,
-            OwnedPartCache.ConditionBreakdown breakdown, Sprite sprite,
-            bool alwaysShowTotal = false)
+            OwnedPartCache.ConditionBreakdown breakdown, Sprite sprite)
         {
             GameObject icon = row.transform.Find("QownedCount")?.gameObject;
             if (breakdown.Total <= 0 || sprite == null) {
@@ -904,28 +960,15 @@ namespace Cms21UiPlus
             textRect.anchoredPosition = new Vector2(0f, -7f);
             textRect.sizeDelta = new Vector2(36f, 64f);
 
-            text.text = BuildOwnedCountText(breakdown, alwaysShowTotal);
+            text.text = BuildOwnedCountText(breakdown);
             icon.SetActive(true);
         }
 
         private static string BuildOwnedCountText(
-            OwnedPartCache.ConditionBreakdown breakdown, bool alwaysShowTotal)
+            OwnedPartCache.ConditionBreakdown breakdown)
         {
-            int populatedConditionGroups = 0;
-            if (!alwaysShowTotal) {
-                if (breakdown.Perfect > 0)
-                    populatedConditionGroups++;
-                if (breakdown.Condition50To99 > 0)
-                    populatedConditionGroups++;
-                if (breakdown.Condition15To49 > 0)
-                    populatedConditionGroups++;
-                if (breakdown.ConditionBelow15 > 0)
-                    populatedConditionGroups++;
-            }
-
             StringBuilder text = new StringBuilder(96);
-            if (alwaysShowTotal || populatedConditionGroups > 1)
-                AppendCountLine(text, breakdown.Total, TotalCountColor);
+            AppendCountLine(text, breakdown.Total, TotalCountColor);
 
             AppendCountLine(text, breakdown.Perfect, PerfectCountColor);
             AppendCountLine(text, breakdown.Condition50To99,
@@ -956,6 +999,15 @@ namespace Cms21UiPlus
     [HarmonyPatch]
     internal static class PartRowIndicatorPatches
     {
+        [HarmonyPatch(typeof(BaseInventory), "FillItem",
+            new Type[] { typeof(BaseItem), typeof(InventoryItem) })]
+        [HarmonyPostfix]
+        private static void BaseInventoryFillItemIndicatorsPostfix(
+            BaseItem __0, InventoryItem __1)
+        {
+            PartRowIndicators.UpdateInventoryRepairabilityRow(__0, __1);
+        }
+
         [HarmonyPatch(typeof(BaseInventory), nameof(BaseInventory.DrawPage))]
         [HarmonyPostfix]
         private static void BaseInventoryDrawPagePostfix(BaseInventory __instance)

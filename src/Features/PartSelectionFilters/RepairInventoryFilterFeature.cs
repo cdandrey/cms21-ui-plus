@@ -45,6 +45,8 @@ namespace Cms21UiPlus
             GarageConditionFilterMode.Off;
         private static QualityQuickFilterMode qualityMode =
             QualityQuickFilterMode.Off;
+        private static RestorationAvailabilityQuickFilterMode availabilityMode =
+            RestorationAvailabilityQuickFilterMode.Off;
         private static string searchText = string.Empty;
         private static bool applyingFilteredList;
         private static bool filteredEmptyState;
@@ -179,6 +181,7 @@ namespace Cms21UiPlus
             OriginalItems.Clear();
             conditionMode = GarageConditionFilterMode.Off;
             qualityMode = QualityQuickFilterMode.Off;
+            availabilityMode = RestorationAvailabilityQuickFilterMode.Off;
             searchText = string.Empty;
             applyingFilteredList = false;
         }
@@ -215,10 +218,18 @@ namespace Cms21UiPlus
                     continue;
 
                 activeWindow = window;
+                bool includeAvailability = !string.IsNullOrEmpty(
+                    GameplayRepairSkillBridge
+                        .GetRepairAvailabilityIndicatorPath(true));
+                if (!includeAvailability)
+                    availabilityMode =
+                        RestorationAvailabilityQuickFilterMode.Off;
+
                 if (!Panel.AttachWithButtons(window.transform,
-                    CycleConditionFilter, null, CycleQualityFilter,
-                    OnSearchChanged, true, false, true,
-                    CycleConditionFilterReverse, null,
+                    CycleConditionFilter, CycleAvailabilityFilter,
+                    CycleQualityFilter, OnSearchChanged, true,
+                    includeAvailability, true, CycleConditionFilterReverse,
+                    CycleAvailabilityFilterReverse,
                     CycleQualityFilterReverse)) {
                     DeactivateWindow();
                     yield break;
@@ -226,7 +237,7 @@ namespace Cms21UiPlus
 
                 Panel.SetSearchText(searchText);
                 Panel.UpdateVisuals(conditionMode,
-                    RepairabilityQuickFilterMode.Off, qualityMode);
+                    availabilityMode, qualityMode);
                 CreateResetHint();
                 ApplyCurrentFilters(true);
                 yield break;
@@ -268,7 +279,7 @@ namespace Cms21UiPlus
 
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
-                RepairabilityQuickFilterMode.Off, qualityMode);
+                availabilityMode, qualityMode);
             ApplyCurrentFilters(true);
         }
 
@@ -291,7 +302,51 @@ namespace Cms21UiPlus
 
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
-                RepairabilityQuickFilterMode.Off, qualityMode);
+                availabilityMode, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
+        private static void CycleAvailabilityFilter()
+        {
+            switch (availabilityMode) {
+                case RestorationAvailabilityQuickFilterMode.Off:
+                    availabilityMode =
+                        RestorationAvailabilityQuickFilterMode.AvailableOnly;
+                    break;
+                case RestorationAvailabilityQuickFilterMode.AvailableOnly:
+                    availabilityMode =
+                        RestorationAvailabilityQuickFilterMode.UnavailableOnly;
+                    break;
+                default:
+                    availabilityMode =
+                        RestorationAvailabilityQuickFilterMode.Off;
+                    break;
+            }
+
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode, availabilityMode, qualityMode);
+            ApplyCurrentFilters(true);
+        }
+
+        private static void CycleAvailabilityFilterReverse()
+        {
+            switch (availabilityMode) {
+                case RestorationAvailabilityQuickFilterMode.Off:
+                    availabilityMode =
+                        RestorationAvailabilityQuickFilterMode.UnavailableOnly;
+                    break;
+                case RestorationAvailabilityQuickFilterMode.UnavailableOnly:
+                    availabilityMode =
+                        RestorationAvailabilityQuickFilterMode.AvailableOnly;
+                    break;
+                default:
+                    availabilityMode =
+                        RestorationAvailabilityQuickFilterMode.Off;
+                    break;
+            }
+
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode, availabilityMode, qualityMode);
             ApplyCurrentFilters(true);
         }
 
@@ -300,7 +355,7 @@ namespace Cms21UiPlus
             qualityMode = InventoryFilterManager.GetNextQualityMode(qualityMode);
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
-                RepairabilityQuickFilterMode.Off, qualityMode);
+                availabilityMode, qualityMode);
             ApplyCurrentFilters(true);
         }
 
@@ -309,7 +364,7 @@ namespace Cms21UiPlus
             qualityMode = InventoryFilterManager.GetPreviousQualityMode(qualityMode);
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
-                RepairabilityQuickFilterMode.Off, qualityMode);
+                availabilityMode, qualityMode);
             ApplyCurrentFilters(true);
         }
 
@@ -328,6 +383,7 @@ namespace Cms21UiPlus
         {
             conditionMode = GarageConditionFilterMode.Off;
             qualityMode = QualityQuickFilterMode.Off;
+            availabilityMode = RestorationAvailabilityQuickFilterMode.Off;
             searchText = string.Empty;
         }
 
@@ -336,7 +392,7 @@ namespace Cms21UiPlus
             ResetFilterState();
             Panel.ResetSearch();
             Panel.UpdateVisuals(conditionMode,
-                RepairabilityQuickFilterMode.Off, qualityMode);
+                availabilityMode, qualityMode);
             ApplyCurrentFilters(true);
         }
 
@@ -392,11 +448,44 @@ namespace Cms21UiPlus
 
             foreach (ChoosePartDownItem item in OriginalItems) {
                 if (item != null && item.BaseItem != null &&
-                    PartFilterRules.Matches(item.BaseItem, criteria))
+                    PartFilterRules.Matches(item.BaseItem, criteria) &&
+                    MatchesRestorationAvailability(item))
                     filtered.Add(item);
             }
 
             return filtered;
+        }
+
+        private static bool MatchesRestorationAvailability(
+            ChoosePartDownItem entry)
+        {
+            if (availabilityMode ==
+                RestorationAvailabilityQuickFilterMode.Off)
+                return true;
+
+            BaseItem baseItem = entry != null ? entry.BaseItem : null;
+            Item item = baseItem != null ? baseItem.TryCast<Item>() : null;
+            if (item == null)
+                return false;
+
+            string[] ignoredIndicatorPaths;
+            bool available;
+            if (!GameplayRepairSkillBridge.TryGetRepairDisplayData(item.ID,
+                    out ignoredIndicatorPaths, out available))
+                available = !entry.IsLocked;
+
+            return availabilityMode ==
+                RestorationAvailabilityQuickFilterMode.AvailableOnly
+                    ? available : !available;
+        }
+
+        private static bool HasActiveFilters()
+        {
+            return conditionMode != GarageConditionFilterMode.Off ||
+                qualityMode != QualityQuickFilterMode.Off ||
+                availabilityMode !=
+                    RestorationAvailabilityQuickFilterMode.Off ||
+                !string.IsNullOrEmpty(searchText);
         }
 
         private static void ApplyCurrentFilters(bool resetPage)
@@ -419,7 +508,7 @@ namespace Cms21UiPlus
                 if (activeRepairWindow != null)
                     activeRepairWindow.CheckIfThereAreItems(filtered);
                 ApplyFilteredEmptyState(filtered.Count == 0 &&
-                    CreateCriteria().HasAnyFilter, filtered.Count);
+                    HasActiveFilters(), filtered.Count);
 
                 if (resetPage) {
                     while (activeWindow.currentPage > 0)

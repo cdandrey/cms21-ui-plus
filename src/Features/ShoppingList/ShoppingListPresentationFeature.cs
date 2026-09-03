@@ -490,6 +490,8 @@ namespace Cms21UiPlus
             rect.sizeDelta = new Vector2(IndicatorSize, IndicatorSize);
             rect.localScale = Vector3.one;
             icon.SetActive(true);
+            RepairSkillIndicator.Update(icon, data.ID,
+                card.Find(CardCaptionName)?.GetComponent<Text>());
         }
 
         private static void ConfigureOwned(Transform card,

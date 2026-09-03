@@ -1209,14 +1209,15 @@ namespace Cms21UiPlus
                         draft, key);
                     ModSettingValue savedValue = currentValues != null
                         ? activeProvider.GetValue(currentValues, key) : value;
+                    bool showIndicator;
+                    bool indicatorValue;
+                    GetSettingsIndicatorState(option, value,
+                        out showIndicator, out indicatorValue);
                     NativeUiFactory.SettingsRowHandle row =
                         NativeUiFactory.CreateSettingsRow(
                             settingsContent, option.Name,
                             option.GetDisplayValue(value),
-                            option.Type == ModSettingType.Boolean,
-                            value != null && value.Type ==
-                                ModSettingValueType.Boolean &&
-                                value.BooleanValue,
+                            showIndicator, indicatorValue,
                             new Action(delegate {
                                 OnSettingsRowClicked(key);
                             }));
@@ -1504,6 +1505,34 @@ namespace Cms21UiPlus
             return null;
         }
 
+        private static void GetSettingsIndicatorState(
+            ModSettingOption option, ModSettingValue value,
+            out bool showIndicator, out bool indicatorValue)
+        {
+            showIndicator = false;
+            indicatorValue = false;
+            if (option == null)
+                return;
+
+            if (option.Type == ModSettingType.Boolean) {
+                showIndicator = true;
+                indicatorValue = value != null &&
+                    value.Type == ModSettingValueType.Boolean &&
+                    value.BooleanValue;
+                return;
+            }
+
+            if (string.IsNullOrEmpty(option.IndicatorSwitchKey) ||
+                activeProvider == null || draft == null)
+                return;
+
+            ModSettingValue switchValue = activeProvider.GetValue(
+                draft, option.IndicatorSwitchKey);
+            showIndicator = switchValue != null &&
+                switchValue.Type == ModSettingValueType.Boolean;
+            indicatorValue = showIndicator && switchValue.BooleanValue;
+        }
+
         private static void SetBindingValue(SettingBinding binding,
             ModSettingValue value)
         {
@@ -1513,7 +1542,8 @@ namespace Cms21UiPlus
                 return;
             binding.Value = value;
             activeProvider.SetValue(draft, binding.Key, value);
-            UpdateBindingRow(binding);
+            for (int index = 0; index < settingBindings.Count; index++)
+                UpdateBindingRow(settingBindings[index]);
             RefreshDependencyWarnings();
             UpdateDirtyStatus();
         }
@@ -1522,13 +1552,13 @@ namespace Cms21UiPlus
         {
             if (binding == null || binding.Option == null)
                 return;
-            bool isBoolean = binding.Option.Type == ModSettingType.Boolean;
-            bool booleanValue = isBoolean && binding.Value != null &&
-                binding.Value.Type == ModSettingValueType.Boolean &&
-                binding.Value.BooleanValue;
+            bool showIndicator;
+            bool indicatorValue;
+            GetSettingsIndicatorState(binding.Option, binding.Value,
+                out showIndicator, out indicatorValue);
             NativeUiFactory.UpdateSettingsRow(binding.Row,
                 binding.Option.GetDisplayValue(binding.Value),
-                isBoolean, booleanValue);
+                showIndicator, indicatorValue);
         }
 
         private static bool StepBindingValue(SettingBinding binding,

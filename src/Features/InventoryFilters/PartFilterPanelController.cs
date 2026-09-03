@@ -19,7 +19,6 @@ namespace Cms21UiPlus
             new Color32(255, 255, 255, 255);
         private static readonly Color32 DisabledButtonColor =
             new Color32(125, 125, 125, 210);
-
         private enum FilterButtonKind
         {
             Condition,
@@ -255,6 +254,15 @@ namespace Cms21UiPlus
             UpdateQualityVisual(qualityMode);
         }
 
+        public void UpdateVisuals(GarageConditionFilterMode conditionMode,
+            RestorationAvailabilityQuickFilterMode availabilityMode,
+            QualityQuickFilterMode qualityMode)
+        {
+            UpdateConditionVisual(conditionMode);
+            UpdateRestorationAvailabilityVisual(availabilityMode);
+            UpdateQualityVisual(qualityMode);
+        }
+
         public void UpdateVisuals(JunkyardConditionFilterMode conditionMode,
             RepairabilityQuickFilterMode repairabilityMode)
         {
@@ -370,6 +378,36 @@ namespace Cms21UiPlus
                     break;
                 default:
                     image.sprite = InventoryIconProvider.GetWhiteRepairWrenchIcon();
+                    image.color = DisabledButtonColor;
+                    break;
+            }
+        }
+
+        private void UpdateRestorationAvailabilityVisual(
+            RestorationAvailabilityQuickFilterMode availabilityMode)
+        {
+            if (repairButton == null)
+                return;
+
+            Image image = repairButton.GetComponent<Image>();
+            if (image == null)
+                return;
+
+            bool available = availabilityMode !=
+                RestorationAvailabilityQuickFilterMode.UnavailableOnly;
+            string iconPath =
+                GameplayRepairSkillBridge.GetRepairAvailabilityIndicatorPath(
+                    available);
+            Sprite sprite = InventoryIconProvider.GetExternalIcon(iconPath);
+            if (sprite != null)
+                image.sprite = sprite;
+
+            switch (availabilityMode) {
+                case RestorationAvailabilityQuickFilterMode.AvailableOnly:
+                case RestorationAvailabilityQuickFilterMode.UnavailableOnly:
+                    image.color = ActiveButtonColor;
+                    break;
+                default:
                     image.color = DisabledButtonColor;
                     break;
             }

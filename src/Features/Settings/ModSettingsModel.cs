@@ -162,7 +162,8 @@ namespace Cms21UiPlus
             string dependencyId, string dependencyWarning,
             string dependencyPartialWarning,
             string dependencyDefaultWarning, string dependencySwitchKey,
-            string dependencyWhenFalseId, ModSettingApplyMode applyMode)
+            string dependencyWhenFalseId, string indicatorSwitchKey,
+            ModSettingApplyMode applyMode)
         {
             Key = key;
             CategoryId = categoryId;
@@ -179,6 +180,7 @@ namespace Cms21UiPlus
             DependencyDefaultWarning = dependencyDefaultWarning ?? string.Empty;
             DependencySwitchKey = dependencySwitchKey ?? string.Empty;
             DependencyWhenFalseId = dependencyWhenFalseId ?? string.Empty;
+            IndicatorSwitchKey = indicatorSwitchKey ?? string.Empty;
             ApplyMode = applyMode;
         }
 
@@ -197,6 +199,7 @@ namespace Cms21UiPlus
         public string DependencyDefaultWarning { get; private set; }
         public string DependencySwitchKey { get; private set; }
         public string DependencyWhenFalseId { get; private set; }
+        public string IndicatorSwitchKey { get; private set; }
         public ModSettingApplyMode ApplyMode { get; private set; }
 
         public ModSettingValueType ValueType

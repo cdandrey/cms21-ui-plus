@@ -75,6 +75,7 @@ namespace Cms21UiPlus
         [DataMember(Name = "dependencyDefaultWarningKey")] public string dependencyDefaultWarningKey;
         [DataMember(Name = "dependencySwitchKey")] public string dependencySwitchKey;
         [DataMember(Name = "dependencyWhenFalse")] public string dependencyWhenFalse;
+        [DataMember(Name = "indicatorSwitchKey")] public string indicatorSwitchKey;
         [DataMember(Name = "order")] public int order;
     }
 
@@ -522,6 +523,34 @@ namespace Cms21UiPlus
                         return false;
                     }
                 }
+                if (!string.IsNullOrWhiteSpace(
+                        setting.indicatorSwitchKey)) {
+                    if (!TomlKeyRegex.IsMatch(setting.indicatorSwitchKey)) {
+                        error = "setting " + setting.id +
+                            " has an invalid indicatorSwitchKey";
+                        return false;
+                    }
+                    UiSettingData indicatorSetting = null;
+                    for (int switchIndex = 0;
+                        switchIndex < manifest.settings.Length; switchIndex++) {
+                        UiSettingData candidate = manifest.settings[switchIndex];
+                        if (candidate != null && string.Equals(candidate.key,
+                            setting.indicatorSwitchKey,
+                            StringComparison.OrdinalIgnoreCase)) {
+                            indicatorSetting = candidate;
+                            break;
+                        }
+                    }
+                    ModSettingType indicatorType;
+                    if (indicatorSetting == null ||
+                        !TryParseSettingType(indicatorSetting.type,
+                            out indicatorType) ||
+                        indicatorType != ModSettingType.Boolean) {
+                        error = "setting " + setting.id +
+                            " indicatorSwitchKey must reference a boolean setting";
+                        return false;
+                    }
+                }
                 if ((!HasLocalizationKey(localization, setting.nameKey) &&
                      !HasLocalizationKey(builtInLocalization,
                          setting.nameKey)) ||
@@ -663,7 +692,7 @@ namespace Cms21UiPlus
                         : string.Empty,
                     hasDependency ? setting.dependencySwitchKey : string.Empty,
                     hasDependency ? setting.dependencyWhenFalse : string.Empty,
-                    applyMode);
+                    setting.indicatorSwitchKey, applyMode);
                 if (!option.IsValueAllowed(defaultValue)) {
                     error = "setting " + setting.id +
                         " default value is not present in enum " +

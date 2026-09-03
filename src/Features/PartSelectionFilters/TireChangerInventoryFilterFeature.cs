@@ -24,6 +24,9 @@ namespace Cms21UiPlus
             internal bool NeedsEmptyRefresh;
         }
 
+        private static bool selectionActive;
+        private static int activeSelectionDownWindowId;
+
         private static readonly AssemblyPartSelectionFilterController Controller =
             new AssemblyPartSelectionFilterController(
                 ChoosePartUpWindowType.WheelConnect,
@@ -36,17 +39,31 @@ namespace Cms21UiPlus
         internal static void OnUpWindowShowPrefix(ChoosePartUpWindow window,
             ChoosePartUpWindowType type)
         {
+            selectionActive = IsTargetType(type);
+            activeSelectionDownWindowId = selectionActive && window != null &&
+                window.choosePartDownWindow != null
+                    ? window.choosePartDownWindow.GetInstanceID() : 0;
             Controller.OnUpWindowShowPrefix(window, type);
         }
 
         internal static void OnUpWindowShowPostfix(ChoosePartUpWindow window,
             ChoosePartUpWindowType type, bool result)
         {
+            if (IsTargetType(type)) {
+                selectionActive = result;
+                activeSelectionDownWindowId = result && window != null &&
+                    window.choosePartDownWindow != null
+                        ? window.choosePartDownWindow.GetInstanceID() : 0;
+            }
             Controller.OnUpWindowShowPostfix(window, type, result);
         }
 
         internal static void OnUpWindowHidden(ChoosePartUpWindow window)
         {
+            if (window != null && IsTargetType(window.choosePartUpWindowType)) {
+                selectionActive = false;
+                activeSelectionDownWindowId = 0;
+            }
             Controller.OnUpWindowHidden(window);
         }
 
@@ -106,12 +123,27 @@ namespace Cms21UiPlus
 
         internal static void ResetAll()
         {
+            selectionActive = false;
+            activeSelectionDownWindowId = 0;
             Controller.ResetAll();
+        }
+
+        internal static bool IsSelectionWindow(ChoosePartDownWindow window)
+        {
+            return window != null && selectionActive &&
+                (activeSelectionDownWindowId == 0 ||
+                 window.GetInstanceID() == activeSelectionDownWindowId);
         }
 
         internal static bool TryResetFromKeyboardShortcut()
         {
             return Controller.TryResetFromKeyboardShortcut();
+        }
+
+        private static bool IsTargetType(ChoosePartUpWindowType type)
+        {
+            return type == ChoosePartUpWindowType.WheelConnect ||
+                type == ChoosePartUpWindowType.WheelSeparate;
         }
 
         private static bool ShouldResetOnExit()

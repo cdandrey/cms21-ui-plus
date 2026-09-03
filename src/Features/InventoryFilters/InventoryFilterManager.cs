@@ -43,6 +43,13 @@ namespace Cms21UiPlus
         NonRepairableOnly = 2,
     }
 
+    public enum RestorationAvailabilityQuickFilterMode
+    {
+        Off = 0,
+        AvailableOnly = 1,
+        UnavailableOnly = 2,
+    }
+
     public enum QualityQuickFilterMode
     {
         Off = 0,

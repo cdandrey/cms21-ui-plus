@@ -17,6 +17,19 @@ namespace Cms21UiPlus
             brakeDrumRepairable = repairable;
         }
 
+        internal static int GetRepairLevel(string itemID)
+        {
+            if (string.IsNullOrEmpty(itemID))
+                return 0;
+
+            GameInventory inventory = Singleton<GameInventory>.Instance;
+            if (inventory == null || !inventory.ExistsInPartProperty(itemID))
+                return 0;
+            PartProperty property = inventory.GetItemProperty(itemID);
+            return property != null && property.RepairGroup > 0
+                ? property.RepairGroup : 0;
+        }
+
         public static bool IsRepairable(Item item)
         {
             return item != null && IsRepairable(item.ID);

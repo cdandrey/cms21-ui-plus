@@ -47,6 +47,7 @@
     <Compile Include="src\Features\InventoryIndicators\OwnedPartCache.cs" />
     <Compile Include="src\Features\InventoryIndicators\PartIdentityComparer.cs" />
     <Compile Include="src\Features\InventoryIndicators\PartRowIndicators.cs" />
+    <Compile Include="src\Features\InventoryIndicators\RepairSkillIndicator.cs" />
     <Compile Include="src\Features\InventoryIndicators\MountPartCardIndicatorsFeature.cs" />
     <Compile Include="src\Features\InventorySorting\InventorySortPersistenceFeature.cs" />
     <Compile Include="src\Features\Jobs\BodyPartMarkingFeature.cs" />
@@ -84,6 +85,7 @@
     <Compile Include="src\Features\UI\ParkingSortingFeature.cs" />
     <Compile Include="src\UI\Native\NativeUiFactory.cs" />
     <Compile Include="src\UI\Native\WindowFooterHintController.cs" />
+    <Compile Include="src\Infrastructure\GameplayRepairSkillBridge.cs" />
     <Compile Include="src\Infrastructure\ModLocalization.cs" />
     <Compile Include="src\Infrastructure\ModLogger.cs" />
     <Compile Include="src\Infrastructure\TextFormatting.cs" />

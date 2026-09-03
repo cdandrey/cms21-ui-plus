@@ -34,6 +34,8 @@ namespace Cms21UiPlus
 
         private static readonly HashSet<string> LoggedIcons =
             new HashSet<string>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, Sprite> ExternalIcons =
+            new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
 
         public static Sprite GetRedRepairWrenchIcon()
         {
@@ -136,6 +138,44 @@ namespace Cms21UiPlus
         public static Sprite GetQualityNonIcon()
         {
             return Load(ref qualityNonIcon, "QualityNon.png", "quality-none");
+        }
+
+        public static Sprite GetExternalIcon(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return null;
+
+            Sprite cached;
+            if (ExternalIcons.TryGetValue(filePath, out cached))
+                return cached;
+
+            string logKey = "external|" + filePath;
+            if (!System.IO.File.Exists(filePath)) {
+                if (LoggedIcons.Add(logKey))
+                    ModLogger.Log("[InventoryIcons] Prepared icon is missing at " +
+                        filePath + ".", Types.LoggingLevels.Warning);
+                return null;
+            }
+
+            try {
+                cached = TextureLoader.LoadSpriteFromFile(filePath, false);
+            } catch (Exception exception) {
+                if (LoggedIcons.Add(logKey))
+                    ModLogger.Log("[InventoryIcons] Failed to load icon from " +
+                        filePath + "." + Environment.NewLine + exception,
+                        Types.LoggingLevels.Warning);
+                return null;
+            }
+
+            if (cached == null) {
+                if (LoggedIcons.Add(logKey))
+                    ModLogger.Log("[InventoryIcons] Could not decode icon at " +
+                        filePath + ".", Types.LoggingLevels.Warning);
+                return null;
+            }
+
+            ExternalIcons[filePath] = cached;
+            return cached;
         }
 
         private static Sprite Load(ref Sprite cache, string fileName, string logicalName)

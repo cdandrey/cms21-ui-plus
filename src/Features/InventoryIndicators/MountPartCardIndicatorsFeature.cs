@@ -83,12 +83,12 @@ namespace Cms21UiPlus
             OwnedPartCache.ConditionBreakdown owned =
                 OwnedPartCache.GetConditionBreakdown(itemId, 0, 0, 0, 0);
 
-            UpdateRepairIndicator(root, repairable);
+            UpdateRepairIndicator(root, itemId, repairable);
             UpdateOwnedIndicator(root, owned);
         }
 
         private static void UpdateRepairIndicator(Transform root,
-            bool repairable)
+            string itemId, bool repairable)
         {
             GameObject icon = FindIndicator(root, RepairIndicatorName);
             Sprite sprite = repairable
@@ -115,6 +115,8 @@ namespace Cms21UiPlus
             image.color = Color.white;
             ConfigureRepairIndicatorRect(rect);
             icon.SetActive(true);
+            RepairSkillIndicator.Update(icon, itemId,
+                root.Find("Condition/ConditionPercentage")?.GetComponent<Text>());
         }
 
         private static void UpdateOwnedIndicator(Transform root,

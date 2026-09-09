@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
+using UnityEngine;
 using UnityEngine.Events;
 
 #if NET6_0_OR_GREATER
@@ -883,6 +884,38 @@ namespace Cms21UiPlus
                 handler();
         }
 
+        private static void SyncNativeClear(ShopListWindow window)
+        {
+            if (window == null || window != activeWindow ||
+                window.items == null || window.items.Count != 0 ||
+                (!Input.GetKey(KeyCode.X) && !Input.GetKeyUp(KeyCode.X)) ||
+                (Parts.Count == 0 && Wheels.Count == 0))
+                return;
+
+            Parts.Clear();
+            Wheels.Clear();
+            SourceOrder.Clear();
+            RenderedRows.Clear();
+            nextOrder = 0;
+        }
+
+        [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Save))]
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static void SavePrefix(ShopListWindow __instance)
+        {
+            if (__instance == null || __instance != activeWindow ||
+                __instance.items == null || __instance.items.Count != 0 ||
+                (Parts.Count == 0 && Wheels.Count == 0))
+                return;
+
+            Parts.Clear();
+            Wheels.Clear();
+            SourceOrder.Clear();
+            RenderedRows.Clear();
+            nextOrder = 0;
+        }
+
         [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Show))]
         [HarmonyPostfix]
         [HarmonyPriority(Priority.First)]
@@ -902,8 +935,11 @@ namespace Cms21UiPlus
         [HarmonyPriority(Priority.Last)]
         private static void FillItemsPostfix(ShopListWindow __instance)
         {
-            if (__instance != null && __instance == activeWindow)
-                BindRenderedRows(__instance);
+            if (__instance == null || __instance != activeWindow)
+                return;
+
+            SyncNativeClear(__instance);
+            BindRenderedRows(__instance);
         }
 
         [HarmonyPatch(typeof(ShopListWindow), nameof(ShopListWindow.Hide))]

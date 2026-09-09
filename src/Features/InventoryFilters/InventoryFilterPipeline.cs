@@ -67,7 +67,7 @@ namespace Cms21UiPlus
                 return;
 
             PartFilterCriteria criteria = IsFeatureEnabled()
-                ? CreateCurrentCriteria() : null;
+                ? CreateCurrentCriteria(inventory) : null;
             bool groupingEnabled = IsInventoryGroupingEnabled() &&
                 SupportsInventoryGrouping(inventory);
             if (!groupingEnabled && GetGroupingState(inventory, false) != null)
@@ -99,7 +99,8 @@ namespace Cms21UiPlus
             }
         }
 
-        private static PartFilterCriteria CreateCurrentCriteria()
+        private static PartFilterCriteria CreateCurrentCriteria(
+            BaseInventory inventory)
         {
             bool junkyardContext = IsBarnOrJunkyardScene();
             PartFilterCriteria criteria = new PartFilterCriteria();
@@ -117,9 +118,13 @@ namespace Cms21UiPlus
             criteria.OwnedMode = junkyardContext
                 ? ownedFilterMode
                 : OwnedQuickFilterMode.Off;
-            // Inventory and warehouse search remains entirely native. The game has
-            // already narrowed the list before DrawPage reaches this pipeline.
-            criteria.SearchText = string.Empty;
+            if (junkyardContext)
+                criteria.SearchText = GetTravelCollectedSearchText(inventory);
+            else {
+                // Inventory and warehouse search remains entirely native. The game has
+                // already narrowed the list before DrawPage reaches this pipeline.
+                criteria.SearchText = string.Empty;
+            }
             return criteria;
         }
 
@@ -195,7 +200,7 @@ namespace Cms21UiPlus
                 if (items == null)
                     return 0;
                 PartFilterCriteria criteria = IsFeatureEnabled()
-                    ? CreateCurrentCriteria() : null;
+                    ? CreateCurrentCriteria(inventory) : null;
                 if (IsInventoryGroupingEnabled() &&
                     SupportsInventoryGrouping(inventory)) {
                     int expandedCount = GetExpandedFilteredCount(inventory,

@@ -42,6 +42,8 @@ namespace Cms21UiPlus
         private const string Condition15To49Color = "FF9900";
         private const string ConditionBelow15Color = "FF0000";
         private static readonly HashSet<int> PendingUpdates = new HashSet<int>();
+        private static readonly Dictionary<int, BaseItem> RowBaseItems =
+            new Dictionary<int, BaseItem>();
         private const string PackageStackName = "QpackageStack";
 
         private sealed class PackageVisualState
@@ -60,6 +62,11 @@ namespace Cms21UiPlus
 
         private static readonly Dictionary<int, PackageVisualState>
             PackageVisualStates = new Dictionary<int, PackageVisualState>();
+
+        internal static void ResetRowBaseItems()
+        {
+            RowBaseItems.Clear();
+        }
 
         public static void ScheduleUpdate(Transform inventoryWindow)
         {
@@ -162,6 +169,8 @@ namespace Cms21UiPlus
         {
             if (baseItem == null || row == null || Main.SettingsEntry == null)
                 return;
+
+            RowBaseItems[row.GetInstanceID()] = baseItem;
 
             if (!Main.SettingsEntry.Value.showPartRepairabilityIndicators) {
                 HideRepairabilityIndicator(row);
@@ -643,17 +652,27 @@ namespace Cms21UiPlus
 
         private static BaseItem GetRowBaseItem(InventoryItem row)
         {
-            if (row == null || row.ButtonAction == null ||
-                row.ButtonAction.hash == null)
+            if (row == null)
                 return null;
 
-            Il2CppSystem.Object value = row.ButtonAction.hash.GetFromKey("Item");
-            if (value == null)
-                return null;
-            Item item = value.TryCast<Item>();
-            if (item != null)
-                return item;
-            return value.TryCast<GroupItem>();
+            BaseItem cached;
+            if (RowBaseItems.TryGetValue(row.GetInstanceID(), out cached))
+                return cached;
+
+            if (row.ButtonAction != null && row.ButtonAction.hash != null) {
+                Il2CppSystem.Object value =
+                    row.ButtonAction.hash.GetFromKey("Item");
+                if (value != null) {
+                    Item item = value.TryCast<Item>();
+                    if (item != null)
+                        return item;
+                    GroupItem group = value.TryCast<GroupItem>();
+                    if (group != null)
+                        return group;
+                }
+            }
+
+            return null;
         }
 
         private static bool ShouldSuppressRepairIndicators(InventoryItem row)
@@ -751,6 +770,8 @@ namespace Cms21UiPlus
 
             Sprite ownedSprite = showOwnedCount
                 ? InventoryIconProvider.GetWhiteWarehouseIcon() : null;
+            BaseInventory inventory =
+                inventoryWindow.GetComponent<BaseInventory>();
             Dictionary<string, OwnedPartCache.ConditionBreakdown> pageCounts =
                 showOwnedCount
                     ? new Dictionary<string,
@@ -766,8 +787,8 @@ namespace Cms21UiPlus
                 if (hidePaintColorBadges)
                     HideNativePaintColorBadge(row);
 
-                BaseInventory baseInventory =
-                    row.GetComponentInParent<BaseInventory>();
+                BaseInventory baseInventory = inventory != null
+                    ? inventory : row.GetComponentInParent<BaseInventory>();
                 BaseItem baseItem = GetRowBaseItem(row);
                 bool suppressOwnedCount = baseInventory != null &&
                     baseItem != null && ApplyGroupingPresentation(
@@ -780,8 +801,8 @@ namespace Cms21UiPlus
                 HideOwnedCountIndicator(row);
 
                 if (row.IsGroup) {
-                    GroupItem group = row.ButtonAction?.hash?.GetFromKey("Item")
-                        ?.TryCast<GroupItem>();
+                    GroupItem group = baseItem != null
+                        ? baseItem.TryCast<GroupItem>() : null;
                     if (group == null || !showOwnedCount ||
                         suppressOwnedCount)
                         continue;
@@ -810,7 +831,7 @@ namespace Cms21UiPlus
                     continue;
                 }
 
-                Item item = row.ButtonAction?.hash?.GetFromKey("Item")?.TryCast<Item>();
+                Item item = baseItem != null ? baseItem.TryCast<Item>() : null;
                 if (item == null)
                     continue;
 

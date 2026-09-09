@@ -34,6 +34,8 @@ namespace Cms21UiPlus
     /// </summary>
     public static class RepairInventoryFilterFeature
     {
+        private const string SelectFilterHintId =
+            "Hint_SelectRepairFilter";
         private static readonly List<ChoosePartDownItem> OriginalItems =
             new List<ChoosePartDownItem>();
         private static readonly PartFilterPanelController Panel =
@@ -54,6 +56,7 @@ namespace Cms21UiPlus
         private static GameObject emptyStateRoot;
         private static Text emptyStateText;
         private static NativeUiFactory.FooterHintHandle resetHint;
+        private static NativeUiFactory.FooterHintHandle selectFilterHint;
         private static bool repairResultPending;
         private static readonly List<RepairUiObjectState> HiddenRepairUi =
             new List<RepairUiObjectState>();
@@ -228,9 +231,21 @@ namespace Cms21UiPlus
                 if (!Panel.AttachWithButtons(window.transform,
                     CycleConditionFilter, CycleAvailabilityFilter,
                     CycleQualityFilter, OnSearchChanged, true,
-                    includeAvailability, true, CycleConditionFilterReverse,
-                    CycleAvailabilityFilterReverse,
-                    CycleQualityFilterReverse)) {
+                    includeAvailability, true,
+                    InventoryFilterManager.CreateGarageConditionQuickFilterMenu(
+                        SelectConditionFilter,
+                        GarageConditionFilterMode.Off,
+                        GarageConditionFilterMode.RepairThresholdToPerfect,
+                        GarageConditionFilterMode.Red,
+                        GarageConditionFilterMode.Orange,
+                        GarageConditionFilterMode.Yellow,
+                        GarageConditionFilterMode.GreenRing,
+                        GarageConditionFilterMode.Perfect),
+                    InventoryFilterManager
+                        .CreateRestorationAvailabilityQuickFilterMenu(
+                            SelectAvailabilityFilter),
+                    InventoryFilterManager.CreateQualityQuickFilterMenu(
+                        SelectQualityFilter))) {
                     DeactivateWindow();
                     yield break;
                 }
@@ -283,23 +298,9 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        private static void CycleConditionFilterReverse()
+        private static void SelectConditionFilter(GarageConditionFilterMode mode)
         {
-            switch (conditionMode) {
-                case GarageConditionFilterMode.Off:
-                    conditionMode = GarageConditionFilterMode.GreenRing;
-                    break;
-                case GarageConditionFilterMode.GreenRing:
-                    conditionMode = GarageConditionFilterMode.Yellow;
-                    break;
-                case GarageConditionFilterMode.Yellow:
-                    conditionMode = GarageConditionFilterMode.Orange;
-                    break;
-                default:
-                    conditionMode = GarageConditionFilterMode.Off;
-                    break;
-            }
-
+            conditionMode = mode;
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
                 availabilityMode, qualityMode);
@@ -328,23 +329,10 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        private static void CycleAvailabilityFilterReverse()
+        private static void SelectAvailabilityFilter(
+            RestorationAvailabilityQuickFilterMode mode)
         {
-            switch (availabilityMode) {
-                case RestorationAvailabilityQuickFilterMode.Off:
-                    availabilityMode =
-                        RestorationAvailabilityQuickFilterMode.UnavailableOnly;
-                    break;
-                case RestorationAvailabilityQuickFilterMode.UnavailableOnly:
-                    availabilityMode =
-                        RestorationAvailabilityQuickFilterMode.AvailableOnly;
-                    break;
-                default:
-                    availabilityMode =
-                        RestorationAvailabilityQuickFilterMode.Off;
-                    break;
-            }
-
+            availabilityMode = mode;
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode, availabilityMode, qualityMode);
             ApplyCurrentFilters(true);
@@ -359,9 +347,9 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        private static void CycleQualityFilterReverse()
+        private static void SelectQualityFilter(QualityQuickFilterMode mode)
         {
-            qualityMode = InventoryFilterManager.GetPreviousQualityMode(qualityMode);
+            qualityMode = mode;
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode,
                 availabilityMode, qualityMode);
@@ -398,12 +386,28 @@ namespace Cms21UiPlus
 
         private static void CreateResetHint()
         {
-            if (resetHint != null && resetHint.Root != null)
+            if (resetHint != null && resetHint.Root != null &&
+                selectFilterHint != null && selectFilterHint.Root != null)
                 return;
             if (activeRepairWindow == null ||
                 activeRepairWindow.uiDescription == null)
                 return;
 
+            selectFilterHint = WindowFooterHintController.RequestNativeHint(
+                new WindowFooterHintController.NativeHintRequest {
+                    WindowId = "Repair",
+                    WindowRoot = activeRepairWindow.transform,
+                    HintRoot = activeRepairWindow.uiDescription.transform,
+                    HintId = SelectFilterHintId,
+                    Keys = new string[] { "MouseLeft" },
+                    Text = ModLocalization.Get("LOC_SetFilterAction"),
+                    Action = null,
+                    Row = 0,
+                    Order = -1,
+                    Profile = WindowFooterHintController
+                        .NativeFooterProfile.RepairPopulated,
+                    ItemCount = OriginalItems.Count,
+                });
             resetHint = WindowFooterHintController.RequestNativeHint(
                 new WindowFooterHintController.NativeHintRequest {
                     WindowId = "Repair",
@@ -659,7 +663,10 @@ namespace Cms21UiPlus
         {
             RestoreRepairUi();
             WindowFooterHintController.RemoveHint("Repair",
+                SelectFilterHintId);
+            WindowFooterHintController.RemoveHint("Repair",
                 "Hint_ResetRepairFilters");
+            selectFilterHint = null;
             resetHint = null;
             if (emptyStateRoot != null) {
                 UnityEngine.Object.Destroy(emptyStateRoot);

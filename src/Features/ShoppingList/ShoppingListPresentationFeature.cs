@@ -202,7 +202,8 @@ namespace Cms21UiPlus
                 int rowCount = window.shopListItems != null
                     ? window.shopListItems.Count : 0;
                 int itemCount = window.items != null
-                    ? Math.Min(visibleItemCount, rowCount) : 0;
+                    ? Math.Min(Math.Min(visibleItemCount, rowCount),
+                        window.items.Count) : 0;
                 for (int index = 0; index < rowCount; index++) {
                     ShopListItem row = window.shopListItems[index];
                     if (row == null)

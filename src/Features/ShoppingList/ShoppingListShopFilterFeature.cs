@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
@@ -32,6 +33,10 @@ namespace Cms21UiPlus
         private const string FilterRootName = "QShoppingListShopFilters";
         private const string FooterWindowId = "ShoppingList";
         private const string ResetHintId = "Hint_ShoppingListShopFilters";
+        private const string SelectFilterHintId =
+            "Hint_ShoppingListSelectShopFilter";
+        private const string DoubleClickFilterHintId =
+            "Hint_ShoppingListDoubleClickShopFilter";
         private const string FilterIconDirectory =
             @"Mods\CMS21UIPlus\ShoppingListIndicators\";
         private const float ButtonWidth = 24f;
@@ -65,8 +70,6 @@ namespace Cms21UiPlus
             new Image[FilterOrder.Length];
         private static readonly Sprite[] FilterSprites =
             new Sprite[FilterOrder.Length];
-        private static readonly bool[] FilterSpriteLoadAttempted =
-            new bool[FilterOrder.Length];
         private static readonly Dictionary<string, ShopType> ShopNameToType =
             new Dictionary<string, ShopType>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, int> ItemShopMaskCache =
@@ -79,6 +82,14 @@ namespace Cms21UiPlus
         private static ShopListWindow activeWindow;
         private static GameObject filterRoot;
         private static NativeUiFactory.FooterHintHandle resetHint;
+        private static NativeUiFactory.FooterHintHandle selectFilterHint;
+        private static NativeUiFactory.FooterHintHandle doubleClickFilterHint;
+        private static readonly bool[] DoubleClickStartState =
+            new bool[FilterOrder.Length];
+        private const float DoubleClickDelay = 0.35f;
+        private static int doubleClickButtonId;
+        private static float doubleClickFirstClickTime;
+        private static bool doubleClickStartStateValid;
         private static bool shopNamesInitialized;
 
         private static bool IsEnabled {
@@ -176,6 +187,41 @@ namespace Cms21UiPlus
             if (window == null || window.uiDescription == null)
                 return;
 
+            selectFilterHint = WindowFooterHintController.RequestNativeHint(
+                new WindowFooterHintController.NativeHintRequest {
+                    WindowId = FooterWindowId,
+                    WindowRoot = window.transform,
+                    HintRoot = window.uiDescription.transform,
+                    HintId = SelectFilterHintId,
+                    Keys = new string[] { "MouseLeft" },
+                    Text = ModLocalization.Get("LOC_SetFilterAction"),
+                    Action = null,
+                    OnlyHandleMouseClickInput = true,
+                    Row = 1,
+                    AllowAutomaticRowWrap = false,
+                    ExtendFooterBackground = true,
+                    Order = 2,
+                    Profile = WindowFooterHintController
+                        .NativeFooterProfile.Automatic,
+                });
+            doubleClickFilterHint = WindowFooterHintController.RequestNativeHint(
+                new WindowFooterHintController.NativeHintRequest {
+                    WindowId = FooterWindowId,
+                    WindowRoot = window.transform,
+                    HintRoot = window.uiDescription.transform,
+                    HintId = DoubleClickFilterHintId,
+                    Keys = new string[] { "MouseLeft" },
+                    Text = ModLocalization.Get("LOC_OnlyThisFilterAction"),
+                    HoldSuffixText = ModLocalization.Get("LOC_DoubleClickAction"),
+                    Action = null,
+                    OnlyHandleMouseClickInput = true,
+                    Row = 1,
+                    AllowAutomaticRowWrap = false,
+                    ExtendFooterBackground = true,
+                    Order = 3,
+                    Profile = WindowFooterHintController
+                        .NativeFooterProfile.Automatic,
+                });
             resetHint = WindowFooterHintController.RequestNativeHint(
                 new WindowFooterHintController.NativeHintRequest {
                     WindowId = FooterWindowId,
@@ -192,7 +238,7 @@ namespace Cms21UiPlus
                     Row = 1,
                     AllowAutomaticRowWrap = false,
                     ExtendFooterBackground = true,
-                    Order = 3,
+                    Order = 4,
                     Profile = WindowFooterHintController
                         .NativeFooterProfile.Automatic,
                 });
@@ -201,7 +247,13 @@ namespace Cms21UiPlus
         private static void DestroyResetHint()
         {
             WindowFooterHintController.RemoveHint(
+                FooterWindowId, SelectFilterHintId);
+            WindowFooterHintController.RemoveHint(
+                FooterWindowId, DoubleClickFilterHintId);
+            WindowFooterHintController.RemoveHint(
                 FooterWindowId, ResetHintId);
+            selectFilterHint = null;
+            doubleClickFilterHint = null;
             resetHint = null;
         }
 
@@ -257,10 +309,9 @@ namespace Cms21UiPlus
             rootRect.localScale = Vector3.one;
 
             Transform sourceGrid = FindNativeShopGrid(window);
-            for (int i = 0; i < FilterOrder.Length; i++) {
+            for (int i = 0; i < FilterOrder.Length; i++)
                 FilterImages[i] = CreateFilterButton(rootRect,
                     sourceGrid, FilterOrder[i], i);
-            }
 
             UpdateButtonVisuals();
             filterRoot.SetActive(true);
@@ -319,6 +370,67 @@ namespace Cms21UiPlus
             return image;
         }
 
+        internal static bool TryHandleFilterButtonPointerClick(Button button,
+            PointerEventData eventData)
+        {
+            if (button == null || eventData == null ||
+                eventData.button != PointerEventData.InputButton.Left ||
+                filterRoot == null ||
+                !button.transform.IsChildOf(filterRoot.transform))
+                return false;
+
+            int filterIndex = -1;
+            for (int i = 0; i < FilterImages.Length; i++) {
+                Image image = FilterImages[i];
+                if (image != null && image.gameObject == button.gameObject) {
+                    filterIndex = i;
+                    break;
+                }
+            }
+            if (filterIndex < 0)
+                return false;
+
+            int buttonId = button.GetInstanceID();
+            float now = Time.realtimeSinceStartup;
+            bool isDoubleClick = doubleClickStartStateValid &&
+                doubleClickButtonId == buttonId &&
+                now - doubleClickFirstClickTime <= DoubleClickDelay;
+            if (!isDoubleClick) {
+                for (int i = 0; i < FilterEnabled.Length; i++)
+                    DoubleClickStartState[i] = FilterEnabled[i];
+                doubleClickButtonId = buttonId;
+                doubleClickFirstClickTime = now;
+                doubleClickStartStateValid = true;
+                return false;
+            }
+
+            bool[] source = DoubleClickStartState;
+
+            bool targetEnabled = source[filterIndex];
+            int enabledCount = 0;
+            for (int i = 0; i < source.Length; i++) {
+                if (source[i])
+                    enabledCount++;
+            }
+
+            if (targetEnabled && enabledCount == 1) {
+                SetAllFilters(true);
+                FilterEnabled[filterIndex] = false;
+            } else {
+                SetAllFilters(false);
+                FilterEnabled[filterIndex] = true;
+            }
+
+            doubleClickButtonId = 0;
+            doubleClickFirstClickTime = 0f;
+            doubleClickStartStateValid = false;
+            if (activeWindow != null)
+                ApplyFilters(activeWindow);
+            UpdateButtonVisuals();
+            eventData.Use();
+            return true;
+        }
+
         private static float GetHeaderRightX(ShopListWindow window)
         {
             if (window != null) {
@@ -349,8 +461,9 @@ namespace Cms21UiPlus
             if (window == null || window.transform.parent == null)
                 return null;
 
-            Transform shopSelection =
-                window.transform.parent.Find("Shop/ShopSelectionMenu");
+            Transform shop = window.transform.parent.Find("Shop");
+            Transform shopSelection = shop != null
+                ? shop.Find("ShopSelectionMenu") : null;
             return shopSelection != null
                 ? shopSelection.Find("ShopsGrid") : null;
         }
@@ -362,21 +475,18 @@ namespace Cms21UiPlus
                 if (FilterSprites[buttonIndex] != null)
                     return FilterSprites[buttonIndex];
 
-                if (!FilterSpriteLoadAttempted[buttonIndex]) {
-                    FilterSpriteLoadAttempted[buttonIndex] = true;
-                    string fileName = GetFilterIconFileName(shopType);
-                    if (!string.IsNullOrEmpty(fileName)) {
-                        string path = FilterIconDirectory + fileName;
-                        if (System.IO.File.Exists(path)) {
-                            try {
-                                FilterSprites[buttonIndex] =
-                                    TextureLoader.LoadSpriteFromFile(path, false);
-                            } catch (Exception exception) {
-                                ModLogger.Log(
-                                    "[ShoppingList] Failed to load filter icon " +
-                                    fileName + "." + Environment.NewLine + exception,
-                                    Types.LoggingLevels.Warning);
-                            }
+                string fileName = GetFilterIconFileName(shopType);
+                if (!string.IsNullOrEmpty(fileName)) {
+                    string path = FilterIconDirectory + fileName;
+                    if (System.IO.File.Exists(path)) {
+                        try {
+                            FilterSprites[buttonIndex] =
+                                TextureLoader.LoadSpriteFromFile(path, false);
+                        } catch (Exception exception) {
+                            ModLogger.Log(
+                                "[ShoppingList] Failed to load filter icon " +
+                                fileName + "." + Environment.NewLine + exception,
+                                Types.LoggingLevels.Warning);
                         }
                     }
                 }
@@ -506,6 +616,9 @@ namespace Cms21UiPlus
             if (filterRoot != null)
                 UnityEngine.Object.Destroy(filterRoot);
             filterRoot = null;
+            doubleClickButtonId = 0;
+            doubleClickFirstClickTime = 0f;
+            doubleClickStartStateValid = false;
             for (int i = 0; i < FilterImages.Length; i++)
                 FilterImages[i] = null;
         }

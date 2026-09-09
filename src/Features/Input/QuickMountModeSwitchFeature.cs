@@ -13,6 +13,8 @@ namespace Cms21UiPlus
         public static void Update()
         {
             if (Input.GetKeyDown(KeyCode.LeftAlt)) {
+                InventoryFilterManager.TryCloseQuickFilterMenu();
+
                 bool handled = false;
                 handled |= ScrapInventoryFilterFeature
                     .TryResetFromKeyboardShortcut();
@@ -40,6 +42,8 @@ namespace Cms21UiPlus
 
             if (!IsEnabled || !WasBindingReleased())
                 return;
+
+            InventoryFilterManager.TryCloseQuickFilterMenu();
 
             GameMode gameModeManager = GameMode.Get();
             if (gameModeManager == null)

@@ -19,6 +19,14 @@ namespace Cms21UiPlus
             Clear(item.onClick);
         }
 
+        public static void RemoveAllListeners(UnityEngine.UI.InputField item)
+        {
+            if (item == null)
+                return;
+            Clear(item.onValueChanged);
+            Clear(item.onEndEdit);
+        }
+
         public static void RemoveAllListeners(GenericButtonOutline item)
         {
             Clear(item.OnClick);

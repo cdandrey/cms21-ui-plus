@@ -52,6 +52,7 @@ namespace Cms21UiPlus
                 handledFrame == Time.frameCount)
                 return;
 
+            InventoryFilterManager.TryCloseQuickFilterMenu();
             TryInvokeActiveMoveAction();
         }
 
@@ -557,7 +558,7 @@ namespace Cms21UiPlus
                 return result;
 
             PartFilterCriteria criteria = IsFeatureEnabled()
-                ? CreateCurrentCriteria()
+                ? CreateCurrentCriteria(inventory)
                 : null;
 
             foreach (BaseItem baseItem in source) {

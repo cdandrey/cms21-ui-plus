@@ -22,6 +22,7 @@ namespace Cms21UiPlus
         Yellow = 3,
         Green = 4,
         Red = 5,
+        Perfect = 6,
     }
 
     public enum GarageConditionFilterMode
@@ -94,9 +95,12 @@ namespace Cms21UiPlus
 
         public static void ResetAll()
         {
+            CloseQuickFilterMenu();
             ClearResetHint();
             ClearInventoryGroupingHint();
             activeFilteredInventory = null;
+            ResetTravelCollectedSearch();
+            PartRowIndicators.ResetRowBaseItems();
             GroupingStates.Clear();
             PackageRows.Clear();
             GroupingListTriggers.Clear();
@@ -130,6 +134,7 @@ namespace Cms21UiPlus
 
         internal static void ResetGarageFiltersOnWindowClose()
         {
+            CloseQuickFilterMenu();
             ClearResetHint();
             activeFilteredInventory = null;
             if (!GlobalState.IsGarageSceneActive || IsBarnOrJunkyardScene())

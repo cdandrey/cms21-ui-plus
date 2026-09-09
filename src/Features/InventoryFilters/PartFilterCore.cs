@@ -67,13 +67,10 @@ namespace Cms21UiPlus
 
     public static class PartFilterRules
     {
+        private const float RepairConditionStart = 0.15f;
         private const float YellowConditionStart = 0.50f;
         private const float GreenConditionStart = 0.80f;
         private const float PerfectConditionStart = 1.00f;
-
-        private static float RepairConditionThreshold {
-            get { return GlobalData.JunkCondition; }
-        }
 
         public static bool Matches(BaseItem baseItem, PartFilterCriteria criteria)
         {
@@ -174,9 +171,9 @@ namespace Cms21UiPlus
                 criteria.UseJunkyardConditionModes) {
                 switch (criteria.JunkyardConditionMode) {
                     case JunkyardConditionFilterMode.RepairThresholdToPerfect:
-                        return condition >= RepairConditionThreshold;
+                        return condition >= RepairConditionStart;
                     case JunkyardConditionFilterMode.Orange:
-                        return condition >= RepairConditionThreshold &&
+                        return condition >= RepairConditionStart &&
                             condition < YellowConditionStart;
                     case JunkyardConditionFilterMode.Yellow:
                         return condition >= YellowConditionStart &&
@@ -184,8 +181,10 @@ namespace Cms21UiPlus
                     case JunkyardConditionFilterMode.Green:
                         return condition >= GreenConditionStart &&
                             condition < PerfectConditionStart;
+                    case JunkyardConditionFilterMode.Perfect:
+                        return condition >= PerfectConditionStart;
                     case JunkyardConditionFilterMode.Red:
-                        return condition < RepairConditionThreshold;
+                        return condition < RepairConditionStart;
                     default:
                         return true;
                 }
@@ -193,11 +192,11 @@ namespace Cms21UiPlus
 
             switch (criteria.GarageConditionMode) {
                 case GarageConditionFilterMode.RepairThresholdToPerfect:
-                    return condition >= RepairConditionThreshold;
+                    return condition >= RepairConditionStart;
                 case GarageConditionFilterMode.Red:
-                    return condition < RepairConditionThreshold;
+                    return condition < RepairConditionStart;
                 case GarageConditionFilterMode.Orange:
-                    return condition >= RepairConditionThreshold &&
+                    return condition >= RepairConditionStart &&
                         condition < YellowConditionStart;
                 case GarageConditionFilterMode.Yellow:
                     return condition >= YellowConditionStart &&

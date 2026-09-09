@@ -197,7 +197,7 @@ namespace Cms21UiPlus
                 (viewport.rect.height + grid.spacing.y + 0.01f) / rowStride));
             int itemCount = Math.Min(
                 ShoppingListShopFilterFeature.GetVisibleItemCount(window),
-                window.shopListItems.Count);
+                Math.Min(window.shopListItems.Count, window.items.Count));
             int visualColumns = GetVisualColumns(window);
             if (visualColumns <= 0)
                 return;

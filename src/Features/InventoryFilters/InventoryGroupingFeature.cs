@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
+using MelonLoader;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -10,6 +12,7 @@ using UnityEngine.UI;
 using Il2Cpp;
 using Il2CppCMS.Containers;
 using Il2CppCMS.UI;
+using Il2CppCMS.UI.Logic;
 using Il2CppCMS.UI.Logic.Warehouse;
 using Il2CppCMS.UI.Windows;
 using Il2CppCMS.UI.Windows.Base;
@@ -17,6 +20,7 @@ using Il2CppCMS.UI.Windows.Base;
 using CMS;
 using CMS.Containers;
 using CMS.UI;
+using CMS.UI.Logic;
 using CMS.UI.Logic.Warehouse;
 using CMS.UI.Windows;
 using CMS.UI.Windows.Base;
@@ -81,9 +85,13 @@ namespace Cms21UiPlus
             new Dictionary<long, string>();
         private static readonly Dictionary<long, string> GroupGroupingKeys =
             new Dictionary<long, string>();
-        private const string GroupingHintName = "Hint_InventoryGrouping";
+        private const string GroupingOpenHintName =
+            "Hint_InventoryGroupingOpen";
+        private const string GroupingCloseHintName =
+            "Hint_InventoryGroupingClose";
         private const string WarehouseGroupingClickSurfaceName =
             "QInventoryGroupingClickSurface";
+        private const float PackageDoubleClickDelay = 0.35f;
         private static BaseInventory groupingHintInventory;
         private static string groupingHintWindowId;
         private static PackageSaleContext currentPackageSaleCandidate;
@@ -92,6 +100,8 @@ namespace Cms21UiPlus
         private static string pendingPackageSalePopupName;
         private static int pendingPackageSalePopupCount;
         private static bool packageSaleInProgress;
+        private static int packageLeftClickToken;
+        private static bool replayingPackageLeftClick;
         private static readonly MethodInfo SellItemMethod = AccessTools.Method(
             typeof(NotificationCenter), "SellItem",
             new Type[] { typeof(Item), typeof(bool), typeof(bool) });
@@ -313,7 +323,7 @@ namespace Cms21UiPlus
                 return false;
 
             PartFilterCriteria criteria = IsFeatureEnabled()
-                ? CreateCurrentCriteria() : null;
+                ? CreateCurrentCriteria(inventory) : null;
             List<BaseItem> result = new List<BaseItem>(packageCount);
             foreach (BaseItem baseItem in source) {
                 if (!string.Equals(GetInventoryGroupingKey(baseItem), key,
@@ -432,7 +442,7 @@ namespace Cms21UiPlus
                 return false;
 
             PartFilterCriteria criteria = IsFeatureEnabled()
-                ? CreateCurrentCriteria() : null;
+                ? CreateCurrentCriteria(inventory) : null;
             int matchedCount = 0;
             foreach (BaseItem candidate in source) {
                 if (!string.Equals(GetInventoryGroupingKey(candidate), key,
@@ -524,6 +534,72 @@ namespace Cms21UiPlus
                     : 0;
         }
 
+        internal static bool TryHandleInventoryPackageLeftClick(
+            BetterButtonAction buttonAction, PointerEventData eventData)
+        {
+            if (replayingPackageLeftClick || buttonAction == null ||
+                eventData == null ||
+                eventData.button != PointerEventData.InputButton.Left ||
+                !IsInventoryGroupingEnabled())
+                return false;
+
+            InventoryItem row =
+                buttonAction.GetComponentInParent<InventoryItem>();
+            if (row == null)
+                return false;
+
+            BaseInventory inventory = row.GetComponentInParent<BaseInventory>();
+            if (inventory == null || !SupportsInventoryGrouping(inventory) ||
+                IsExpandedInventoryPackage(inventory))
+                return false;
+
+            string key;
+            if (!TryResolvePackageKeyFromRow(inventory, row, out key))
+                return false;
+
+            BaseItem representative = GetInventoryRowBaseItem(row);
+            Item item = representative != null
+                ? representative.TryCast<Item>() : null;
+            bool suppressSingleClick = PartFilterRules.IsSpecialInventoryItem(item);
+
+            if (eventData.clickCount >= 2) {
+                packageLeftClickToken++;
+                TryExpandPackageFromRow(inventory, row);
+                eventData.Use();
+                return true;
+            }
+
+            int token = ++packageLeftClickToken;
+            MelonCoroutines.Start(ReplayPackageLeftClickDeferred(
+                buttonAction, token, suppressSingleClick));
+            eventData.Use();
+            return true;
+        }
+
+        private static IEnumerator ReplayPackageLeftClickDeferred(
+            BetterButtonAction buttonAction, int token, bool suppressSingleClick)
+        {
+            yield return new WaitForSecondsRealtime(PackageDoubleClickDelay);
+            if (token != packageLeftClickToken || suppressSingleClick ||
+                buttonAction == null || buttonAction.gameObject == null ||
+                !buttonAction.gameObject.activeInHierarchy)
+                yield break;
+
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null)
+                yield break;
+
+            PointerEventData replayEvent = new PointerEventData(eventSystem);
+            replayEvent.button = PointerEventData.InputButton.Left;
+            replayEvent.clickCount = 1;
+            replayingPackageLeftClick = true;
+            try {
+                buttonAction.OnPointerClick(replayEvent);
+            } finally {
+                replayingPackageLeftClick = false;
+            }
+        }
+
         internal static bool TryHandleInventoryRowRightClick(
             InventoryItem row, PointerEventData eventData)
         {
@@ -532,12 +608,11 @@ namespace Cms21UiPlus
                 !ShouldSuppressInventoryRowRightClick(row))
                 return false;
 
+            packageLeftClickToken++;
             SuppressBetterButtonRightClick(row);
             BaseInventory inventory = row.GetComponentInParent<BaseInventory>();
             EnsureGroupingListTrigger(inventory, row);
-            bool closed = TryCloseExpandedPackage(inventory);
-            if (!closed)
-                TryExpandPackageFromRow(inventory, row);
+            TryCloseExpandedPackage(inventory);
             eventData.Use();
             return true;
         }
@@ -686,6 +761,7 @@ namespace Cms21UiPlus
             RemovePackageRows(instanceId);
             RemoveGroupingListTriggers(inventory);
             suppressedBetterButtonActionId = 0;
+            packageLeftClickToken++;
             if (groupingHintInventory == inventory)
                 ClearInventoryGroupingHint();
         }
@@ -791,37 +867,71 @@ namespace Cms21UiPlus
             int itemCount = GetCurrentFilteredItemCount(inventory);
             groupingHintInventory = inventory;
             groupingHintWindowId = windowId;
-            WindowFooterHintController.RequestNativeHint(
-                new WindowFooterHintController.NativeHintRequest {
-                    WindowId = windowId,
-                    WindowRoot = windowRoot,
-                    HintRoot = descriptionRoot,
-                    HintId = GroupingHintName,
-                    Keys = new string[] { "MouseRight" },
-                    Text = ModLocalization.Get(expanded
-                        ? "LOC_CloseInventoryPackageAction"
-                        : "LOC_OpenInventoryPackageAction"),
-                    Action = null,
-                    Row = 0,
-                    Order = 5,
-                    Profile = ResolveFooterProfile(inventory, itemCount == 0),
-                    ItemCount = itemCount,
-                });
+            if (expanded) {
+                WindowFooterHintController.RemoveHint(windowId,
+                    GroupingOpenHintName);
+                WindowFooterHintController.RequestNativeHint(
+                    new WindowFooterHintController.NativeHintRequest {
+                        WindowId = windowId,
+                        WindowRoot = windowRoot,
+                        HintRoot = descriptionRoot,
+                        HintId = GroupingCloseHintName,
+                        Keys = new string[] { "MouseRight" },
+                        Text = ModLocalization.Get(
+                            "LOC_CloseInventoryPackageAction"),
+                        Action = null,
+                        Row = 0,
+                        Order = 5,
+                        Profile = ResolveFooterProfile(inventory,
+                            itemCount == 0),
+                        ItemCount = itemCount,
+                    });
+            } else {
+                WindowFooterHintController.RemoveHint(windowId,
+                    GroupingCloseHintName);
+                WindowFooterHintController.RequestNativeHint(
+                    new WindowFooterHintController.NativeHintRequest {
+                        WindowId = windowId,
+                        WindowRoot = windowRoot,
+                        HintRoot = descriptionRoot,
+                        HintId = GroupingOpenHintName,
+                        Keys = new string[] { "MouseLeft" },
+                        Text = ModLocalization.Get(
+                            "LOC_OpenInventoryPackageAction"),
+                        HoldSuffixText = ModLocalization.Get(
+                            "LOC_DoubleClickAction"),
+                        Action = null,
+                        Row = 0,
+                        Order = 5,
+                        Profile = ResolveFooterProfile(inventory,
+                            itemCount == 0),
+                        ItemCount = itemCount,
+                    });
+            }
+
         }
 
         internal static void ClearInventoryGroupingHint()
         {
-            if (!string.IsNullOrEmpty(groupingHintWindowId))
+            if (!string.IsNullOrEmpty(groupingHintWindowId)) {
                 WindowFooterHintController.RemoveHint(groupingHintWindowId,
-                    GroupingHintName);
+                    GroupingOpenHintName);
+                WindowFooterHintController.RemoveHint(groupingHintWindowId,
+                    GroupingCloseHintName);
+            }
             groupingHintWindowId = null;
             groupingHintInventory = null;
         }
+
 
         private static PackageSaleContext CreatePackageSaleContext(
             BaseItem representative)
         {
             if (representative == null || !IsInventoryGroupingEnabled())
+                return null;
+
+            Item representativeItem = representative.TryCast<Item>();
+            if (PartFilterRules.IsSpecialInventoryItem(representativeItem))
                 return null;
 
             BaseInventory inventory = FindPackageInventory(representative);
@@ -855,7 +965,7 @@ namespace Cms21UiPlus
                 return null;
 
             PartFilterCriteria criteria = IsFeatureEnabled()
-                ? CreateCurrentCriteria() : null;
+                ? CreateCurrentCriteria(inventory) : null;
             PackageSaleContext context = new PackageSaleContext();
             context.Inventory = inventory;
             context.DisplayName = representative.GetLocalizedName();

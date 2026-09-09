@@ -63,6 +63,7 @@ namespace Cms21UiPlus
         private bool applyingFilteredList;
         private bool awaitingFilteredSelection;
         private NativeUiFactory.FooterHintHandle resetHint;
+        private NativeUiFactory.FooterHintHandle selectFilterHint;
         private GameObject hiddenItemsDetailRoot;
         private bool hiddenItemsDetailWasActive;
         private GameObject filteredEmptyStateRoot;
@@ -176,8 +177,9 @@ namespace Cms21UiPlus
             bool attached = panel.AttachWithButtons(window.transform,
                 CycleConditionFilter, null, CycleQualityFilter,
                 OnSearchChanged, true, false, true,
-                CycleConditionFilterReverse, null,
-                CycleQualityFilterReverse);
+                CreateConditionMenuOptions(), null,
+                InventoryFilterManager.CreateQualityQuickFilterMenu(
+                    SelectQualityFilter));
             if (!attached) {
                 RestoreOriginalList();
                 DeactivateWindow();
@@ -412,37 +414,17 @@ namespace Cms21UiPlus
             RefreshFilterPanel();
         }
 
-        private void CycleConditionFilterReverse()
+        private QuickFilterMenuOption[] CreateConditionMenuOptions()
         {
-            switch (conditionMode) {
-                case GarageConditionFilterMode.Off:
-                    conditionMode = GarageConditionFilterMode.Red;
-                    break;
-                case GarageConditionFilterMode.Red:
-                    conditionMode = GarageConditionFilterMode.Orange;
-                    break;
-                case GarageConditionFilterMode.Orange:
-                    conditionMode = GarageConditionFilterMode.Yellow;
-                    break;
-                case GarageConditionFilterMode.Yellow:
-                    conditionMode = GarageConditionFilterMode.GreenRing;
-                    break;
-                case GarageConditionFilterMode.GreenRing:
-                    conditionMode = includePerfectCondition
-                        ? GarageConditionFilterMode.Perfect
-                        : GarageConditionFilterMode.RepairThresholdToPerfect;
-                    break;
-                case GarageConditionFilterMode.Perfect:
-                    conditionMode = includePerfectCondition
-                        ? GarageConditionFilterMode.RepairThresholdToPerfect
-                        : GarageConditionFilterMode.Off;
-                    break;
-                default:
-                    conditionMode = GarageConditionFilterMode.Off;
-                    break;
-            }
-
-            RefreshFilterPanel();
+            return InventoryFilterManager.CreateGarageConditionQuickFilterMenu(
+                SelectConditionFilter,
+                GarageConditionFilterMode.Off,
+                GarageConditionFilterMode.RepairThresholdToPerfect,
+                GarageConditionFilterMode.Red,
+                GarageConditionFilterMode.Orange,
+                GarageConditionFilterMode.Yellow,
+                GarageConditionFilterMode.GreenRing,
+                GarageConditionFilterMode.Perfect);
         }
 
         private void CycleQualityFilter()
@@ -451,10 +433,15 @@ namespace Cms21UiPlus
             RefreshFilterPanel();
         }
 
-        private void CycleQualityFilterReverse()
+        private void SelectConditionFilter(GarageConditionFilterMode mode)
         {
-            qualityMode = InventoryFilterManager.GetPreviousQualityMode(
-                qualityMode);
+            conditionMode = mode;
+            RefreshFilterPanel();
+        }
+
+        private void SelectQualityFilter(QualityQuickFilterMode mode)
+        {
+            qualityMode = mode;
             RefreshFilterPanel();
         }
 
@@ -490,11 +477,27 @@ namespace Cms21UiPlus
 
         private void CreateResetHint()
         {
-            if (resetHint != null && resetHint.Root != null)
+            if (resetHint != null && resetHint.Root != null &&
+                selectFilterHint != null && selectFilterHint.Root != null)
                 return;
             if (activeUpWindow == null || activeUpWindow.uiDescription == null)
                 return;
 
+            selectFilterHint = WindowFooterHintController.RequestNativeHint(
+                new WindowFooterHintController.NativeHintRequest {
+                    WindowId = windowId,
+                    WindowRoot = activeUpWindow.transform,
+                    HintRoot = activeUpWindow.uiDescription.transform,
+                    HintId = resetHintId + "_SelectFilter",
+                    Keys = new string[] { "MouseLeft" },
+                    Text = ModLocalization.Get("LOC_SetFilterAction"),
+                    Action = null,
+                    Row = 0,
+                    Order = 9,
+                    Profile = WindowFooterHintController.NativeFooterProfile
+                        .Automatic,
+                    ItemCount = originalItems.Count,
+                });
             resetHint = WindowFooterHintController.RequestNativeHint(
                 new WindowFooterHintController.NativeHintRequest {
                     WindowId = windowId,
@@ -514,7 +517,10 @@ namespace Cms21UiPlus
 
         private void DestroyResetHint()
         {
+            WindowFooterHintController.RemoveHint(windowId,
+                resetHintId + "_SelectFilter");
             WindowFooterHintController.RemoveHint(windowId, resetHintId);
+            selectFilterHint = null;
             resetHint = null;
         }
 

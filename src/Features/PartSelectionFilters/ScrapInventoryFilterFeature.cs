@@ -43,6 +43,8 @@ namespace Cms21UiPlus
     {
         private const string NativeBulkDescriptionObjectName =
             "QScrapFilteredBulkDescription";
+        private const string SelectFilterHintId =
+            "Hint_SelectScrapFilter";
         private const float BulkScrapAllCondition = 101f;
         private const float NativeBulkHoldDurationSeconds = 1f;
         private const int BulkInputSuppressionFrames = 8;
@@ -74,6 +76,7 @@ namespace Cms21UiPlus
         private static GameObject nativeBulkDescriptionObject;
         private static NativeUiFactory.FooterHintHandle nativeBulkHint;
         private static NativeUiFactory.FooterHintHandle resetHint;
+        private static NativeUiFactory.FooterHintHandle selectFilterHint;
         private static string nativeBulkBaseLabel;
         private static GarageConditionFilterMode conditionMode =
             GarageConditionFilterMode.Off;
@@ -146,9 +149,19 @@ namespace Cms21UiPlus
                     CycleConditionFilter, CycleRepairabilityFilter,
                     CycleQualityFilter, OnSearchChanged,
                     includeConditionFilter, true, true,
-                    CycleConditionFilterReverse,
-                    CycleRepairabilityFilterReverse,
-                    CycleQualityFilterReverse)) {
+                    InventoryFilterManager.CreateGarageConditionQuickFilterMenu(
+                        SelectConditionFilter,
+                        GarageConditionFilterMode.Off,
+                        GarageConditionFilterMode.RepairThresholdToPerfect,
+                        GarageConditionFilterMode.Red,
+                        GarageConditionFilterMode.Orange,
+                        GarageConditionFilterMode.Yellow,
+                        GarageConditionFilterMode.GreenRing,
+                        GarageConditionFilterMode.Perfect),
+                    InventoryFilterManager.CreateRepairabilityQuickFilterMenu(
+                        SelectRepairabilityFilter),
+                    InventoryFilterManager.CreateQualityQuickFilterMenu(
+                        SelectQualityFilter))) {
                     Panel.SetSearchText(searchText);
                     Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
                     if (!enteringUpgrade)
@@ -318,12 +331,27 @@ namespace Cms21UiPlus
             WindowFooterHintController.NativeFooterProfile profile,
             int itemCount)
         {
-            if (resetHint != null && resetHint.Root != null)
+            if (resetHint != null && resetHint.Root != null &&
+                selectFilterHint != null && selectFilterHint.Root != null)
                 return;
             if (activeScrapProduction == null ||
                 activeScrapProduction.uiDescription == null)
                 return;
 
+            selectFilterHint = WindowFooterHintController.RequestNativeHint(
+                new WindowFooterHintController.NativeHintRequest {
+                    WindowId = "Scrap",
+                    WindowRoot = activeWindow.transform,
+                    HintRoot = activeScrapProduction.uiDescription.transform,
+                    HintId = SelectFilterHintId,
+                    Keys = new string[] { "MouseLeft" },
+                    Text = ModLocalization.Get("LOC_SetFilterAction"),
+                    Action = null,
+                    Row = 0,
+                    Order = 9,
+                    Profile = profile,
+                    ItemCount = itemCount,
+                });
             resetHint = WindowFooterHintController.RequestNativeHint(
                 new WindowFooterHintController.NativeHintRequest {
                     WindowId = "Scrap",
@@ -357,7 +385,10 @@ namespace Cms21UiPlus
         private static void DestroyResetHint()
         {
             WindowFooterHintController.RemoveHint("Scrap",
+                SelectFilterHintId);
+            WindowFooterHintController.RemoveHint("Scrap",
                 "Hint_ResetScrapFilters");
+            selectFilterHint = null;
             resetHint = null;
         }
 
@@ -636,26 +667,9 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        private static void CycleConditionFilterReverse()
+        private static void SelectConditionFilter(GarageConditionFilterMode mode)
         {
-            switch (conditionMode) {
-                case GarageConditionFilterMode.Off:
-                    conditionMode = GarageConditionFilterMode.GreenRing;
-                    break;
-                case GarageConditionFilterMode.GreenRing:
-                    conditionMode = GarageConditionFilterMode.Yellow;
-                    break;
-                case GarageConditionFilterMode.Yellow:
-                    conditionMode = GarageConditionFilterMode.Orange;
-                    break;
-                case GarageConditionFilterMode.Orange:
-                    conditionMode = GarageConditionFilterMode.Red;
-                    break;
-                default:
-                    conditionMode = GarageConditionFilterMode.Off;
-                    break;
-            }
-
+            conditionMode = mode;
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
             ApplyCurrentFilters(true);
@@ -682,10 +696,10 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        private static void CycleRepairabilityFilterReverse()
+        private static void SelectRepairabilityFilter(
+            RepairabilityQuickFilterMode mode)
         {
-            repairabilityMode = InventoryFilterManager
-                .GetPreviousRepairabilityMode(repairabilityMode);
+            repairabilityMode = mode;
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
             ApplyCurrentFilters(true);
@@ -699,9 +713,9 @@ namespace Cms21UiPlus
             ApplyCurrentFilters(true);
         }
 
-        private static void CycleQualityFilterReverse()
+        private static void SelectQualityFilter(QualityQuickFilterMode mode)
         {
-            qualityMode = InventoryFilterManager.GetPreviousQualityMode(qualityMode);
+            qualityMode = mode;
             PartFilterPanelController.ClearSelectedControl();
             Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
             ApplyCurrentFilters(true);

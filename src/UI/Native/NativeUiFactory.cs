@@ -4476,6 +4476,14 @@ namespace Cms21UiPlus
             else if (string.Equals(key, "Space",
                 StringComparison.OrdinalIgnoreCase))
                 names = new string[] { "spacebar", "space" };
+            else if (string.Equals(key, "MouseLeft",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(key, "LMB",
+                    StringComparison.OrdinalIgnoreCase))
+                names = new string[] { "mouseleft", "leftmouse",
+                    "mouseleftbutton", "leftmousebutton",
+                    "mousebuttonleft", "mouseleftclick", "leftclick",
+                    "mouse0", "mousebutton0", "leftbutton", "lmb" };
             else if (string.Equals(key, "MouseRight",
                     StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(key, "RMB",

@@ -5,11 +5,13 @@ using UnityEngine.UI;
 
 #if NET6_0_OR_GREATER
 using Il2CppCMS.UI;
+using Il2CppCMS.UI.Description;
 using Il2CppCMS.UI.Logic;
 using Il2CppCMS.UI.Windows;
 using Il2CppCMS.UI.Windows.Base;
 #else
 using CMS.UI;
+using CMS.UI.Description;
 using CMS.UI.Logic;
 using CMS.UI.Windows;
 using CMS.UI.Windows.Base;
@@ -158,6 +160,10 @@ namespace Cms21UiPlus
         private static bool BetterButtonActionOnPointerClickPrefix(
             BetterButtonAction __instance, PointerEventData __0)
         {
+            if (InventoryFilterManager.TryHandleInventoryPackageLeftClick(
+                    __instance, __0))
+                return false;
+
             if (__0 == null ||
                 __0.button != PointerEventData.InputButton.Right)
                 return true;
@@ -187,8 +193,35 @@ namespace Cms21UiPlus
         private static bool EventTriggerOnPointerClickGroupingPrefix(
             EventTrigger __instance, PointerEventData __0)
         {
+            if (InventoryFilterManager.TryHandleQuickFilterBlockerEvent(
+                    __instance, __0))
+                return false;
             return !InventoryFilterManager.TryHandleGroupingListRightClick(
                 __instance, __0);
+        }
+
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnCancel))]
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static void EventTriggerOnCancelQuickFilterPrefix()
+        {
+            InventoryFilterManager.TryCloseQuickFilterMenu();
+        }
+
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnSubmit))]
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static void EventTriggerOnSubmitQuickFilterPrefix()
+        {
+            InventoryFilterManager.TryCloseQuickFilterMenu();
+        }
+
+        [HarmonyPatch(typeof(EventTrigger), nameof(EventTrigger.OnMove))]
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static void EventTriggerOnMoveQuickFilterPrefix()
+        {
+            InventoryFilterManager.TryCloseQuickFilterMenu();
         }
 
         [HarmonyPatch(typeof(Button), nameof(Button.OnPointerClick))]
@@ -197,18 +230,34 @@ namespace Cms21UiPlus
         private static bool ButtonOnPointerClickPrefix(
             Button __instance, PointerEventData __0)
         {
+            if (InventoryFilterManager.TryHandleQuickFilterButtonPointerClick(
+                    __instance, __0))
+                return false;
+            if (ShoppingListShopFilterFeature.TryHandleFilterButtonPointerClick(
+                    __instance, __0))
+                return false;
+
             if (__0 == null ||
                 __0.button != PointerEventData.InputButton.Right)
                 return true;
 
             InventoryItem row = __instance.GetComponentInParent<InventoryItem>();
-            if (InventoryFilterManager.TryHandleInventoryRowRightClick(row, __0))
-                return false;
-
-            return !InventoryFilterManager.TryHandleReverseQuickFilterClick(
-                __instance);
+            return !InventoryFilterManager.TryHandleInventoryRowRightClick(
+                row, __0);
         }
 
 
     }
+    [HarmonyPatch(typeof(ControlDescription), "InvokeActionInstant")]
+    internal static class QuickFilterMenuControlDescriptionPatch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static bool InvokeActionInstantPrefix()
+        {
+            InventoryFilterManager.TryCloseQuickFilterMenu();
+            return true;
+        }
+    }
+
 }

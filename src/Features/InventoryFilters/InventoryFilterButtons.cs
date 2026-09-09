@@ -1,15 +1,20 @@
+using MelonLoader;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 #if NET6_0_OR_GREATER
+using Il2CppInterop.Runtime;
 using Il2CppCMS.UI.Description;
 using Il2CppCMS.UI.Logic.Warehouse;
 using Il2CppCMS.UI.Windows;
 using Il2CppCMS.UI.Windows.Base;
 #else
+using UnhollowerRuntimeLib;
 using CMS.UI.Description;
 using CMS.UI.Logic.Warehouse;
 using CMS.UI.Windows;
@@ -18,6 +23,23 @@ using CMS.UI.Windows.Base;
 
 namespace Cms21UiPlus
 {
+    internal sealed class QuickFilterMenuOption
+    {
+        internal readonly Sprite Sprite;
+        internal readonly Color Color;
+        internal readonly Action Select;
+        internal readonly string Label;
+
+        internal QuickFilterMenuOption(Sprite sprite, Color color, Action select,
+            string label = null)
+        {
+            Sprite = sprite;
+            Color = color;
+            Select = select;
+            Label = label;
+        }
+    }
+
     public static partial class InventoryFilterManager
     {
         private const string ConditionButtonName = "QInventoryQuickFilterCondition";
@@ -26,6 +48,10 @@ namespace Cms21UiPlus
         private const string OwnedButtonName = "QInventoryQuickFilterOwned";
         private const string PackageButtonName = "QInventoryQuickFilterPackage";
         private const string ResetHintName = "Hint_ResetInventoryFilters";
+        private const string SelectFilterHintName =
+            "Hint_SelectInventoryFilter";
+        private const string TravelCollectedSearchFieldName =
+            "QTravelCollectedSearchField";
 
 
         private const float ButtonSize = 20f;
@@ -37,18 +63,40 @@ namespace Cms21UiPlus
         private const float FallbackQualityX = -272f;
         private const float FallbackOwnedX = -244f;
         private const float FallbackPackageX = -244f;
+        private const float QuickFilterMenuPadding = 4f;
+        private const float QuickFilterMenuColumnWidth = 32f;
+        private const float QuickFilterMenuLegendLineHeight = 11f;
+        private const float QuickFilterMenuLegendHeight =
+            QuickFilterMenuLegendLineHeight * 2f;
+        private const float QuickFilterMenuColumnSpacing = 1f;
+        private const int QuickFilterMenuLabelFontSize = 10;
 
-        private static readonly Dictionary<int, Action> ReverseQuickFilterClicks =
-            new Dictionary<int, Action>();
+        private static readonly Dictionary<int, QuickFilterMenuOption[]>
+            QuickFilterMenus = new Dictionary<int, QuickFilterMenuOption[]>();
+        private static readonly Dictionary<int, Button> QuickFilterMenuButtons =
+            new Dictionary<int, Button>();
 
         private static readonly Color32 ActiveButtonColor =
             new Color32(255, 255, 255, 255);
         private static readonly Color32 DisabledButtonColor =
             new Color32(155, 155, 155, 210);
+        private static readonly Color32 QuickFilterMenuBackgroundColor =
+            new Color32(20, 20, 20, 235);
+        private static readonly Color32 QuickFilterMenuSelectedColor =
+            new Color32(58, 58, 58, 235);
+        private static GameObject activeQuickFilterMenuRoot;
+        private static GameObject activeQuickFilterBlockerRoot;
+        private static Font quickFilterMenuFallbackFont;
+        private static EventTrigger activeQuickFilterBlockerTrigger;
+        private static int activeQuickFilterSourceId;
         private static BaseInventory resetHintInventory;
         private static BaseInventory activeFilteredInventory;
         private static NativeUiFactory.FooterHintHandle resetHint;
+        private static NativeUiFactory.FooterHintHandle selectFilterHint;
         private static string resetHintWindowId;
+        private static InputField travelCollectedSearchField;
+        private static BaseInventory travelCollectedSearchInventory;
+        private static string travelCollectedSearchText = string.Empty;
 
         private enum QuickFilterButtonKind
         {
@@ -146,8 +194,13 @@ namespace Cms21UiPlus
 
             InputField searchField = FindSearchField(inventory, true);
             if (searchField != null) {
-                searchField.text = string.Empty;
-                searchField.SendOnSubmit();
+                if (IsTravelCollectedInventory(inventory)) {
+                    travelCollectedSearchText = string.Empty;
+                    searchField.SetTextWithoutNotify(string.Empty);
+                } else {
+                    searchField.text = string.Empty;
+                    searchField.SendOnSubmit();
+                }
             }
 
             ClearSelectedButton();
@@ -156,7 +209,8 @@ namespace Cms21UiPlus
 
         private static void CreateResetHint(BaseInventory inventory)
         {
-            if (resetHint != null && resetHint.Root != null) {
+            if (resetHint != null && resetHint.Root != null &&
+                selectFilterHint != null && selectFilterHint.Root != null) {
                 int currentCount = GetCurrentFilteredItemCount(inventory);
                 WindowFooterHintController.SetNativeProfile(
                     resetHintWindowId,
@@ -176,6 +230,20 @@ namespace Cms21UiPlus
             int itemCount = GetCurrentFilteredItemCount(inventory);
             WindowFooterHintController.NativeFooterProfile footerProfile =
                 ResolveFooterProfile(inventory, itemCount == 0);
+            selectFilterHint = WindowFooterHintController.RequestNativeHint(
+                new WindowFooterHintController.NativeHintRequest {
+                    WindowId = resetHintWindowId,
+                    WindowRoot = windowRoot,
+                    HintRoot = descriptionRoot,
+                    HintId = SelectFilterHintName,
+                    Keys = new string[] { "MouseLeft" },
+                    Text = ModLocalization.Get("LOC_SetFilterAction"),
+                    Action = null,
+                    Row = 0,
+                    Order = 9,
+                    Profile = footerProfile,
+                    ItemCount = itemCount,
+                });
             resetHint = WindowFooterHintController.RequestNativeHint(
                 new WindowFooterHintController.NativeHintRequest {
                     WindowId = resetHintWindowId,
@@ -287,9 +355,13 @@ namespace Cms21UiPlus
 
         private static void ClearResetHint()
         {
-            if (!string.IsNullOrEmpty(resetHintWindowId))
+            if (!string.IsNullOrEmpty(resetHintWindowId)) {
+                WindowFooterHintController.RemoveHint(resetHintWindowId,
+                    SelectFilterHintName);
                 WindowFooterHintController.RemoveHint(resetHintWindowId,
                     ResetHintName);
+            }
+            selectFilterHint = null;
             resetHint = null;
             resetHintWindowId = null;
             resetHintInventory = null;
@@ -301,6 +373,7 @@ namespace Cms21UiPlus
             if (!ShouldHandleWindow(inventory))
                 return;
 
+            EnsureTravelCollectedSearch(inventory);
             Transform buttonRoot = GetButtonRoot(inventory);
             bool junkyardContext = IsBarnOrJunkyardScene();
             bool packageContext = !junkyardContext &&
@@ -327,7 +400,7 @@ namespace Cms21UiPlus
                     packageButton = CreateButton(inventory, buttonRoot,
                         PackageButtonName, QuickFilterButtonKind.Package);
             } else if (packageButton != null) {
-                UnregisterReverseQuickFilterClick(
+                UnregisterQuickFilterMenu(
                     packageButton.GetComponent<Button>());
                 packageButton.gameObject.SetActive(false);
                 UnityEngine.Object.Destroy(packageButton.gameObject);
@@ -339,7 +412,7 @@ namespace Cms21UiPlus
                     ownedButton = CreateButton(inventory, buttonRoot,
                         OwnedButtonName, QuickFilterButtonKind.Owned);
             } else if (ownedButton != null) {
-                UnregisterReverseQuickFilterClick(
+                UnregisterQuickFilterMenu(
                     ownedButton.GetComponent<Button>());
                 ownedButton.gameObject.SetActive(false);
                 UnityEngine.Object.Destroy(ownedButton.gameObject);
@@ -444,49 +517,59 @@ namespace Cms21UiPlus
             button.navigation = navigation;
             UnityEventUtility.RemoveAllListeners(button);
 
-            Action reverseClickAction;
+            QuickFilterMenuOption[] menuOptions;
             if (kind == QuickFilterButtonKind.Condition) {
-                Action clickAction = delegate () {
-                    CycleConditionFilter(ResolveActiveInventory(inventory));
-                };
-                button.onClick.AddListener(clickAction);
-                reverseClickAction = delegate () {
-                    CycleConditionFilterReverse(ResolveActiveInventory(inventory));
-                };
+                if (IsBarnOrJunkyardScene()) {
+                    menuOptions = CreateJunkyardConditionQuickFilterMenu(
+                        delegate (JunkyardConditionFilterMode mode) {
+                            SelectJunkyardConditionFilter(
+                                ResolveActiveInventory(inventory), mode);
+                        },
+                        JunkyardConditionFilterMode.Off,
+                        JunkyardConditionFilterMode.RepairThresholdToPerfect,
+                        JunkyardConditionFilterMode.Red,
+                        JunkyardConditionFilterMode.Orange,
+                        JunkyardConditionFilterMode.Yellow,
+                        JunkyardConditionFilterMode.Green,
+                        JunkyardConditionFilterMode.Perfect);
+                } else {
+                    menuOptions = CreateGarageConditionQuickFilterMenu(
+                        delegate (GarageConditionFilterMode mode) {
+                            SelectGarageConditionFilter(
+                                ResolveActiveInventory(inventory), mode);
+                        },
+                        GarageConditionFilterMode.Off,
+                        GarageConditionFilterMode.RepairThresholdToPerfect,
+                        GarageConditionFilterMode.Red,
+                        GarageConditionFilterMode.Orange,
+                        GarageConditionFilterMode.Yellow,
+                        GarageConditionFilterMode.GreenRing,
+                        GarageConditionFilterMode.Perfect);
+                }
             } else if (kind == QuickFilterButtonKind.Repairability) {
-                Action clickAction = delegate () {
-                    CycleRepairabilityFilter(ResolveActiveInventory(inventory));
-                };
-                button.onClick.AddListener(clickAction);
-                reverseClickAction = delegate () {
-                    CycleRepairabilityFilterReverse(ResolveActiveInventory(inventory));
-                };
+                menuOptions = CreateRepairabilityQuickFilterMenu(
+                    delegate (RepairabilityQuickFilterMode mode) {
+                        SelectRepairabilityFilter(
+                            ResolveActiveInventory(inventory), mode);
+                    });
             } else if (kind == QuickFilterButtonKind.Quality) {
-                Action clickAction = delegate () {
-                    CycleQualityFilter(ResolveActiveInventory(inventory));
-                };
-                button.onClick.AddListener(clickAction);
-                reverseClickAction = delegate () {
-                    CycleQualityFilterReverse(ResolveActiveInventory(inventory));
-                };
+                menuOptions = CreateQualityQuickFilterMenu(
+                    delegate (QualityQuickFilterMode mode) {
+                        SelectQualityFilter(
+                            ResolveActiveInventory(inventory), mode);
+                    });
             } else if (kind == QuickFilterButtonKind.Owned) {
-                Action clickAction = delegate () {
-                    CycleOwnedFilter(ResolveActiveInventory(inventory));
-                };
-                button.onClick.AddListener(clickAction);
-                reverseClickAction = delegate () {
-                    CycleOwnedFilterReverse(ResolveActiveInventory(inventory));
-                };
+                menuOptions = CreateOwnedQuickFilterMenu(
+                    delegate (OwnedQuickFilterMode mode) {
+                        SelectOwnedFilter(ResolveActiveInventory(inventory), mode);
+                    });
             } else {
-                Action clickAction = delegate () {
-                    CyclePackageFilter(ResolveActiveInventory(inventory));
-                };
-                button.onClick.AddListener(clickAction);
-                reverseClickAction = delegate () {
-                    CyclePackageFilterReverse(ResolveActiveInventory(inventory));
-                };
+                menuOptions = CreatePackageQuickFilterMenu(
+                    delegate (PackageQuickFilterMode mode) {
+                        SelectPackageFilter(ResolveActiveInventory(inventory), mode);
+                    });
             }
-            RegisterReverseQuickFilterClick(button, reverseClickAction);
+            RegisterQuickFilterMenu(button, menuOptions);
         }
 
         private static void ApplyButtonLayout(BaseInventory inventory,
@@ -533,6 +616,33 @@ namespace Cms21UiPlus
                     SetButtonWorldPosition(qualityButton, parent, qualityWorld);
                     if (packageContext)
                         SetButtonWorldPosition(packageButton, parent, packageWorld);
+                    return;
+                }
+
+                if (junkyardContext && IsTravelCollectedInventory(inventory)) {
+                    float centerY = searchRect.rect.center.y + SearchRowYOffset;
+                    float ownedOffset = 18f;
+                    float qualityOffset = ownedOffset + ButtonSpacing;
+                    float repairOffset = qualityOffset + ButtonSpacing;
+                    float conditionOffset = repairOffset + ButtonSpacing;
+
+                    Vector3 ownedWorld = searchRect.TransformPoint(new Vector3(
+                        searchRect.rect.xMin - ownedOffset, centerY, 0f));
+                    Vector3 qualityWorld = searchRect.TransformPoint(new Vector3(
+                        searchRect.rect.xMin - qualityOffset, centerY, 0f));
+                    Vector3 repairWorld = searchRect.TransformPoint(new Vector3(
+                        searchRect.rect.xMin - repairOffset, centerY, 0f));
+                    Vector3 conditionWorld = searchRect.TransformPoint(new Vector3(
+                        searchRect.rect.xMin - conditionOffset, centerY, 0f));
+
+                    SetButtonWorldPosition(conditionButton, inventory.transform,
+                        conditionWorld);
+                    SetButtonWorldPosition(repairButton, inventory.transform,
+                        repairWorld);
+                    SetButtonWorldPosition(qualityButton, inventory.transform,
+                        qualityWorld);
+                    SetButtonWorldPosition(ownedButton, inventory.transform,
+                        ownedWorld);
                     return;
                 }
 
@@ -594,6 +704,11 @@ namespace Cms21UiPlus
             WarehouseWindow parentWarehouse = inventory.GetComponentInParent<WarehouseWindow>();
             if (parentWarehouse != null)
                 searchRoot = parentWarehouse.transform;
+            else if (IsTravelCollectedInventory(inventory)) {
+                Transform exchangeRoot = FindItemsExchangeWindow(inventory.transform);
+                if (exchangeRoot != null)
+                    searchRoot = exchangeRoot;
+            }
 
             InputField[] fields = searchRoot.GetComponentsInChildren<InputField>(true);
             InputField bestActive = null;
@@ -624,6 +739,135 @@ namespace Cms21UiPlus
             if (activeOnly)
                 return bestActive;
             return bestActive != null ? bestActive : bestAny;
+        }
+
+        internal static string GetTravelCollectedSearchText(
+            BaseInventory inventory)
+        {
+            return IsTravelCollectedInventory(inventory)
+                ? travelCollectedSearchText : string.Empty;
+        }
+
+        internal static void ResetTravelCollectedSearch()
+        {
+            travelCollectedSearchText = string.Empty;
+            travelCollectedSearchInventory = null;
+            travelCollectedSearchField = null;
+        }
+
+        private static bool IsTravelCollectedInventory(BaseInventory inventory)
+        {
+            return inventory != null && IsBarnOrJunkyardScene() &&
+                (string.Equals(inventory.name, "Collected",
+                     StringComparison.Ordinal) ||
+                 string.Equals(inventory.name, "Found",
+                     StringComparison.Ordinal)) &&
+                FindItemsExchangeWindow(inventory.transform) != null;
+        }
+
+        private static Transform FindItemsExchangeWindow(Transform transform)
+        {
+            Transform current = transform;
+            while (current != null) {
+                if (string.Equals(current.name, "ItemsExchangeWindow",
+                        StringComparison.Ordinal))
+                    return current;
+                current = current.parent;
+            }
+            return null;
+        }
+
+        private static void EnsureTravelCollectedSearch(BaseInventory inventory)
+        {
+            if (!IsBarnOrJunkyardScene())
+                return;
+
+            if (!IsTravelCollectedInventory(inventory)) {
+                if (travelCollectedSearchField != null &&
+                    travelCollectedSearchField.gameObject != null)
+                    travelCollectedSearchField.gameObject.SetActive(false);
+                return;
+            }
+
+            if (travelCollectedSearchField != null &&
+                travelCollectedSearchField.gameObject != null &&
+                travelCollectedSearchInventory == inventory) {
+                travelCollectedSearchField.gameObject.SetActive(true);
+                return;
+            }
+
+            Transform exchangeRoot = FindItemsExchangeWindow(inventory.transform);
+            if (exchangeRoot == null)
+                return;
+
+            Transform existing = FindDeepChild(exchangeRoot,
+                TravelCollectedSearchFieldName);
+            InputField field = existing != null
+                ? existing.GetComponent<InputField>() : null;
+            if (field == null) {
+                InputField template = FindTravelSearchTemplate(exchangeRoot);
+                if (template == null || template.gameObject == null)
+                    return;
+
+                GameObject clone = GameObject.Instantiate(
+                    template.gameObject, exchangeRoot);
+                clone.name = TravelCollectedSearchFieldName;
+                clone.transform.localScale = Vector3.one;
+                RectTransform sourceRect =
+                    template.GetComponent<RectTransform>();
+                RectTransform cloneRect = clone.GetComponent<RectTransform>();
+                if (sourceRect != null && cloneRect != null) {
+                    cloneRect.position = sourceRect.position;
+                    cloneRect.rotation = sourceRect.rotation;
+                    cloneRect.sizeDelta = sourceRect.sizeDelta;
+                }
+                field = clone.GetComponent<InputField>();
+            }
+            if (field == null)
+                return;
+
+            UnityEventUtility.RemoveAllListeners(field);
+            travelCollectedSearchField = field;
+            travelCollectedSearchInventory = inventory;
+            field.SetTextWithoutNotify(travelCollectedSearchText);
+            Action<string> changed = delegate (string value) {
+                OnTravelCollectedSearchChanged(inventory, value);
+            };
+            UnityAction<string> changedAction =
+                DelegateSupport.ConvertDelegate<UnityAction<string>>(changed);
+            field.onValueChanged.AddListener(changedAction);
+            field.gameObject.SetActive(true);
+            field.transform.SetAsLastSibling();
+        }
+
+        private static InputField FindTravelSearchTemplate(Transform exchangeRoot)
+        {
+            Transform searchRoot = exchangeRoot.parent != null
+                ? exchangeRoot.parent : exchangeRoot.root;
+            if (searchRoot == null)
+                return null;
+
+            foreach (InputField field in
+                searchRoot.GetComponentsInChildren<InputField>(true)) {
+                if (field == null || field.gameObject == null ||
+                    field.name == TravelCollectedSearchFieldName)
+                    continue;
+                if (string.Equals(field.name, "SearchField",
+                        StringComparison.OrdinalIgnoreCase))
+                    return field;
+            }
+            return null;
+        }
+
+        private static void OnTravelCollectedSearchChanged(
+            BaseInventory inventory, string value)
+        {
+            if (inventory == null)
+                return;
+
+            travelCollectedSearchText = value ?? string.Empty;
+            ClearSelectedButton();
+            RedrawInventory(inventory);
         }
 
         private static void SetButtonPosition(Transform buttonTransform, Transform parent,
@@ -746,60 +990,6 @@ namespace Cms21UiPlus
             RedrawInventory(inventory);
         }
 
-        private static void CycleConditionFilterReverse(BaseInventory inventory)
-        {
-            if (inventory == null)
-                return;
-
-            if (IsBarnOrJunkyardScene()) {
-                switch (junkyardConditionFilterMode) {
-                    case JunkyardConditionFilterMode.Off:
-                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Green;
-                        break;
-                    case JunkyardConditionFilterMode.Green:
-                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Yellow;
-                        break;
-                    case JunkyardConditionFilterMode.Yellow:
-                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Orange;
-                        break;
-                    case JunkyardConditionFilterMode.Orange:
-                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Red;
-                        break;
-                    case JunkyardConditionFilterMode.Red:
-                        junkyardConditionFilterMode =
-                            JunkyardConditionFilterMode.RepairThresholdToPerfect;
-                        break;
-                    default:
-                        junkyardConditionFilterMode = JunkyardConditionFilterMode.Off;
-                        break;
-                }
-            } else {
-                switch (garageConditionFilterMode) {
-                    case GarageConditionFilterMode.Off:
-                        garageConditionFilterMode = GarageConditionFilterMode.Perfect;
-                        break;
-                    case GarageConditionFilterMode.Perfect:
-                        garageConditionFilterMode = GarageConditionFilterMode.GreenRing;
-                        break;
-                    case GarageConditionFilterMode.GreenRing:
-                        garageConditionFilterMode = GarageConditionFilterMode.Yellow;
-                        break;
-                    case GarageConditionFilterMode.Yellow:
-                        garageConditionFilterMode = GarageConditionFilterMode.Orange;
-                        break;
-                    case GarageConditionFilterMode.Orange:
-                        garageConditionFilterMode = GarageConditionFilterMode.Red;
-                        break;
-                    default:
-                        garageConditionFilterMode = GarageConditionFilterMode.Off;
-                        break;
-                }
-            }
-
-            ClearSelectedButton();
-            RedrawInventory(inventory);
-        }
-
         private static void CycleRepairabilityFilter(BaseInventory inventory)
         {
             if (inventory == null)
@@ -825,35 +1015,6 @@ namespace Cms21UiPlus
                     return RepairabilityQuickFilterMode.RepairGroupOnly;
                 case RepairabilityQuickFilterMode.RepairGroupOnly:
                     return RepairabilityQuickFilterMode.NonRepairableOnly;
-                default:
-                    return RepairabilityQuickFilterMode.Off;
-            }
-        }
-
-        private static void CycleRepairabilityFilterReverse(BaseInventory inventory)
-        {
-            if (inventory == null)
-                return;
-
-            if (IsBarnOrJunkyardScene())
-                junkyardRepairabilityFilterMode =
-                    GetPreviousRepairabilityMode(junkyardRepairabilityFilterMode);
-            else
-                garageRepairabilityFilterMode =
-                    GetPreviousRepairabilityMode(garageRepairabilityFilterMode);
-
-            ClearSelectedButton();
-            RedrawInventory(inventory);
-        }
-
-        internal static RepairabilityQuickFilterMode GetPreviousRepairabilityMode(
-            RepairabilityQuickFilterMode current)
-        {
-            switch (current) {
-                case RepairabilityQuickFilterMode.Off:
-                    return RepairabilityQuickFilterMode.NonRepairableOnly;
-                case RepairabilityQuickFilterMode.NonRepairableOnly:
-                    return RepairabilityQuickFilterMode.RepairGroupOnly;
                 default:
                     return RepairabilityQuickFilterMode.Off;
             }
@@ -892,39 +1053,6 @@ namespace Cms21UiPlus
             }
         }
 
-        private static void CycleQualityFilterReverse(BaseInventory inventory)
-        {
-            if (inventory == null)
-                return;
-
-            if (IsBarnOrJunkyardScene())
-                junkyardQualityFilterMode = GetPreviousQualityMode(junkyardQualityFilterMode);
-            else
-                garageQualityFilterMode = GetPreviousQualityMode(garageQualityFilterMode);
-
-            ClearSelectedButton();
-            RedrawInventory(inventory);
-        }
-
-        internal static QualityQuickFilterMode GetPreviousQualityMode(
-            QualityQuickFilterMode current)
-        {
-            switch (current) {
-                case QualityQuickFilterMode.Off:
-                    return QualityQuickFilterMode.NonImproved;
-                case QualityQuickFilterMode.NonImproved:
-                    return QualityQuickFilterMode.Quality3;
-                case QualityQuickFilterMode.Quality3:
-                    return QualityQuickFilterMode.Quality2;
-                case QualityQuickFilterMode.Quality2:
-                    return QualityQuickFilterMode.Quality1;
-                case QualityQuickFilterMode.Quality1:
-                    return QualityQuickFilterMode.Improved;
-                default:
-                    return QualityQuickFilterMode.Off;
-            }
-        }
-
         private static void CycleOwnedFilter(BaseInventory inventory)
         {
             if (!SupportsOwnedFilter(inventory))
@@ -936,27 +1064,6 @@ namespace Cms21UiPlus
                     break;
                 case OwnedQuickFilterMode.Owned:
                     ownedFilterMode = OwnedQuickFilterMode.Missing;
-                    break;
-                default:
-                    ownedFilterMode = OwnedQuickFilterMode.Off;
-                    break;
-            }
-
-            ClearSelectedButton();
-            RedrawInventory(inventory);
-        }
-
-        private static void CycleOwnedFilterReverse(BaseInventory inventory)
-        {
-            if (!SupportsOwnedFilter(inventory))
-                return;
-
-            switch (ownedFilterMode) {
-                case OwnedQuickFilterMode.Off:
-                    ownedFilterMode = OwnedQuickFilterMode.Missing;
-                    break;
-                case OwnedQuickFilterMode.Missing:
-                    ownedFilterMode = OwnedQuickFilterMode.Owned;
                     break;
                 default:
                     ownedFilterMode = OwnedQuickFilterMode.Off;
@@ -990,60 +1097,804 @@ namespace Cms21UiPlus
             RedrawInventory(inventory);
         }
 
-        private static void CyclePackageFilterReverse(BaseInventory inventory)
+        private static void SelectGarageConditionFilter(BaseInventory inventory,
+            GarageConditionFilterMode mode)
         {
-            if (inventory == null || !IsInventoryGroupingEnabled() ||
-                !SupportsInventoryGrouping(inventory))
+            if (inventory == null || garageConditionFilterMode == mode)
                 return;
 
-            CollapseExpandedPackageWithoutRedraw(inventory);
-            switch (packageFilterMode) {
-                case PackageQuickFilterMode.Off:
-                    packageFilterMode = PackageQuickFilterMode.Singles;
-                    break;
-                case PackageQuickFilterMode.Singles:
-                    packageFilterMode = PackageQuickFilterMode.Packages;
-                    break;
-                default:
-                    packageFilterMode = PackageQuickFilterMode.Off;
-                    break;
+            garageConditionFilterMode = mode;
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        private static void SelectJunkyardConditionFilter(BaseInventory inventory,
+            JunkyardConditionFilterMode mode)
+        {
+            if (inventory == null || junkyardConditionFilterMode == mode)
+                return;
+
+            junkyardConditionFilterMode = mode;
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        private static void SelectRepairabilityFilter(BaseInventory inventory,
+            RepairabilityQuickFilterMode mode)
+        {
+            if (inventory == null)
+                return;
+
+            if (IsBarnOrJunkyardScene()) {
+                if (junkyardRepairabilityFilterMode == mode)
+                    return;
+                junkyardRepairabilityFilterMode = mode;
+            } else {
+                if (garageRepairabilityFilterMode == mode)
+                    return;
+                garageRepairabilityFilterMode = mode;
             }
 
             ClearSelectedButton();
             RedrawInventory(inventory);
         }
 
-        internal static void RegisterReverseQuickFilterClick(
-            Button button, Action action)
+        private static void SelectQualityFilter(BaseInventory inventory,
+            QualityQuickFilterMode mode)
+        {
+            if (inventory == null)
+                return;
+
+            if (IsBarnOrJunkyardScene()) {
+                if (junkyardQualityFilterMode == mode)
+                    return;
+                junkyardQualityFilterMode = mode;
+            } else {
+                if (garageQualityFilterMode == mode)
+                    return;
+                garageQualityFilterMode = mode;
+            }
+
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        private static void SelectOwnedFilter(BaseInventory inventory,
+            OwnedQuickFilterMode mode)
+        {
+            if (!SupportsOwnedFilter(inventory) || ownedFilterMode == mode)
+                return;
+
+            ownedFilterMode = mode;
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        private static void SelectPackageFilter(BaseInventory inventory,
+            PackageQuickFilterMode mode)
+        {
+            if (inventory == null || !IsInventoryGroupingEnabled() ||
+                !SupportsInventoryGrouping(inventory) || packageFilterMode == mode)
+                return;
+
+            CollapseExpandedPackageWithoutRedraw(inventory);
+            packageFilterMode = mode;
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        internal static QuickFilterMenuOption[] CreateGarageConditionQuickFilterMenu(
+            Action<GarageConditionFilterMode> select,
+            params GarageConditionFilterMode[] modes)
+        {
+            if (select == null || modes == null || modes.Length == 0)
+                return null;
+
+            QuickFilterMenuOption[] options =
+                new QuickFilterMenuOption[modes.Length];
+            for (int i = 0; i < modes.Length; i++) {
+                GarageConditionFilterMode mode = modes[i];
+                options[i] = new QuickFilterMenuOption(
+                    GetGarageConditionMenuSprite(mode),
+                    mode == GarageConditionFilterMode.Off
+                        ? DisabledButtonColor : ActiveButtonColor,
+                    delegate () { select(mode); },
+                    GetGarageConditionMenuLabel(mode));
+            }
+            return options;
+        }
+
+        internal static QuickFilterMenuOption[] CreateJunkyardConditionQuickFilterMenu(
+            Action<JunkyardConditionFilterMode> select,
+            params JunkyardConditionFilterMode[] modes)
+        {
+            if (select == null || modes == null || modes.Length == 0)
+                return null;
+
+            QuickFilterMenuOption[] options =
+                new QuickFilterMenuOption[modes.Length];
+            for (int i = 0; i < modes.Length; i++) {
+                JunkyardConditionFilterMode mode = modes[i];
+                options[i] = new QuickFilterMenuOption(
+                    GetJunkyardConditionMenuSprite(mode),
+                    mode == JunkyardConditionFilterMode.Off
+                        ? DisabledButtonColor : ActiveButtonColor,
+                    delegate () { select(mode); },
+                    GetJunkyardConditionMenuLabel(mode));
+            }
+            return options;
+        }
+
+        internal static QuickFilterMenuOption[] CreateRepairabilityQuickFilterMenu(
+            Action<RepairabilityQuickFilterMode> select)
+        {
+            if (select == null)
+                return null;
+
+            return new[] {
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetWhiteRepairWrenchIcon(),
+                    DisabledButtonColor,
+                    delegate () { select(RepairabilityQuickFilterMode.Off); }),
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetWhiteRepairWrenchIcon(),
+                    ActiveButtonColor,
+                    delegate () {
+                        select(RepairabilityQuickFilterMode.RepairGroupOnly);
+                    }),
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetRedRepairWrenchIcon(),
+                    ActiveButtonColor,
+                    delegate () {
+                        select(RepairabilityQuickFilterMode.NonRepairableOnly);
+                    }),
+            };
+        }
+
+        internal static QuickFilterMenuOption[] CreateRestorationAvailabilityQuickFilterMenu(
+            Action<RestorationAvailabilityQuickFilterMode> select)
+        {
+            if (select == null)
+                return null;
+
+            Sprite available = InventoryIconProvider.GetExternalIcon(
+                GameplayRepairSkillBridge.GetRepairAvailabilityIndicatorPath(true));
+            Sprite unavailable = InventoryIconProvider.GetExternalIcon(
+                GameplayRepairSkillBridge.GetRepairAvailabilityIndicatorPath(false));
+            return new[] {
+                new QuickFilterMenuOption(available, DisabledButtonColor,
+                    delegate () {
+                        select(RestorationAvailabilityQuickFilterMode.Off);
+                    }),
+                new QuickFilterMenuOption(available, ActiveButtonColor,
+                    delegate () {
+                        select(RestorationAvailabilityQuickFilterMode.AvailableOnly);
+                    }),
+                new QuickFilterMenuOption(unavailable, ActiveButtonColor,
+                    delegate () {
+                        select(RestorationAvailabilityQuickFilterMode.UnavailableOnly);
+                    }),
+            };
+        }
+
+        internal static QuickFilterMenuOption[] CreateQualityQuickFilterMenu(
+            Action<QualityQuickFilterMode> select)
+        {
+            if (select == null)
+                return null;
+
+            return new[] {
+                new QuickFilterMenuOption(InventoryIconProvider.GetQualityIcon(),
+                    DisabledButtonColor,
+                    delegate () { select(QualityQuickFilterMode.Off); }),
+                new QuickFilterMenuOption(InventoryIconProvider.GetQualityIcon(),
+                    ActiveButtonColor,
+                    delegate () { select(QualityQuickFilterMode.Improved); },
+                    "1 ... 3"),
+                new QuickFilterMenuOption(InventoryIconProvider.GetQuality1Icon(),
+                    ActiveButtonColor,
+                    delegate () { select(QualityQuickFilterMode.Quality1); },
+                    "1"),
+                new QuickFilterMenuOption(InventoryIconProvider.GetQuality2Icon(),
+                    ActiveButtonColor,
+                    delegate () { select(QualityQuickFilterMode.Quality2); },
+                    "2"),
+                new QuickFilterMenuOption(InventoryIconProvider.GetQuality3Icon(),
+                    ActiveButtonColor,
+                    delegate () { select(QualityQuickFilterMode.Quality3); },
+                    "3"),
+                new QuickFilterMenuOption(InventoryIconProvider.GetQualityNonIcon(),
+                    ActiveButtonColor,
+                    delegate () { select(QualityQuickFilterMode.NonImproved); },
+                    "0"),
+            };
+        }
+
+        internal static QuickFilterMenuOption[] CreateOwnedQuickFilterMenu(
+            Action<OwnedQuickFilterMode> select)
+        {
+            if (select == null)
+                return null;
+
+            return new[] {
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetWhiteWarehouseIcon(),
+                    DisabledButtonColor,
+                    delegate () { select(OwnedQuickFilterMode.Off); }),
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetWhiteWarehouseIcon(),
+                    ActiveButtonColor,
+                    delegate () { select(OwnedQuickFilterMode.Owned); }),
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetRedWarehouseIcon(),
+                    ActiveButtonColor,
+                    delegate () { select(OwnedQuickFilterMode.Missing); }),
+            };
+        }
+
+        internal static QuickFilterMenuOption[] CreatePackageQuickFilterMenu(
+            Action<PackageQuickFilterMode> select)
+        {
+            if (select == null)
+                return null;
+
+            return new[] {
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetWhiteWarehouseIcon(),
+                    DisabledButtonColor,
+                    delegate () { select(PackageQuickFilterMode.Off); }),
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetWhiteWarehouseIcon(),
+                    ActiveButtonColor,
+                    delegate () { select(PackageQuickFilterMode.Packages); }),
+                new QuickFilterMenuOption(
+                    InventoryIconProvider.GetRedWarehouseIcon(),
+                    ActiveButtonColor,
+                    delegate () { select(PackageQuickFilterMode.Singles); }),
+            };
+        }
+
+        internal static void RegisterQuickFilterMenu(
+            Button button, QuickFilterMenuOption[] options)
         {
             if (button == null)
                 return;
 
             int id = button.GetInstanceID();
-            if (action == null)
-                ReverseQuickFilterClicks.Remove(id);
-            else
-                ReverseQuickFilterClicks[id] = action;
+            if (options == null || options.Length == 0) {
+                QuickFilterMenus.Remove(id);
+                QuickFilterMenuButtons.Remove(id);
+                return;
+            }
+
+            QuickFilterMenus[id] = options;
+            QuickFilterMenuButtons[id] = button;
+            Action openMenuAction = delegate () {
+                TryHandleQuickFilterMenuClick(button);
+            };
+            button.onClick.AddListener(openMenuAction);
         }
 
-        internal static void UnregisterReverseQuickFilterClick(Button button)
+        internal static void UnregisterQuickFilterMenu(Button button)
         {
-            if (button != null)
-                ReverseQuickFilterClicks.Remove(button.GetInstanceID());
+            if (button == null)
+                return;
+
+            int id = button.GetInstanceID();
+            QuickFilterMenus.Remove(id);
+            QuickFilterMenuButtons.Remove(id);
+            if (activeQuickFilterSourceId == id)
+                CloseQuickFilterMenu();
         }
 
-        internal static bool TryHandleReverseQuickFilterClick(Button button)
+        internal static bool TryHandleQuickFilterMenuClick(Button button)
         {
             if (button == null)
                 return false;
 
-            Action action;
-            if (!ReverseQuickFilterClicks.TryGetValue(button.GetInstanceID(), out action) ||
-                action == null)
+            QuickFilterMenuOption[] options;
+            if (!QuickFilterMenus.TryGetValue(button.GetInstanceID(), out options) ||
+                options == null || options.Length == 0) {
+                if (activeQuickFilterMenuRoot != null)
+                    CloseQuickFilterMenu();
+                return false;
+            }
+
+            OpenQuickFilterMenu(button, options);
+            return true;
+        }
+
+        internal static void CloseQuickFilterMenu()
+        {
+            activeQuickFilterSourceId = 0;
+            activeQuickFilterBlockerTrigger = null;
+
+            if (activeQuickFilterMenuRoot != null)
+                UnityEngine.Object.Destroy(activeQuickFilterMenuRoot);
+            if (activeQuickFilterBlockerRoot != null)
+                UnityEngine.Object.Destroy(activeQuickFilterBlockerRoot);
+
+            activeQuickFilterMenuRoot = null;
+            activeQuickFilterBlockerRoot = null;
+        }
+
+        internal static bool TryCloseQuickFilterMenu()
+        {
+            if (activeQuickFilterSourceId == 0)
                 return false;
 
-            action();
+            if (activeQuickFilterMenuRoot == null) {
+                CloseQuickFilterMenu();
+                return false;
+            }
+
+            CloseQuickFilterMenu();
             return true;
+        }
+
+        internal static bool TryHandleQuickFilterBlockerEvent(
+            EventTrigger trigger, BaseEventData eventData)
+        {
+            if (activeQuickFilterMenuRoot == null || trigger == null ||
+                trigger != activeQuickFilterBlockerTrigger)
+                return false;
+
+            CloseQuickFilterMenu();
+            if (eventData != null)
+                eventData.Use();
+            return true;
+        }
+
+        internal static bool TryHandleQuickFilterButtonPointerClick(
+            Button button, PointerEventData eventData)
+        {
+            if (activeQuickFilterMenuRoot == null || button == null ||
+                eventData == null)
+                return false;
+
+            Transform buttonTransform = button.transform;
+            bool isMenuOption = buttonTransform != null &&
+                buttonTransform.IsChildOf(activeQuickFilterMenuRoot.transform);
+            bool isSwitchButton = buttonTransform != null &&
+                activeQuickFilterBlockerRoot != null &&
+                buttonTransform.IsChildOf(activeQuickFilterBlockerRoot.transform);
+            if ((isMenuOption || isSwitchButton) &&
+                eventData.button == PointerEventData.InputButton.Left)
+                return false;
+
+            CloseQuickFilterMenu();
+            eventData.Use();
+            return true;
+        }
+
+        private static IEnumerator SelectQuickFilterOptionDeferred(Action select)
+        {
+            yield return null;
+            if (select != null)
+                select();
+        }
+
+        private static void ApplyQuickFilterOptionVisual(Button sourceButton,
+            QuickFilterMenuOption option)
+        {
+            if (sourceButton == null || option == null)
+                return;
+
+            Image image = sourceButton.GetComponent<Image>();
+            if (image == null)
+                return;
+
+            image.sprite = option.Sprite;
+            image.color = option.Color;
+            image.preserveAspect = true;
+        }
+
+        private static Font FindQuickFilterMenuFont(Canvas canvas)
+        {
+            Font nativeFont = NativeUiFactory.Font;
+            if (nativeFont != null)
+                return nativeFont;
+            if (quickFilterMenuFallbackFont != null)
+                return quickFilterMenuFallbackFont;
+            if (canvas == null)
+                return null;
+
+            foreach (Text text in canvas.GetComponentsInChildren<Text>(true)) {
+                if (text == null || text.font == null)
+                    continue;
+
+                quickFilterMenuFallbackFont = text.font;
+                return quickFilterMenuFallbackFont;
+            }
+            return null;
+        }
+
+        private static void OpenQuickFilterMenu(Button sourceButton,
+            QuickFilterMenuOption[] options)
+        {
+            CloseQuickFilterMenu();
+            if (sourceButton == null || options == null || options.Length == 0)
+                return;
+
+            Canvas canvas = sourceButton.GetComponentInParent<Canvas>();
+            RectTransform sourceRect = sourceButton.GetComponent<RectTransform>();
+            if (canvas == null || sourceRect == null)
+                return;
+
+            GameObject blockerObject = CreateQuickFilterRectObject(
+                "QQuickFilterMenuBlocker");
+            blockerObject.transform.SetParent(canvas.transform, false);
+            blockerObject.layer = sourceButton.gameObject.layer;
+            RectTransform blockerRect = blockerObject.GetComponent<RectTransform>();
+            blockerRect.anchorMin = Vector2.zero;
+            blockerRect.anchorMax = Vector2.one;
+            blockerRect.offsetMin = Vector2.zero;
+            blockerRect.offsetMax = Vector2.zero;
+            blockerRect.localScale = Vector3.one;
+
+            Image blockerImage = blockerObject.AddComponent<Image>();
+            blockerImage.color = new Color(0f, 0f, 0f, 0f);
+            blockerImage.raycastTarget = true;
+            EventTrigger blockerTrigger =
+                blockerObject.AddComponent<EventTrigger>();
+            blockerObject.transform.SetAsLastSibling();
+            CreateQuickFilterSwitchButtons(blockerObject.transform, canvas,
+                sourceButton);
+
+            bool hasLabels = false;
+            for (int i = 0; i < options.Length; i++) {
+                if (options[i] != null && !string.IsNullOrEmpty(options[i].Label)) {
+                    hasLabels = true;
+                    break;
+                }
+            }
+
+            Font menuFont = hasLabels ? FindQuickFilterMenuFont(canvas) : null;
+            float optionHeight = ButtonSize +
+                (hasLabels ? QuickFilterMenuLegendHeight : 0f);
+            float menuWidth = (options.Length * QuickFilterMenuColumnWidth) +
+                ((options.Length - 1) * QuickFilterMenuColumnSpacing);
+            float menuHeight = optionHeight +
+                (QuickFilterMenuPadding * 2f);
+
+            GameObject menuObject = CreateQuickFilterRectObject(
+                "QQuickFilterMenu");
+            menuObject.transform.SetParent(canvas.transform, false);
+            menuObject.layer = sourceButton.gameObject.layer;
+            RectTransform menuRect = menuObject.GetComponent<RectTransform>();
+            menuRect.anchorMin = new Vector2(0.5f, 0.5f);
+            menuRect.anchorMax = new Vector2(0.5f, 0.5f);
+            menuRect.pivot = new Vector2(1f, 0f);
+            menuRect.sizeDelta = new Vector2(menuWidth, menuHeight);
+            menuRect.localScale = Vector3.one;
+            menuRect.position = sourceRect.TransformPoint(new Vector3(
+                sourceRect.rect.xMax, sourceRect.rect.yMax, 0f));
+
+            Image menuImage = menuObject.AddComponent<Image>();
+            menuImage.color = QuickFilterMenuBackgroundColor;
+            menuImage.raycastTarget = false;
+
+            Image[] optionBackgrounds = new Image[options.Length];
+            for (int i = 0; i < options.Length; i++) {
+                QuickFilterMenuOption option = options[i];
+                if (option == null)
+                    continue;
+
+                GameObject optionObject = CreateQuickFilterRectObject(
+                    "QQuickFilterMenuOption" + i);
+                optionObject.transform.SetParent(menuObject.transform, false);
+                optionObject.layer = sourceButton.gameObject.layer;
+                RectTransform optionRect =
+                    optionObject.GetComponent<RectTransform>();
+                optionRect.anchorMin = new Vector2(0f, 0f);
+                optionRect.anchorMax = new Vector2(0f, 0f);
+                optionRect.pivot = new Vector2(0f, 0f);
+                optionRect.anchoredPosition = new Vector2(
+                    i * (QuickFilterMenuColumnWidth +
+                        QuickFilterMenuColumnSpacing), 0f);
+                optionRect.sizeDelta = new Vector2(
+                    QuickFilterMenuColumnWidth, menuHeight);
+                optionRect.localScale = Vector3.one;
+
+                Image optionBackground = optionObject.AddComponent<Image>();
+                optionBackground.color = IsQuickFilterOptionSelected(
+                    sourceButton, option)
+                    ? QuickFilterMenuSelectedColor
+                    : new Color32(0, 0, 0, 0);
+                optionBackground.raycastTarget = true;
+                optionBackgrounds[i] = optionBackground;
+
+                GameObject iconObject = CreateQuickFilterRectObject(
+                    "QQuickFilterMenuOptionIcon" + i);
+                iconObject.transform.SetParent(optionObject.transform, false);
+                iconObject.layer = sourceButton.gameObject.layer;
+                RectTransform iconRect =
+                    iconObject.GetComponent<RectTransform>();
+                iconRect.anchorMin = new Vector2(0.5f, 0f);
+                iconRect.anchorMax = new Vector2(0.5f, 0f);
+                iconRect.pivot = new Vector2(0.5f, 0f);
+                iconRect.anchoredPosition = new Vector2(0f,
+                    QuickFilterMenuPadding);
+                iconRect.sizeDelta = new Vector2(ButtonSize, ButtonSize);
+                iconRect.localScale = Vector3.one;
+
+                Image optionImage = iconObject.AddComponent<Image>();
+                optionImage.sprite = option.Sprite;
+                optionImage.color = option.Color;
+                optionImage.preserveAspect = true;
+                optionImage.raycastTarget = false;
+
+                if (!string.IsNullOrEmpty(option.Label))
+                    CreateQuickFilterMenuOptionLabel(optionObject.transform,
+                        i, option.Label, menuFont);
+
+                Button optionButton = optionObject.AddComponent<Button>();
+                optionButton.targetGraphic = optionBackground;
+                optionButton.transition = Selectable.Transition.None;
+                Navigation optionNavigation = optionButton.navigation;
+                optionNavigation.mode = Navigation.Mode.None;
+                optionButton.navigation = optionNavigation;
+                int optionIndex = i;
+                Action selectAction = delegate () {
+                    if (IsQuickFilterOptionSelected(sourceButton, option)) {
+                        CloseQuickFilterMenu();
+                        return;
+                    }
+
+                    ApplyQuickFilterOptionVisual(sourceButton, option);
+                    UpdateQuickFilterMenuSelection(optionBackgrounds,
+                        optionIndex);
+                    if (option.Select != null)
+                        MelonCoroutines.Start(
+                            SelectQuickFilterOptionDeferred(option.Select));
+                };
+                UnityAction selectUnityAction =
+                    DelegateSupport.ConvertDelegate<UnityAction>(selectAction);
+                optionButton.onClick.AddListener(selectUnityAction);
+            }
+
+            menuObject.transform.SetAsLastSibling();
+            activeQuickFilterSourceId = sourceButton.GetInstanceID();
+            activeQuickFilterBlockerRoot = blockerObject;
+            activeQuickFilterBlockerTrigger = blockerTrigger;
+            activeQuickFilterMenuRoot = menuObject;
+        }
+
+        private static void CreateQuickFilterSwitchButtons(
+            Transform blocker, Canvas canvas, Button sourceButton)
+        {
+            if (blocker == null || canvas == null || sourceButton == null)
+                return;
+
+            foreach (KeyValuePair<int, Button> pair in QuickFilterMenuButtons) {
+                Button targetButton = pair.Value;
+                if (targetButton == null || targetButton == sourceButton ||
+                    !targetButton.gameObject.activeInHierarchy ||
+                    targetButton.GetComponentInParent<Canvas>() != canvas)
+                    continue;
+
+                QuickFilterMenuOption[] targetOptions;
+                if (!QuickFilterMenus.TryGetValue(pair.Key, out targetOptions) ||
+                    targetOptions == null || targetOptions.Length == 0)
+                    continue;
+
+                RectTransform targetRect =
+                    targetButton.GetComponent<RectTransform>();
+                if (targetRect == null)
+                    continue;
+
+                GameObject proxyObject = CreateQuickFilterRectObject(
+                    "QQuickFilterSwitch" + pair.Key);
+                proxyObject.transform.SetParent(blocker, false);
+                proxyObject.layer = sourceButton.gameObject.layer;
+                RectTransform proxyRect =
+                    proxyObject.GetComponent<RectTransform>();
+                proxyRect.anchorMin = new Vector2(0.5f, 0.5f);
+                proxyRect.anchorMax = new Vector2(0.5f, 0.5f);
+                proxyRect.pivot = new Vector2(0.5f, 0.5f);
+                proxyRect.position = targetRect.TransformPoint(
+                    targetRect.rect.center);
+                proxyRect.sizeDelta = targetRect.rect.size;
+                proxyRect.localScale = Vector3.one;
+
+                Image proxyImage = proxyObject.AddComponent<Image>();
+                proxyImage.color = new Color32(0, 0, 0, 0);
+                proxyImage.raycastTarget = true;
+
+                Button proxyButton = proxyObject.AddComponent<Button>();
+                proxyButton.targetGraphic = proxyImage;
+                proxyButton.transition = Selectable.Transition.None;
+                Navigation proxyNavigation = proxyButton.navigation;
+                proxyNavigation.mode = Navigation.Mode.None;
+                proxyButton.navigation = proxyNavigation;
+                Button capturedButton = targetButton;
+                QuickFilterMenuOption[] capturedOptions = targetOptions;
+                Action switchAction = delegate () {
+                    OpenQuickFilterMenu(capturedButton, capturedOptions);
+                };
+                UnityAction switchUnityAction =
+                    DelegateSupport.ConvertDelegate<UnityAction>(switchAction);
+                proxyButton.onClick.AddListener(switchUnityAction);
+            }
+        }
+
+        private static void CreateQuickFilterMenuOptionLabel(
+            Transform parent, int optionIndex, string value, Font menuFont)
+        {
+            const string rangeSeparator = " ... ";
+            float legendLeft = (QuickFilterMenuColumnWidth - ButtonSize) * 0.5f;
+            int separatorIndex = value.IndexOf(rangeSeparator,
+                StringComparison.Ordinal);
+            if (separatorIndex <= 0) {
+                CreateQuickFilterMenuOptionText(parent, optionIndex,
+                    "Value", value, TextAnchor.MiddleCenter, menuFont,
+                    legendLeft, QuickFilterMenuLegendLineHeight * 0.5f,
+                    ButtonSize, QuickFilterMenuLegendLineHeight);
+                return;
+            }
+
+            string startValue = value.Substring(0, separatorIndex);
+            string endValue = value.Substring(separatorIndex +
+                rangeSeparator.Length);
+            CreateQuickFilterMenuOptionText(parent, optionIndex,
+                "End", endValue, TextAnchor.MiddleCenter, menuFont,
+                legendLeft, QuickFilterMenuLegendLineHeight,
+                ButtonSize, QuickFilterMenuLegendLineHeight);
+            CreateQuickFilterMenuOptionText(parent, optionIndex,
+                "Start", startValue, TextAnchor.MiddleCenter, menuFont,
+                legendLeft, 0f, ButtonSize, QuickFilterMenuLegendLineHeight);
+        }
+
+        private static bool IsQuickFilterOptionSelected(Button sourceButton,
+            QuickFilterMenuOption option)
+        {
+            if (sourceButton == null || option == null)
+                return false;
+
+            Image image = sourceButton.GetComponent<Image>();
+            if (image == null)
+                return false;
+
+            return image.sprite == option.Sprite && image.color == option.Color;
+        }
+
+        private static void UpdateQuickFilterMenuSelection(
+            Image[] optionBackgrounds, int selectedIndex)
+        {
+            if (optionBackgrounds == null)
+                return;
+
+            for (int i = 0; i < optionBackgrounds.Length; i++) {
+                Image background = optionBackgrounds[i];
+                if (background == null)
+                    continue;
+
+                background.color = i == selectedIndex
+                    ? QuickFilterMenuSelectedColor
+                    : new Color32(0, 0, 0, 0);
+            }
+        }
+
+        private static void CreateQuickFilterMenuOptionText(Transform parent,
+            int optionIndex, string suffix, string value,
+            TextAnchor alignment, Font menuFont, float x, float y,
+            float width, float height)
+        {
+            Text text = NativeUiFactory.CreateText(parent,
+                "QQuickFilterMenuOptionLabel" + optionIndex + suffix,
+                value, QuickFilterMenuLabelFontSize, alignment, Color.white);
+            if (text == null)
+                return;
+
+            if (text.font == null && menuFont != null)
+                text.font = menuFont;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            RectTransform rect = text.GetComponent<RectTransform>();
+            if (rect == null)
+                return;
+
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(0f, 0f);
+            rect.pivot = new Vector2(0f, 0f);
+            rect.anchoredPosition = new Vector2(x,
+                ButtonSize + QuickFilterMenuPadding + y);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.localScale = Vector3.one;
+        }
+
+        private static GameObject CreateQuickFilterRectObject(string name)
+        {
+#if NET6_0_OR_GREATER
+            return new GameObject(name, typeof(RectTransform));
+#else
+            UnhollowerBaseLib.Il2CppReferenceArray<Il2CppSystem.Type>
+                componentTypes =
+                    new UnhollowerBaseLib.Il2CppReferenceArray<Il2CppSystem.Type>(1);
+            componentTypes[0] =
+                UnhollowerRuntimeLib.Il2CppType.Of<RectTransform>();
+            return new GameObject(name, componentTypes);
+#endif
+        }
+
+        private static Sprite GetGarageConditionMenuSprite(
+            GarageConditionFilterMode mode)
+        {
+            switch (mode) {
+                case GarageConditionFilterMode.Red:
+                    return InventoryIconProvider.GetRedConditionIcon();
+                case GarageConditionFilterMode.Orange:
+                    return InventoryIconProvider.GetOrangeConditionIcon();
+                case GarageConditionFilterMode.Yellow:
+                    return InventoryIconProvider.GetYellowConditionIcon();
+                case GarageConditionFilterMode.GreenRing:
+                    return InventoryIconProvider.GetGreenRingConditionIcon();
+                case GarageConditionFilterMode.Perfect:
+                    return InventoryIconProvider.GetGreenConditionIcon();
+                default:
+                    return InventoryIconProvider.GetWhiteConditionIcon();
+            }
+        }
+
+        private static Sprite GetJunkyardConditionMenuSprite(
+            JunkyardConditionFilterMode mode)
+        {
+            switch (mode) {
+                case JunkyardConditionFilterMode.Red:
+                    return InventoryIconProvider.GetRedConditionIcon();
+                case JunkyardConditionFilterMode.Orange:
+                    return InventoryIconProvider.GetOrangeConditionIcon();
+                case JunkyardConditionFilterMode.Yellow:
+                    return InventoryIconProvider.GetYellowConditionIcon();
+                case JunkyardConditionFilterMode.Green:
+                    return InventoryIconProvider.GetGreenRingConditionIcon();
+                case JunkyardConditionFilterMode.Perfect:
+                    return InventoryIconProvider.GetGreenConditionIcon();
+                default:
+                    return InventoryIconProvider.GetWhiteConditionIcon();
+            }
+        }
+
+        private static string GetGarageConditionMenuLabel(
+            GarageConditionFilterMode mode)
+        {
+            switch (mode) {
+                case GarageConditionFilterMode.RepairThresholdToPerfect:
+                    return "15 ... 100%";
+                case GarageConditionFilterMode.Red:
+                    return "0 ... 14%";
+                case GarageConditionFilterMode.Orange:
+                    return "15 ... 49%";
+                case GarageConditionFilterMode.Yellow:
+                    return "50 ... 79%";
+                case GarageConditionFilterMode.GreenRing:
+                    return "80 ... 99%";
+                case GarageConditionFilterMode.Perfect:
+                    return "100%";
+                default:
+                    return null;
+            }
+        }
+
+        private static string GetJunkyardConditionMenuLabel(
+            JunkyardConditionFilterMode mode)
+        {
+            switch (mode) {
+                case JunkyardConditionFilterMode.RepairThresholdToPerfect:
+                    return "15 ... 100%";
+                case JunkyardConditionFilterMode.Red:
+                    return "0 ... 14%";
+                case JunkyardConditionFilterMode.Orange:
+                    return "15 ... 49%";
+                case JunkyardConditionFilterMode.Yellow:
+                    return "50 ... 79%";
+                case JunkyardConditionFilterMode.Green:
+                    return "80 ... 99%";
+                case JunkyardConditionFilterMode.Perfect:
+                    return "100%";
+                default:
+                    return null;
+            }
         }
 
         private static void RedrawInventory(BaseInventory inventory)
@@ -1110,6 +1961,10 @@ namespace Cms21UiPlus
                             case JunkyardConditionFilterMode.Green:
                                 conditionImage.sprite =
                                     InventoryIconProvider.GetGreenRingConditionIcon();
+                                break;
+                            case JunkyardConditionFilterMode.Perfect:
+                                conditionImage.sprite =
+                                    InventoryIconProvider.GetGreenConditionIcon();
                                 break;
                             case JunkyardConditionFilterMode.Red:
                                 conditionImage.sprite =
@@ -1304,7 +2159,7 @@ namespace Cms21UiPlus
                     continue;
                 }
 
-                UnregisterReverseQuickFilterClick(
+                UnregisterQuickFilterMenu(
                     child.GetComponent<Button>());
                 child.gameObject.SetActive(false);
                 UnityEngine.Object.Destroy(child.gameObject);

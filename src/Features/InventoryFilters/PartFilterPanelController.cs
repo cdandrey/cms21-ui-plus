@@ -39,9 +39,9 @@ namespace Cms21UiPlus
         private Action conditionClick;
         private Action repairabilityClick;
         private Action qualityClick;
-        private Action conditionReverseClick;
-        private Action repairabilityReverseClick;
-        private Action qualityReverseClick;
+        private QuickFilterMenuOption[] conditionMenuOptions;
+        private QuickFilterMenuOption[] repairabilityMenuOptions;
+        private QuickFilterMenuOption[] qualityMenuOptions;
         private Action<string> searchChanged;
 
         public PartFilterPanelController(string buttonPrefix)
@@ -86,8 +86,9 @@ namespace Cms21UiPlus
             Action onConditionClick, Action onRepairabilityClick,
             Action onQualityClick, Action<string> onSearchChanged,
             bool includeCondition, bool includeRepairability,
-            bool includeQuality, Action onConditionReverseClick,
-            Action onRepairabilityReverseClick, Action onQualityReverseClick)
+            bool includeQuality, QuickFilterMenuOption[] onConditionMenuOptions,
+            QuickFilterMenuOption[] onRepairabilityMenuOptions,
+            QuickFilterMenuOption[] onQualityMenuOptions)
         {
             if (windowRoot == null)
                 return false;
@@ -114,11 +115,11 @@ namespace Cms21UiPlus
             repairabilityClick = includeRepairability ?
                 onRepairabilityClick : null;
             qualityClick = includeQuality ? onQualityClick : null;
-            conditionReverseClick = includeCondition ?
-                onConditionReverseClick : null;
-            repairabilityReverseClick = includeRepairability ?
-                onRepairabilityReverseClick : null;
-            qualityReverseClick = includeQuality ? onQualityReverseClick : null;
+            conditionMenuOptions = includeCondition ?
+                onConditionMenuOptions : null;
+            repairabilityMenuOptions = includeRepairability ?
+                onRepairabilityMenuOptions : null;
+            qualityMenuOptions = includeQuality ? onQualityMenuOptions : null;
             searchChanged = onSearchChanged;
             lastSearchText = string.Empty;
 
@@ -177,9 +178,9 @@ namespace Cms21UiPlus
             conditionClick = null;
             repairabilityClick = null;
             qualityClick = null;
-            conditionReverseClick = null;
-            repairabilityReverseClick = null;
-            qualityReverseClick = null;
+            conditionMenuOptions = null;
+            repairabilityMenuOptions = null;
+            qualityMenuOptions = null;
             searchChanged = null;
             lastSearchText = string.Empty;
         }
@@ -194,6 +195,7 @@ namespace Cms21UiPlus
             if (string.Equals(current, lastSearchText, StringComparison.Ordinal))
                 return true;
 
+            InventoryFilterManager.TryCloseQuickFilterMenu();
             lastSearchText = current;
             Action<string> callback = searchChanged;
             if (callback != null)
@@ -344,6 +346,10 @@ namespace Cms21UiPlus
                     break;
                 case JunkyardConditionFilterMode.Green:
                     image.sprite = InventoryIconProvider.GetGreenRingConditionIcon();
+                    image.color = ActiveButtonColor;
+                    break;
+                case JunkyardConditionFilterMode.Perfect:
+                    image.sprite = InventoryIconProvider.GetGreenConditionIcon();
                     image.color = ActiveButtonColor;
                     break;
                 case JunkyardConditionFilterMode.Red:
@@ -513,19 +519,22 @@ namespace Cms21UiPlus
             button.navigation = navigation;
             UnityEventUtility.RemoveAllListeners(button);
 
+            QuickFilterMenuOption[] menuOptions = kind == FilterButtonKind.Condition
+                ? conditionMenuOptions
+                : kind == FilterButtonKind.Repairability
+                    ? repairabilityMenuOptions : qualityMenuOptions;
+            if (menuOptions != null && menuOptions.Length > 0) {
+                InventoryFilterManager.RegisterQuickFilterMenu(button, menuOptions);
+                return;
+            }
+
             Action click = kind == FilterButtonKind.Condition
                 ? conditionClick
                 : kind == FilterButtonKind.Repairability
                     ? repairabilityClick : qualityClick;
             if (click != null)
                 button.onClick.AddListener(click);
-
-            Action reverseClick = kind == FilterButtonKind.Condition
-                ? conditionReverseClick
-                : kind == FilterButtonKind.Repairability
-                    ? repairabilityReverseClick : qualityReverseClick;
-            InventoryFilterManager.RegisterReverseQuickFilterClick(
-                button, reverseClick);
+            InventoryFilterManager.RegisterQuickFilterMenu(button, null);
         }
 
         private void ApplyVerticalOffset()
@@ -646,7 +655,7 @@ namespace Cms21UiPlus
         {
             if (buttonTransform == null)
                 return;
-            InventoryFilterManager.UnregisterReverseQuickFilterClick(
+            InventoryFilterManager.UnregisterQuickFilterMenu(
                 buttonTransform.GetComponent<Button>());
             buttonTransform.gameObject.SetActive(false);
             UnityEngine.Object.Destroy(buttonTransform.gameObject);

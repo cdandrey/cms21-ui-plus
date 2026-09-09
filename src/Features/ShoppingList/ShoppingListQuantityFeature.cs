@@ -56,32 +56,25 @@ namespace Cms21UiPlus
             bool equals = Input.GetKeyDown(KeyCode.Equals);
             bool keypadMinus = Input.GetKeyDown(KeyCode.KeypadMinus);
             bool minus = Input.GetKeyDown(KeyCode.Minus);
-            bool remove = Input.GetKeyDown(KeyCode.X);
             bool shift = Input.GetKey(KeyCode.LeftShift) ||
                 Input.GetKey(KeyCode.RightShift);
             if (__instance == null || __instance != activeWindow ||
                 !ShoppingListBackend.IsOpen(__instance))
                 return true;
 
-            int delta = 0;
-            if (!remove) {
-                if (keypadPlus || plus || (equals && shift))
-                    delta = 1;
-                else if (keypadMinus || minus)
-                    delta = -1;
-                else
-                    return true;
-            }
+            int delta;
+            if (keypadPlus || plus || (equals && shift))
+                delta = 1;
+            else if (keypadMinus || minus)
+                delta = -1;
+            else
+                return true;
 
             ShoppingListBackendEntry entry =
                 ShoppingListBackend.GetCurrentSelectedEntry(__instance);
 
-            if (entry != null && entry.Data != null) {
-                if (remove)
-                    ShoppingListBackend.Remove(__instance, entry.Data);
-                else
-                    AdjustQuantity(__instance, entry.Data, delta);
-            }
+            if (entry != null && entry.Data != null)
+                AdjustQuantity(__instance, entry.Data, delta);
 
             Input.ResetInputAxes();
             return false;

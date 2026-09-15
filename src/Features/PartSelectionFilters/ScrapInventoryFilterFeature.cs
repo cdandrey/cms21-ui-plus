@@ -574,7 +574,7 @@ namespace Cms21UiPlus
         private static bool AreScrapFiltersEnabled()
         {
             return Main.SettingsEntry != null &&
-                Main.SettingsEntry.Value.addScrapInventoryFilters;
+                Main.SettingsEntry.Value.addQuickFilters;
         }
 
         private static bool IsScrapFilterPanelVisible()

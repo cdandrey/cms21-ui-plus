@@ -70,6 +70,7 @@ namespace Cms21UiPlus
             StartupPromptAutoContinueFeature.OnSceneUnloaded(sceneName);
             if (sceneName == "Menu")
                 GlobalState.IsMenuSceneActive = false;
+            TakenItemsPresentationFeature.OnSceneUnloaded(sceneName);
 
             bool garageStillLoaded = UnityEngine.SceneManagement.SceneManager
                 .GetSceneByName("garage").isLoaded;
@@ -155,7 +156,6 @@ namespace Cms21UiPlus
         private static void LoadSettings()
         {
             bool fileExisted = File.Exists(GlobalConfig.cfgFile);
-            SettingsMigration.MigrateLegacySettings();
             MelonPreferences_Category preferences =
                 MelonPreferences.CreateCategory(BuildInfo.TechnicalName);
             preferences.SetFilePath(GlobalConfig.cfgFile, autoload: false);

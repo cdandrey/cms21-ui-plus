@@ -34,6 +34,7 @@
     <Compile Include="src\Config.cs" />
     <Compile Include="src\Features\Input\KeyBindingsConfig.cs" />
     <Compile Include="src\Features\Input\QuickMountModeSwitchFeature.cs" />
+    <Compile Include="src\Features\InventoryFilters\TakenItemsPresentationFeature.cs" />
     <Compile Include="src\Features\InventoryFilters\FilteredWarehouseTransferFeature.cs" />
     <Compile Include="src\Features\InventoryFilters\InventoryFilterBindings.cs" />
     <Compile Include="src\Features\InventoryFilters\InventoryFilterButtons.cs" />

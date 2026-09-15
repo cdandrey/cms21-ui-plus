@@ -164,6 +164,29 @@ namespace Cms21UiPlus
             }
         }
 
+        internal static void UpdateCardIndicators(BaseItem baseItem,
+            InventoryItem row)
+        {
+            if (baseItem == null || row == null || Main.SettingsEntry == null)
+                return;
+
+            UpdateInventoryRepairabilityRow(baseItem, row);
+            if (!Main.SettingsEntry.Value.showOwnedPartCountIndicators) {
+                HideOwnedCountIndicator(row);
+                return;
+            }
+
+            GroupItem group = baseItem.TryCast<GroupItem>();
+            Item item = group == null ? baseItem.TryCast<Item>() : null;
+            OwnedPartCache.ConditionBreakdown breakdown = group != null
+                ? OwnedPartCache.GetConditionBreakdown(group)
+                : item != null
+                    ? OwnedPartCache.GetConditionBreakdown(item)
+                    : default(OwnedPartCache.ConditionBreakdown);
+            UpdateOwnedIcon(row, breakdown,
+                InventoryIconProvider.GetWhiteWarehouseIcon());
+        }
+
         internal static void UpdateInventoryRepairabilityRow(BaseItem baseItem,
             InventoryItem row)
         {

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.RegularExpressions;
 
 #if NET6_0_OR_GREATER
 using Il2Cpp;
@@ -45,137 +41,38 @@ namespace Cms21UiPlus
         public bool addParkingSorting = true;
         [Tomlet.Attributes.TomlInlineComment("Automatically accept the redundant dyno-start confirmation")]
         public bool autoConfirmDynoStart = true;
-        [Tomlet.Attributes.TomlInlineComment("Show repairability indicators in all supported inventories")]
+        [Tomlet.Attributes.TomlInlineComment("Show repairability indicators on all supported part cards")]
         public bool showPartRepairabilityIndicators = true;
-        [Tomlet.Attributes.TomlInlineComment("Show owned-part count indicators in all supported inventories")]
+        [Tomlet.Attributes.TomlInlineComment("Show owned-part count indicators on all supported part cards")]
         public bool showOwnedPartCountIndicators = true;
-        [Tomlet.Attributes.TomlInlineComment("Show repairability and owned-part indicators on the hovered part card in mount/unmount modes")]
-        public bool showMountPartCardIndicators = true;
         [Tomlet.Attributes.TomlInlineComment("Hide the vanilla paint-colour badge on part cards")]
         public bool hideBodyPartPaintColorBadges = true;
         [Tomlet.Attributes.TomlInlineComment("Group identical parts into expandable inventory and warehouse packages")]
         public bool groupInventoryParts = true;
-        [Tomlet.Attributes.TomlInlineComment("Enable inventory, warehouse, barn and junkyard quick filters")]
-        public bool addInventoryQuickFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Enable quick filters in all supported windows")]
+        public bool addQuickFilters = true;
+        [Tomlet.Attributes.TomlInlineComment("Enable the improved return-to-garage parts window in barn and junkyard")]
+        public bool addTakenItemsPresentation = true;
         [Tomlet.Attributes.TomlInlineComment("Reset garage inventory and warehouse quick filters when the window closes")]
         public bool resetInventoryQuickFiltersOnExit = true;
-        [Tomlet.Attributes.TomlInlineComment("Enable spring-clamp quick filters")]
-        public bool addSpringClampInventoryFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset spring-clamp quick filters when the selection window closes")]
         public bool resetSpringClampInventoryFiltersOnExit = false;
-        [Tomlet.Attributes.TomlInlineComment("Enable tire-changer quick filters")]
-        public bool addTireChangerInventoryFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset tire-changer quick filters when the selection window closes")]
         public bool resetTireChangerInventoryFiltersOnExit = false;
-        [Tomlet.Attributes.TomlInlineComment("Enable wheel-balancer quick filters")]
-        public bool addWheelBalancerInventoryFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset wheel-balancer quick filters when the selection window closes")]
         public bool resetWheelBalancerInventoryFiltersOnExit = false;
-        [Tomlet.Attributes.TomlInlineComment("Enable brake-lathe quick filters")]
-        public bool addBrakeLatheInventoryFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset brake-lathe quick filters when the selection window closes")]
         public bool resetBrakeLatheInventoryFiltersOnExit = false;
-        [Tomlet.Attributes.TomlInlineComment("Enable mount part-selection quick filters")]
-        public bool addMountPartSelectionFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset mount part-selection quick filters when the selection window closes")]
         public bool resetMountPartSelectionFiltersOnExit = false;
         [Tomlet.Attributes.TomlInlineComment("Move all filtered parts between inventory and warehouse with the configured shortcut")]
         public bool moveFilteredPartsBetweenInventoryAndWarehouse = true;
-        [Tomlet.Attributes.TomlInlineComment("Add search, condition and repairability filters to the scrap inventory")]
-        public bool addScrapInventoryFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset scrap inventory quick filters when the scrap window closes")]
         public bool resetScrapInventoryFiltersOnExit = true;
         [Tomlet.Attributes.TomlInlineComment("Hold Space to bulk scrap all or filtered scrap inventory parts")]
         public bool addBulkScrapShortcut = true;
-        [Tomlet.Attributes.TomlInlineComment("Add search, condition and repairability filters to part and body repair inventories")]
-        public bool addRepairInventoryFilters = true;
         [Tomlet.Attributes.TomlInlineComment("Reset repair inventory quick filters when the repair window closes")]
         public bool resetRepairInventoryFiltersOnExit = true;
-    }
-
-    internal static class SettingsMigration
-    {
-        private static readonly Regex LegacyPartIndicatorsRegex = new Regex(
-            @"^([ \t]*)showInventoryPartIndicators[ \t]*=[ \t]*(true|false)[^\r\n]*",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        private static readonly Regex RepairabilityIndicatorsRegex = new Regex(
-            @"^[ \t]*showPartRepairabilityIndicators[ \t]*=",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        private static readonly Regex OwnedCountIndicatorsRegex = new Regex(
-            @"^[ \t]*showOwnedPartCountIndicators[ \t]*=",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        private static readonly Regex LegacyDynoRegex = new Regex(
-            @"^([ \t]*)streamlinedDyno[ \t]*=[ \t]*(true|false)[^\r\n]*",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        private static readonly Regex DynoConfirmationRegex = new Regex(
-            @"^[ \t]*autoConfirmDynoStart[ \t]*=",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
-
-        public static void MigrateLegacySettings()
-        {
-            string path = GlobalConfig.cfgFile;
-            if (!File.Exists(path))
-                return;
-            MigrateLegacyPartIndicatorSetting(path);
-            MigrateLegacyDynoSetting(path);
-        }
-
-        private static void MigrateLegacyPartIndicatorSetting(string path)
-        {
-            string tempPath = path + ".migration.tmp";
-            try {
-                string source = File.ReadAllText(path);
-                Match legacy = LegacyPartIndicatorsRegex.Match(source);
-                if (!legacy.Success)
-                    return;
-
-                string indent = legacy.Groups[1].Value;
-                string value = legacy.Groups[2].Value.ToLowerInvariant();
-                string newLine = source.IndexOf("\r\n", StringComparison.Ordinal) >= 0
-                    ? "\r\n" : "\n";
-                List<string> replacement = new List<string>(2);
-                if (!RepairabilityIndicatorsRegex.IsMatch(source))
-                    replacement.Add(indent + "showPartRepairabilityIndicators = " + value + " # Show repairability indicators in all supported inventories");
-                if (!OwnedCountIndicatorsRegex.IsMatch(source))
-                    replacement.Add(indent + "showOwnedPartCountIndicators = " + value + " # Show owned-part count indicators in all supported inventories");
-
-                string migrated = source.Remove(legacy.Index, legacy.Length)
-                    .Insert(legacy.Index, string.Join(newLine, replacement.ToArray()));
-                File.WriteAllText(tempPath, migrated);
-                File.Copy(tempPath, path, true);
-                File.Delete(tempPath);
-            } catch (Exception exception) {
-                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
-                ModLogger.Log("[Settings] Failed to migrate legacy part-indicator setting." +
-                    Environment.NewLine + exception, Types.LoggingLevels.Warning);
-            }
-        }
-
-        private static void MigrateLegacyDynoSetting(string path)
-        {
-            string tempPath = path + ".migration.tmp";
-            try {
-                string source = File.ReadAllText(path);
-                Match legacy = LegacyDynoRegex.Match(source);
-                if (!legacy.Success || DynoConfirmationRegex.IsMatch(source))
-                    return;
-
-                string newLine = source.IndexOf("\r\n", StringComparison.Ordinal) >= 0
-                    ? "\r\n" : "\n";
-                string addition = legacy.Groups[1].Value + "autoConfirmDynoStart = " +
-                    legacy.Groups[2].Value.ToLowerInvariant() +
-                    " # Automatically accept the redundant dyno-start confirmation";
-                string migrated = source.Insert(legacy.Index + legacy.Length,
-                    newLine + addition);
-                File.WriteAllText(tempPath, migrated);
-                File.Copy(tempPath, path, true);
-                File.Delete(tempPath);
-            } catch (Exception exception) {
-                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
-                ModLogger.Log("[Settings] Failed to migrate the legacy dyno setting." +
-                    Environment.NewLine + exception, Types.LoggingLevels.Warning);
-            }
-        }
     }
 
     public static class GlobalConfig

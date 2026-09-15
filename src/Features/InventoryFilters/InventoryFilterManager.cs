@@ -182,10 +182,10 @@ namespace Cms21UiPlus
 
         private static bool IsFeatureEnabled()
         {
-            return Main.SettingsEntry != null && Main.SettingsEntry.Value.addInventoryQuickFilters;
+            return Main.SettingsEntry != null && Main.SettingsEntry.Value.addQuickFilters;
         }
 
-        private static bool IsBarnOrJunkyardScene()
+        internal static bool IsBarnOrJunkyardScene()
         {
             GameScript gameScript = GameScript.Get();
             return gameScript != null &&

@@ -655,14 +655,12 @@ namespace Cms21UiPlus
                     return;
             }
 
+            ScrollRect scrollRect = row.GetComponentInParent<ScrollRect>();
             Transform target = inventory.GetComponentInParent<WarehouseWindow>() != null
                 ? EnsureWarehouseGroupingClickSurface(inventory, row)
-                : row.transform.parent;
-            if (target == null || target.GetComponent<RectTransform>() == null) {
-                ScrollRect scrollRect = row.GetComponentInParent<ScrollRect>();
-                if (scrollRect != null && scrollRect.viewport != null)
-                    target = scrollRect.viewport;
-            }
+                : scrollRect != null && scrollRect.viewport != null
+                    ? scrollRect.viewport
+                    : row.transform.parent;
             if (target == null)
                 return;
 

@@ -62,17 +62,6 @@
       "descriptionKey": "LOC_SettingShowOwnedPartCountIndicatorsDescription"
     },
     {
-      "id": "FID_ShowMountPartCardIndicators",
-      "key": "showMountPartCardIndicators",
-      "group": "inventory",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 12,
-      "nameKey": "LOC_SettingShowMountPartCardIndicatorsName",
-      "descriptionKey": "LOC_SettingShowMountPartCardIndicatorsDescription"
-    },
-    {
       "id": "FID_HideBodyPartPaintColorBadges",
       "key": "hideBodyPartPaintColorBadges",
       "group": "inventory",
@@ -95,15 +84,26 @@
       "descriptionKey": "LOC_SettingGroupInventoryPartsDescription"
     },
     {
-      "id": "FID_AddInventoryQuickFilters",
-      "key": "addInventoryQuickFilters",
+      "id": "FID_AddQuickFilters",
+      "key": "addQuickFilters",
       "group": "inventoryFilters",
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
       "order": 20,
-      "nameKey": "LOC_SettingAddInventoryQuickFiltersName",
-      "descriptionKey": "LOC_SettingAddInventoryQuickFiltersDescription"
+      "nameKey": "LOC_SettingAddQuickFiltersName",
+      "descriptionKey": "LOC_SettingAddQuickFiltersDescription"
+    },
+    {
+      "id": "FID_AddTakenItemsPresentation",
+      "key": "addTakenItemsPresentation",
+      "group": "inventoryFilters",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 20,
+      "nameKey": "LOC_SettingAddTakenItemsPresentationName",
+      "descriptionKey": "LOC_SettingAddTakenItemsPresentationDescription"
     },
     {
       "id": "FID_ResetInventoryQuickFiltersOnExit",
@@ -117,17 +117,6 @@
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
     {
-      "id": "FID_AddScrapInventoryFilters",
-      "key": "addScrapInventoryFilters",
-      "group": "inventoryFilters",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 21,
-      "nameKey": "LOC_SettingAddScrapInventoryFiltersName",
-      "descriptionKey": "LOC_SettingAddScrapInventoryFiltersDescription"
-    },
-    {
       "id": "FID_ResetScrapInventoryFiltersOnExit",
       "key": "resetScrapInventoryFiltersOnExit",
       "group": "inventoryFilters",
@@ -137,17 +126,6 @@
       "order": 21,
       "nameKey": "LOC_SettingResetScrapInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
-    },
-    {
-      "id": "FID_AddRepairInventoryFilters",
-      "key": "addRepairInventoryFilters",
-      "group": "inventoryFilters",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 22,
-      "nameKey": "LOC_SettingAddRepairInventoryFiltersName",
-      "descriptionKey": "LOC_SettingAddRepairInventoryFiltersDescription"
     },
     {
       "id": "FID_ResetRepairInventoryFiltersOnExit",
@@ -161,17 +139,6 @@
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
     {
-      "id": "FID_AddSpringClampInventoryFilters",
-      "key": "addSpringClampInventoryFilters",
-      "group": "inventoryFilters",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 23,
-      "nameKey": "LOC_SettingAddSpringClampInventoryFiltersName",
-      "descriptionKey": "LOC_SettingAddSpringClampInventoryFiltersDescription"
-    },
-    {
       "id": "FID_ResetSpringClampInventoryFiltersOnExit",
       "key": "resetSpringClampInventoryFiltersOnExit",
       "group": "inventoryFilters",
@@ -181,17 +148,6 @@
       "order": 23,
       "nameKey": "LOC_SettingResetSpringClampInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
-    },
-    {
-      "id": "FID_AddTireChangerInventoryFilters",
-      "key": "addTireChangerInventoryFilters",
-      "group": "inventoryFilters",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 24,
-      "nameKey": "LOC_SettingAddTireChangerInventoryFiltersName",
-      "descriptionKey": "LOC_SettingAddTireChangerInventoryFiltersDescription"
     },
     {
       "id": "FID_ResetTireChangerInventoryFiltersOnExit",
@@ -205,17 +161,6 @@
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
     {
-      "id": "FID_AddWheelBalancerInventoryFilters",
-      "key": "addWheelBalancerInventoryFilters",
-      "group": "inventoryFilters",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 25,
-      "nameKey": "LOC_SettingAddWheelBalancerInventoryFiltersName",
-      "descriptionKey": "LOC_SettingAddWheelBalancerInventoryFiltersDescription"
-    },
-    {
       "id": "FID_ResetWheelBalancerInventoryFiltersOnExit",
       "key": "resetWheelBalancerInventoryFiltersOnExit",
       "group": "inventoryFilters",
@@ -227,17 +172,6 @@
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
     {
-      "id": "FID_AddBrakeLatheInventoryFilters",
-      "key": "addBrakeLatheInventoryFilters",
-      "group": "inventoryFilters",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 26,
-      "nameKey": "LOC_SettingAddBrakeLatheInventoryFiltersName",
-      "descriptionKey": "LOC_SettingAddBrakeLatheInventoryFiltersDescription"
-    },
-    {
       "id": "FID_ResetBrakeLatheInventoryFiltersOnExit",
       "key": "resetBrakeLatheInventoryFiltersOnExit",
       "group": "inventoryFilters",
@@ -247,17 +181,6 @@
       "order": 26,
       "nameKey": "LOC_SettingResetBrakeLatheInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
-    },
-    {
-      "id": "FID_AddMountPartSelectionFilters",
-      "key": "addMountPartSelectionFilters",
-      "group": "inventoryFilters",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 27,
-      "nameKey": "LOC_SettingAddMountPartSelectionFiltersName",
-      "descriptionKey": "LOC_SettingAddMountPartSelectionFiltersDescription"
     },
     {
       "id": "FID_ResetMountPartSelectionFiltersOnExit",

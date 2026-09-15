@@ -193,6 +193,9 @@ namespace Cms21UiPlus
         private static bool EventTriggerOnPointerClickGroupingPrefix(
             EventTrigger __instance, PointerEventData __0)
         {
+            if (TakenItemsPresentationFeature.TryHandlePriceRangeBlockerEvent(
+                    __instance, __0))
+                return false;
             if (InventoryFilterManager.TryHandleQuickFilterBlockerEvent(
                     __instance, __0))
                 return false;

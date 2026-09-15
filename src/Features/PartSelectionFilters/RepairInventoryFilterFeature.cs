@@ -198,7 +198,7 @@ namespace Cms21UiPlus
         private static bool IsEnabled()
         {
             return Main.SettingsEntry != null &&
-                Main.SettingsEntry.Value.addRepairInventoryFilters;
+                Main.SettingsEntry.Value.addQuickFilters;
         }
 
         private static bool IsRepairWindowActive()

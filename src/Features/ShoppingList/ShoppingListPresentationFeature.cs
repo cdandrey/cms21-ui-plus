@@ -456,6 +456,14 @@ namespace Cms21UiPlus
         private static void ConfigureRepairability(Transform card,
             ShopListItemData data)
         {
+            if (Main.SettingsEntry == null ||
+                !Main.SettingsEntry.Value.showPartRepairabilityIndicators) {
+                Transform existing = card.Find(RepairIndicatorName);
+                if (existing != null)
+                    existing.gameObject.SetActive(false);
+                return;
+            }
+
             GameObject icon = EnsureImageObject(card, RepairIndicatorName);
             if (icon == null)
                 return;
@@ -498,6 +506,14 @@ namespace Cms21UiPlus
         private static void ConfigureOwned(Transform card,
             ShopListItemData data)
         {
+            if (Main.SettingsEntry == null ||
+                !Main.SettingsEntry.Value.showOwnedPartCountIndicators) {
+                Transform existing = card.Find(OwnedIndicatorName);
+                if (existing != null)
+                    existing.gameObject.SetActive(false);
+                return;
+            }
+
             GameObject icon = EnsureOwnedIndicator(card);
             if (icon == null)
                 return;

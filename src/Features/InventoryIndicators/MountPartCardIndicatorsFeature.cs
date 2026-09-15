@@ -32,9 +32,12 @@ namespace Cms21UiPlus
 
         private static bool IsEnabled {
             get {
-                return GlobalState.IsGarageSceneActive &&
-                    Main.SettingsEntry != null &&
-                    Main.SettingsEntry.Value.showMountPartCardIndicators;
+                if (!GlobalState.IsGarageSceneActive || Main.SettingsEntry == null)
+                    return false;
+
+                Settings settings = Main.SettingsEntry.Value;
+                return settings.showPartRepairabilityIndicators ||
+                    settings.showOwnedPartCountIndicators;
             }
         }
 
@@ -79,12 +82,25 @@ namespace Cms21UiPlus
 
             PartProperty property = part.partProperty;
             string itemId = property != null ? property.ID : string.Empty;
-            bool repairable = PartRepairabilityRules.IsRepairable(itemId);
-            OwnedPartCache.ConditionBreakdown owned =
-                OwnedPartCache.GetConditionBreakdown(itemId, 0, 0, 0, 0);
+            Settings settings = Main.SettingsEntry.Value;
+            if (settings.showPartRepairabilityIndicators) {
+                bool repairable = PartRepairabilityRules.IsRepairable(itemId);
+                UpdateRepairIndicator(root, itemId, repairable);
+            } else {
+                GameObject repair = FindIndicator(root, RepairIndicatorName);
+                if (repair != null)
+                    repair.SetActive(false);
+            }
 
-            UpdateRepairIndicator(root, itemId, repairable);
-            UpdateOwnedIndicator(root, owned);
+            if (settings.showOwnedPartCountIndicators) {
+                OwnedPartCache.ConditionBreakdown owned =
+                    OwnedPartCache.GetConditionBreakdown(itemId, 0, 0, 0, 0);
+                UpdateOwnedIndicator(root, owned);
+            } else {
+                GameObject owned = FindIndicator(root, OwnedIndicatorName);
+                if (owned != null)
+                    owned.SetActive(false);
+            }
         }
 
         private static void UpdateRepairIndicator(Transform root,

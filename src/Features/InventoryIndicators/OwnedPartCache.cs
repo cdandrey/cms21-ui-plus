@@ -21,8 +21,8 @@ namespace Cms21UiPlus
 {
     /// <summary>
     /// Cached owned-part counts across inventory and all unlocked warehouses.
-    /// The full condition breakdown is retained for row indicators, while owned/missing
-    /// filters continue to treat copies at 50% condition or higher as usable.
+    /// The full condition breakdown is retained for row indicators and owned/missing
+    /// filters treat every owned copy as present regardless of condition.
     /// </summary>
     public static class OwnedPartCache
     {
@@ -105,9 +105,8 @@ namespace Cms21UiPlus
 
             Settings settings = Main.SettingsEntry.Value;
             return settings.showOwnedPartCountIndicators ||
-                settings.showMountPartCardIndicators ||
                 settings.addShoppingListSorting ||
-                settings.addInventoryQuickFilters;
+                settings.addQuickFilters;
         }
 
         public static void BeginRefreshAfterGarageLoad()
@@ -315,12 +314,12 @@ namespace Cms21UiPlus
 
         public static bool Has(Item item)
         {
-            return GetCount(item) > 0;
+            return GetConditionBreakdown(item).Total > 0;
         }
 
         public static bool Has(GroupItem group)
         {
-            return GetCount(group) > 0;
+            return GetConditionBreakdown(group).Total > 0;
         }
 
         public static void NotifyItemAdded(Item item)
@@ -367,6 +366,8 @@ namespace Cms21UiPlus
                 ScheduleRefresh();
                 return;
             }
+            if (InventoryFilterManager.IsBarnOrJunkyardScene())
+                return;
 
             Adjust(group, delta);
         }
@@ -427,6 +428,8 @@ namespace Cms21UiPlus
                 ScheduleRefresh();
                 return;
             }
+            if (InventoryFilterManager.IsBarnOrJunkyardScene())
+                return;
 
             Adjust(item, delta);
         }

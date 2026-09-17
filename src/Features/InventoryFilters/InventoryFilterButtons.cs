@@ -29,14 +29,21 @@ namespace Cms21UiPlus
         internal readonly Color Color;
         internal readonly Action Select;
         internal readonly string Label;
+        internal readonly int Column;
+        internal readonly int Row;
+        internal readonly Func<bool> IsSelected;
 
         internal QuickFilterMenuOption(Sprite sprite, Color color, Action select,
-            string label = null)
+            string label = null, int column = -1, int row = 0,
+            Func<bool> isSelected = null)
         {
             Sprite = sprite;
             Color = color;
             Select = select;
             Label = label;
+            Column = column;
+            Row = row;
+            IsSelected = isSelected;
         }
     }
 
@@ -182,12 +189,14 @@ namespace Cms21UiPlus
                     JunkyardConditionFilterMode.Off;
                 junkyardRepairabilityFilterMode =
                     RepairabilityQuickFilterMode.Off;
+                junkyardRepairSpecializationFilter.Reset();
                 junkyardQualityFilterMode = QualityQuickFilterMode.Off;
                 ownedFilterMode = OwnedQuickFilterMode.Off;
             } else {
                 garageConditionFilterMode = GarageConditionFilterMode.Off;
                 garageRepairabilityFilterMode =
                     RepairabilityQuickFilterMode.Off;
+                garageRepairSpecializationFilter.Reset();
                 garageQualityFilterMode = QualityQuickFilterMode.Off;
                 packageFilterMode = PackageQuickFilterMode.Off;
             }
@@ -547,10 +556,25 @@ namespace Cms21UiPlus
                         GarageConditionFilterMode.Perfect);
                 }
             } else if (kind == QuickFilterButtonKind.Repairability) {
+                bool junkyardContext = IsBarnOrJunkyardScene();
+                RepairSpecializationFilterState specializationState =
+                    junkyardContext
+                        ? junkyardRepairSpecializationFilter
+                        : garageRepairSpecializationFilter;
                 menuOptions = CreateRepairabilityQuickFilterMenu(
                     delegate (RepairabilityQuickFilterMode mode) {
                         SelectRepairabilityFilter(
                             ResolveActiveInventory(inventory), mode);
+                    },
+                    delegate () {
+                        return junkyardContext
+                            ? junkyardRepairabilityFilterMode
+                            : garageRepairabilityFilterMode;
+                    },
+                    specializationState,
+                    delegate () {
+                        PartFilterPanelController.ClearSelectedControl();
+                        RedrawInventory(ResolveActiveInventory(inventory));
                     });
             } else if (kind == QuickFilterButtonKind.Quality) {
                 menuOptions = CreateQualityQuickFilterMenu(
@@ -1226,29 +1250,117 @@ namespace Cms21UiPlus
         }
 
         internal static QuickFilterMenuOption[] CreateRepairabilityQuickFilterMenu(
-            Action<RepairabilityQuickFilterMode> select)
+            Action<RepairabilityQuickFilterMode> select,
+            Func<RepairabilityQuickFilterMode> getMode = null,
+            RepairSpecializationFilterState specializationState = null,
+            Action specializationChanged = null)
         {
             if (select == null)
                 return null;
 
-            return new[] {
-                new QuickFilterMenuOption(
-                    InventoryIconProvider.GetWhiteRepairWrenchIcon(),
-                    DisabledButtonColor,
-                    delegate () { select(RepairabilityQuickFilterMode.Off); }),
-                new QuickFilterMenuOption(
-                    InventoryIconProvider.GetWhiteRepairWrenchIcon(),
-                    ActiveButtonColor,
-                    delegate () {
-                        select(RepairabilityQuickFilterMode.RepairGroupOnly);
-                    }),
-                new QuickFilterMenuOption(
-                    InventoryIconProvider.GetRedRepairWrenchIcon(),
-                    ActiveButtonColor,
-                    delegate () {
-                        select(RepairabilityQuickFilterMode.NonRepairableOnly);
-                    }),
+            if (!GameplayRepairSkillBridge.SupportsRepairSpecializations ||
+                specializationState == null) {
+                return new[] {
+                    new QuickFilterMenuOption(
+                        InventoryIconProvider.GetWhiteRepairWrenchIcon(),
+                        DisabledButtonColor,
+                        delegate () { select(RepairabilityQuickFilterMode.Off); }),
+                    new QuickFilterMenuOption(
+                        InventoryIconProvider.GetWhiteRepairWrenchIcon(),
+                        ActiveButtonColor,
+                        delegate () {
+                            select(RepairabilityQuickFilterMode.RepairGroupOnly);
+                        }),
+                    new QuickFilterMenuOption(
+                        InventoryIconProvider.GetRedRepairWrenchIcon(),
+                        ActiveButtonColor,
+                        delegate () {
+                            select(RepairabilityQuickFilterMode.NonRepairableOnly);
+                        }),
+                };
+            }
+
+            List<QuickFilterMenuOption> options =
+                new List<QuickFilterMenuOption>(21);
+            AddRepairabilityMatrixColumn(options, 0,
+                InventoryIconProvider.GetWhiteRepairWrenchIcon(),
+                InventoryIconProvider.GetRedRepairWrenchIcon(),
+                delegate () {
+                    return getMode != null
+                        ? getMode() : RepairabilityQuickFilterMode.Off;
+                }, select);
+
+            for (int index = 0;
+                    index < GameplayRepairSkillBridge.RepairSpecializationIndicatorPaths.Length;
+                    index++) {
+                int specializationIndex = index;
+                int bit = 1 << specializationIndex;
+                Sprite sprite = InventoryIconProvider.GetExternalIcon(
+                    GameplayRepairSkillBridge.RepairSpecializationIndicatorPaths[
+                        specializationIndex]);
+                AddRepairSpecializationMatrixColumn(options, index + 1,
+                    sprite, specializationState, bit, specializationChanged);
+            }
+            return options.ToArray();
+        }
+
+        private static void AddRepairabilityMatrixColumn(
+            List<QuickFilterMenuOption> options, int column,
+            Sprite enabledSprite, Sprite excludedSprite,
+            Func<RepairabilityQuickFilterMode> getMode,
+            Action<RepairabilityQuickFilterMode> select)
+        {
+            options.Add(new QuickFilterMenuOption(excludedSprite,
+                ActiveButtonColor,
+                delegate () {
+                    select(RepairabilityQuickFilterMode.NonRepairableOnly);
+                }, null, column, 0,
+                delegate () {
+                    return getMode() ==
+                        RepairabilityQuickFilterMode.NonRepairableOnly;
+                }));
+            options.Add(new QuickFilterMenuOption(enabledSprite,
+                ActiveButtonColor,
+                delegate () {
+                    select(RepairabilityQuickFilterMode.RepairGroupOnly);
+                }, null, column, 1,
+                delegate () {
+                    return getMode() ==
+                        RepairabilityQuickFilterMode.RepairGroupOnly;
+                }));
+            options.Add(new QuickFilterMenuOption(enabledSprite,
+                DisabledButtonColor,
+                delegate () { select(RepairabilityQuickFilterMode.Off); },
+                null, column, 2,
+                delegate () {
+                    return getMode() == RepairabilityQuickFilterMode.Off;
+                }));
+        }
+
+        private static void AddRepairSpecializationMatrixColumn(
+            List<QuickFilterMenuOption> options, int column, Sprite sprite,
+            RepairSpecializationFilterState state, int bit, Action changed)
+        {
+            RepairSpecializationQuickFilterMode[] modes = {
+                RepairSpecializationQuickFilterMode.ExcludedOnly,
+                RepairSpecializationQuickFilterMode.RequiredOnly,
+                RepairSpecializationQuickFilterMode.Off,
             };
+            for (int row = 0; row < modes.Length; row++) {
+                RepairSpecializationQuickFilterMode mode = modes[row];
+                Color color = mode == RepairSpecializationQuickFilterMode.Off
+                    ? DisabledButtonColor
+                    : mode == RepairSpecializationQuickFilterMode.RequiredOnly
+                        ? ActiveButtonColor
+                        : new Color32(255, 80, 80, 255);
+                options.Add(new QuickFilterMenuOption(sprite, color,
+                    delegate () {
+                        state.SetMode(bit, mode);
+                        if (changed != null)
+                            changed();
+                    }, null, column, row,
+                    delegate () { return state.GetMode(bit) == mode; }));
+            }
         }
 
         internal static QuickFilterMenuOption[] CreateRestorationAvailabilityQuickFilterMenu(
@@ -1549,13 +1661,31 @@ namespace Cms21UiPlus
                 }
             }
 
+            bool matrixLayout = false;
+            int matrixColumns = 0;
+            int matrixRows = 0;
+            for (int i = 0; i < options.Length; i++) {
+                QuickFilterMenuOption option = options[i];
+                if (option == null || option.Column < 0)
+                    continue;
+                matrixLayout = true;
+                matrixColumns = Mathf.Max(matrixColumns, option.Column + 1);
+                matrixRows = Mathf.Max(matrixRows, option.Row + 1);
+            }
+
             Font menuFont = hasLabels ? FindQuickFilterMenuFont(canvas) : null;
             float optionHeight = ButtonSize +
                 (hasLabels ? QuickFilterMenuLegendHeight : 0f);
-            float menuWidth = (options.Length * QuickFilterMenuColumnWidth) +
-                ((options.Length - 1) * QuickFilterMenuColumnSpacing);
-            float menuHeight = optionHeight +
-                (QuickFilterMenuPadding * 2f);
+            float menuWidth = matrixLayout
+                ? (matrixColumns * QuickFilterMenuColumnWidth) +
+                    ((matrixColumns - 1) * QuickFilterMenuPadding)
+                : (options.Length * QuickFilterMenuColumnWidth) +
+                    ((options.Length - 1) * QuickFilterMenuColumnSpacing);
+            float menuHeight = matrixLayout
+                ? (matrixRows * ButtonSize) +
+                    ((matrixRows - 1) * QuickFilterMenuColumnSpacing) +
+                    (QuickFilterMenuPadding * 2f)
+                : optionHeight + (QuickFilterMenuPadding * 2f);
 
             GameObject menuObject = CreateQuickFilterRectObject(
                 "QQuickFilterMenu");
@@ -1589,11 +1719,21 @@ namespace Cms21UiPlus
                 optionRect.anchorMin = new Vector2(0f, 0f);
                 optionRect.anchorMax = new Vector2(0f, 0f);
                 optionRect.pivot = new Vector2(0f, 0f);
-                optionRect.anchoredPosition = new Vector2(
-                    i * (QuickFilterMenuColumnWidth +
-                        QuickFilterMenuColumnSpacing), 0f);
+                int column = matrixLayout ? option.Column : i;
+                int row = matrixLayout ? option.Row : 0;
+                optionRect.anchoredPosition = matrixLayout
+                    ? new Vector2(
+                        column * (QuickFilterMenuColumnWidth +
+                            QuickFilterMenuPadding),
+                        QuickFilterMenuPadding +
+                            ((matrixRows - 1 - row) *
+                                (ButtonSize + QuickFilterMenuColumnSpacing)))
+                    : new Vector2(
+                        column * (QuickFilterMenuColumnWidth +
+                            QuickFilterMenuColumnSpacing), 0f);
                 optionRect.sizeDelta = new Vector2(
-                    QuickFilterMenuColumnWidth, menuHeight);
+                    QuickFilterMenuColumnWidth,
+                    matrixLayout ? ButtonSize : menuHeight);
                 optionRect.localScale = Vector3.one;
 
                 Image optionBackground = optionObject.AddComponent<Image>();
@@ -1614,7 +1754,7 @@ namespace Cms21UiPlus
                 iconRect.anchorMax = new Vector2(0.5f, 0f);
                 iconRect.pivot = new Vector2(0.5f, 0f);
                 iconRect.anchoredPosition = new Vector2(0f,
-                    QuickFilterMenuPadding);
+                    matrixLayout ? 0f : QuickFilterMenuPadding);
                 iconRect.sizeDelta = new Vector2(ButtonSize, ButtonSize);
                 iconRect.localScale = Vector3.one;
 
@@ -1636,6 +1776,16 @@ namespace Cms21UiPlus
                 optionButton.navigation = optionNavigation;
                 int optionIndex = i;
                 Action selectAction = delegate () {
+                    if (matrixLayout) {
+                        if (IsQuickFilterOptionSelected(sourceButton, option))
+                            return;
+                        if (option.Select != null)
+                            option.Select();
+                        UpdateQuickFilterMenuSelection(optionBackgrounds,
+                            options, option.Column);
+                        return;
+                    }
+
                     if (IsQuickFilterOptionSelected(sourceButton, option)) {
                         CloseQuickFilterMenu();
                         return;
@@ -1755,7 +1905,31 @@ namespace Cms21UiPlus
             if (image == null)
                 return false;
 
+            if (option.IsSelected != null)
+                return option.IsSelected();
+
             return image.sprite == option.Sprite && image.color == option.Color;
+        }
+
+        private static void UpdateQuickFilterMenuSelection(
+            Image[] optionBackgrounds, QuickFilterMenuOption[] options,
+            int column)
+        {
+            if (optionBackgrounds == null || options == null)
+                return;
+
+            int count = Math.Min(optionBackgrounds.Length, options.Length);
+            for (int i = 0; i < count; i++) {
+                Image background = optionBackgrounds[i];
+                QuickFilterMenuOption option = options[i];
+                if (background == null || option == null ||
+                    option.Column != column)
+                    continue;
+                background.color = option.IsSelected != null &&
+                    option.IsSelected()
+                    ? QuickFilterMenuSelectedColor
+                    : new Color32(0, 0, 0, 0);
+            }
         }
 
         private static void UpdateQuickFilterMenuSelection(
@@ -2019,6 +2193,10 @@ namespace Cms21UiPlus
                         ? junkyardRepairabilityFilterMode
                         : garageRepairabilityFilterMode;
 
+                    RepairSpecializationFilterState specializations =
+                        junkyardContext
+                            ? junkyardRepairSpecializationFilter
+                            : garageRepairSpecializationFilter;
                     switch (mode) {
                         case RepairabilityQuickFilterMode.NonRepairableOnly:
                             repairImage.sprite = InventoryIconProvider.GetRedRepairWrenchIcon();
@@ -2030,7 +2208,9 @@ namespace Cms21UiPlus
                             break;
                         default:
                             repairImage.sprite = InventoryIconProvider.GetWhiteRepairWrenchIcon();
-                            repairImage.color = DisabledButtonColor;
+                            repairImage.color = specializations.HasAny
+                                ? ActiveButtonColor
+                                : DisabledButtonColor;
                             break;
                     }
                 }

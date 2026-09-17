@@ -53,6 +53,8 @@ namespace Cms21UiPlus
         private static InventoryItem inventoryTemplate;
         private static JunkyardConditionFilterMode conditionMode;
         private static RepairabilityQuickFilterMode repairabilityMode;
+        private static readonly RepairSpecializationFilterState
+            repairSpecializationFilter = new RepairSpecializationFilterState();
         private static QualityQuickFilterMode qualityMode;
         private static OwnedQuickFilterMode ownedMode;
         private static Image conditionButton;
@@ -117,6 +119,7 @@ namespace Cms21UiPlus
 
             conditionMode = JunkyardConditionFilterMode.Off;
             repairabilityMode = RepairabilityQuickFilterMode.Off;
+            repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             ownedMode = OwnedQuickFilterMode.Off;
             searchText = string.Empty;
@@ -438,6 +441,7 @@ namespace Cms21UiPlus
         {
             conditionMode = JunkyardConditionFilterMode.Off;
             repairabilityMode = RepairabilityQuickFilterMode.Off;
+            repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             ownedMode = OwnedQuickFilterMode.Off;
             searchText = string.Empty;
@@ -503,7 +507,13 @@ namespace Cms21UiPlus
             repairButton = EnsureFilterButton(root, "Repairability", 1,
                 InventoryIconProvider.GetWhiteRepairWrenchIcon(),
                 InventoryFilterManager.CreateRepairabilityQuickFilterMenu(
-                    SelectRepairability));
+                    SelectRepairability,
+                    delegate () { return repairabilityMode; },
+                    repairSpecializationFilter,
+                    delegate () {
+                        UpdateFilterVisuals();
+                        ApplyFilters();
+                    }));
             qualityButton = EnsureFilterButton(root, "Quality", 2,
                 InventoryIconProvider.GetQualityIcon(),
                 InventoryFilterManager.CreateQualityQuickFilterMenu(
@@ -1037,6 +1047,10 @@ namespace Cms21UiPlus
                 SearchText = searchText,
                 JunkyardConditionMode = conditionMode,
                 RepairabilityMode = repairabilityMode,
+                RequiredRepairSpecializationMask =
+                    repairSpecializationFilter.RequiredMask,
+                ExcludedRepairSpecializationMask =
+                    repairSpecializationFilter.ExcludedMask,
                 QualityMode = qualityMode,
                 OwnedMode = ownedMode,
             };
@@ -1106,7 +1120,9 @@ namespace Cms21UiPlus
                     RepairabilityQuickFilterMode.NonRepairableOnly
                     ? InventoryIconProvider.GetRedRepairWrenchIcon()
                     : InventoryIconProvider.GetWhiteRepairWrenchIcon();
-                repairButton.color = repairabilityMode == RepairabilityQuickFilterMode.Off
+                repairButton.color = repairabilityMode ==
+                        RepairabilityQuickFilterMode.Off &&
+                        !repairSpecializationFilter.HasAny
                     ? DisabledButtonColor : ActiveButtonColor;
             }
             if (qualityButton != null) {

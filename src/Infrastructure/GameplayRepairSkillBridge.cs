@@ -13,6 +13,15 @@ namespace Cms21UiPlus
         private delegate string GetRepairAvailabilityIndicatorPathDelegate(
             bool available);
 
+        internal static readonly string[] RepairSpecializationIndicatorPaths = {
+            @"Mods\CMS21GameplayPlus\SkillIndicators\SI_SkillCompose.png",
+            @"Mods\CMS21GameplayPlus\SkillIndicators\SI_SkillTurner.png",
+            @"Mods\CMS21GameplayPlus\SkillIndicators\SI_SkillGlazier.png",
+            @"Mods\CMS21GameplayPlus\SkillIndicators\SI_SkillElectric.png",
+            @"Mods\CMS21GameplayPlus\SkillIndicators\SI_SkillTailor.png",
+            @"Mods\CMS21GameplayPlus\SkillIndicators\SI_SkillWelder.png",
+        };
+
         private static readonly Type RulesType =
             Type.GetType(RulesTypeName, false);
         private static readonly TryGetRepairDisplayDataDelegate
@@ -20,6 +29,37 @@ namespace Cms21UiPlus
         private static readonly GetRepairAvailabilityIndicatorPathDelegate
             RepairAvailabilityIndicatorPathResolver =
                 ResolveRepairAvailabilityIndicatorPathResolver();
+
+        internal static bool SupportsRepairSpecializations {
+            get { return RepairDisplayDataResolver != null; }
+        }
+
+        internal static int GetRepairSpecializationMask(string itemId)
+        {
+            string[] indicatorPaths;
+            bool restorationAvailable;
+            if (!TryGetRepairDisplayData(itemId, out indicatorPaths,
+                    out restorationAvailable) || indicatorPaths == null)
+                return 0;
+
+            int mask = 0;
+            for (int pathIndex = 0; pathIndex < indicatorPaths.Length; pathIndex++) {
+                string path = indicatorPaths[pathIndex];
+                if (string.IsNullOrEmpty(path))
+                    continue;
+                for (int specializationIndex = 0;
+                        specializationIndex < RepairSpecializationIndicatorPaths.Length;
+                        specializationIndex++) {
+                    if (string.Equals(path,
+                            RepairSpecializationIndicatorPaths[specializationIndex],
+                            StringComparison.OrdinalIgnoreCase)) {
+                        mask |= 1 << specializationIndex;
+                        break;
+                    }
+                }
+            }
+            return mask;
+        }
 
         public static bool TryGetRepairDisplayData(string itemId,
             out string[] indicatorPaths, out bool restorationAvailable)

@@ -257,6 +257,16 @@ namespace Cms21UiPlus
         }
 
         public void UpdateVisuals(GarageConditionFilterMode conditionMode,
+            RepairabilityQuickFilterMode repairabilityMode,
+            QualityQuickFilterMode qualityMode, bool specializationFilterActive)
+        {
+            UpdateConditionVisual(conditionMode);
+            UpdateRepairabilityVisual(repairabilityMode,
+                specializationFilterActive);
+            UpdateQualityVisual(qualityMode);
+        }
+
+        public void UpdateVisuals(GarageConditionFilterMode conditionMode,
             RestorationAvailabilityQuickFilterMode availabilityMode,
             QualityQuickFilterMode qualityMode)
         {
@@ -366,6 +376,13 @@ namespace Cms21UiPlus
         private void UpdateRepairabilityVisual(
             RepairabilityQuickFilterMode repairabilityMode)
         {
+            UpdateRepairabilityVisual(repairabilityMode, false);
+        }
+
+        private void UpdateRepairabilityVisual(
+            RepairabilityQuickFilterMode repairabilityMode,
+            bool specializationFilterActive)
+        {
             if (repairButton == null)
                 return;
 
@@ -384,7 +401,8 @@ namespace Cms21UiPlus
                     break;
                 default:
                     image.sprite = InventoryIconProvider.GetWhiteRepairWrenchIcon();
-                    image.color = DisabledButtonColor;
+                    image.color = specializationFilterActive
+                        ? ActiveButtonColor : DisabledButtonColor;
                     break;
             }
         }

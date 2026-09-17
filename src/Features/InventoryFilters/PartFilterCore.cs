@@ -26,6 +26,8 @@ namespace Cms21UiPlus
             JunkyardConditionFilterMode.Off;
         public RepairabilityQuickFilterMode RepairabilityMode =
             RepairabilityQuickFilterMode.Off;
+        public int RequiredRepairSpecializationMask;
+        public int ExcludedRepairSpecializationMask;
         public QualityQuickFilterMode QualityMode = QualityQuickFilterMode.Off;
         public OwnedQuickFilterMode OwnedMode = OwnedQuickFilterMode.Off;
         public bool UseJunkyardConditionModes;
@@ -45,6 +47,13 @@ namespace Cms21UiPlus
             get { return RepairabilityMode != RepairabilityQuickFilterMode.Off; }
         }
 
+        public bool UsesRepairSpecializationFilter {
+            get {
+                return RequiredRepairSpecializationMask != 0 ||
+                    ExcludedRepairSpecializationMask != 0;
+            }
+        }
+
         public bool UsesQualityFilter {
             get { return QualityMode != QualityQuickFilterMode.Off; }
         }
@@ -60,7 +69,8 @@ namespace Cms21UiPlus
         public bool HasAnyFilter {
             get {
                 return UsesSearch || UsesConditionFilter || UsesRepairabilityFilter ||
-                    UsesQualityFilter || UsesOwnedFilter;
+                    UsesRepairSpecializationFilter || UsesQualityFilter ||
+                    UsesOwnedFilter;
             }
         }
     }
@@ -112,7 +122,9 @@ namespace Cms21UiPlus
             if (criteria.Context == PartFilterContext.Garage) {
                 // Complete wheels, assembled shock absorbers and other GroupItems have
                 // aggregate condition but no repairability or quality value of their own.
-                if (criteria.UsesRepairabilityFilter || criteria.UsesQualityFilter)
+                if (criteria.UsesRepairabilityFilter ||
+                    criteria.UsesRepairSpecializationFilter ||
+                    criteria.UsesQualityFilter)
                     return false;
 
                 return !criteria.UsesConditionFilter ||
@@ -155,6 +167,15 @@ namespace Cms21UiPlus
                 !MatchesRepairability(PartRepairabilityRules.IsRepairable(item),
                     criteria.RepairabilityMode))
                 return false;
+
+            if (criteria.UsesRepairSpecializationFilter) {
+                int specializationMask =
+                    GameplayRepairSkillBridge.GetRepairSpecializationMask(item.ID);
+                if ((specializationMask & criteria.RequiredRepairSpecializationMask) !=
+                        criteria.RequiredRepairSpecializationMask ||
+                    (specializationMask & criteria.ExcludedRepairSpecializationMask) != 0)
+                    return false;
+            }
 
             if (criteria.UsesQualityFilter &&
                 !MatchesQuality(item.Quality, criteria.QualityMode))

@@ -112,6 +112,14 @@ namespace Cms21UiPlus
             criteria.RepairabilityMode = junkyardContext
                 ? junkyardRepairabilityFilterMode
                 : garageRepairabilityFilterMode;
+            RepairSpecializationFilterState repairSpecializations =
+                junkyardContext
+                    ? junkyardRepairSpecializationFilter
+                    : garageRepairSpecializationFilter;
+            criteria.RequiredRepairSpecializationMask =
+                repairSpecializations.RequiredMask;
+            criteria.ExcludedRepairSpecializationMask =
+                repairSpecializations.ExcludedMask;
             criteria.QualityMode = junkyardContext
                 ? junkyardQualityFilterMode
                 : garageQualityFilterMode;

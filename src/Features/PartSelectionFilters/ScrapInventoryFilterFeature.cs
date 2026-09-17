@@ -82,6 +82,8 @@ namespace Cms21UiPlus
             GarageConditionFilterMode.Off;
         private static RepairabilityQuickFilterMode repairabilityMode =
             RepairabilityQuickFilterMode.Off;
+        private static readonly RepairSpecializationFilterState
+            repairSpecializationFilter = new RepairSpecializationFilterState();
         private static QualityQuickFilterMode qualityMode =
             QualityQuickFilterMode.Off;
         private static string searchText = string.Empty;
@@ -159,11 +161,15 @@ namespace Cms21UiPlus
                         GarageConditionFilterMode.GreenRing,
                         GarageConditionFilterMode.Perfect),
                     InventoryFilterManager.CreateRepairabilityQuickFilterMenu(
-                        SelectRepairabilityFilter),
+                        SelectRepairabilityFilter,
+                        delegate () { return repairabilityMode; },
+                        repairSpecializationFilter,
+                        RepairSpecializationFilterChanged),
                     InventoryFilterManager.CreateQualityQuickFilterMenu(
                         SelectQualityFilter))) {
                     Panel.SetSearchText(searchText);
-                    Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+                    Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
                     if (!enteringUpgrade)
                         CreateResetHint();
                     ApplyCurrentFilters(true);
@@ -310,10 +316,12 @@ namespace Cms21UiPlus
         {
             conditionMode = GarageConditionFilterMode.Off;
             repairabilityMode = RepairabilityQuickFilterMode.Off;
+            repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             searchText = string.Empty;
             Panel.ResetSearch();
-            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
         }
 
         private static void ResetFilters()
@@ -556,6 +564,7 @@ namespace Cms21UiPlus
             FilteredItems.Clear();
             conditionMode = GarageConditionFilterMode.Off;
             repairabilityMode = RepairabilityQuickFilterMode.Off;
+            repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             searchText = string.Empty;
             applyingFilteredList = false;
@@ -663,7 +672,8 @@ namespace Cms21UiPlus
             }
 
             PartFilterPanelController.ClearSelectedControl();
-            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
             ApplyCurrentFilters(true);
         }
 
@@ -671,7 +681,8 @@ namespace Cms21UiPlus
         {
             conditionMode = mode;
             PartFilterPanelController.ClearSelectedControl();
-            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
             ApplyCurrentFilters(true);
         }
 
@@ -692,7 +703,8 @@ namespace Cms21UiPlus
             }
 
             PartFilterPanelController.ClearSelectedControl();
-            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
             ApplyCurrentFilters(true);
         }
 
@@ -701,7 +713,16 @@ namespace Cms21UiPlus
         {
             repairabilityMode = mode;
             PartFilterPanelController.ClearSelectedControl();
-            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
+            ApplyCurrentFilters(true);
+        }
+
+        private static void RepairSpecializationFilterChanged()
+        {
+            PartFilterPanelController.ClearSelectedControl();
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
             ApplyCurrentFilters(true);
         }
 
@@ -709,7 +730,8 @@ namespace Cms21UiPlus
         {
             qualityMode = InventoryFilterManager.GetNextQualityMode(qualityMode);
             PartFilterPanelController.ClearSelectedControl();
-            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
             ApplyCurrentFilters(true);
         }
 
@@ -717,7 +739,8 @@ namespace Cms21UiPlus
         {
             qualityMode = mode;
             PartFilterPanelController.ClearSelectedControl();
-            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode);
+            Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
+                repairSpecializationFilter.HasAny);
             ApplyCurrentFilters(true);
         }
 
@@ -734,6 +757,10 @@ namespace Cms21UiPlus
             criteria.SearchText = searchText;
             criteria.GarageConditionMode = conditionMode;
             criteria.RepairabilityMode = repairabilityMode;
+            criteria.RequiredRepairSpecializationMask =
+                repairSpecializationFilter.RequiredMask;
+            criteria.ExcludedRepairSpecializationMask =
+                repairSpecializationFilter.ExcludedMask;
             criteria.QualityMode = qualityMode;
             criteria.OwnedMode = OwnedQuickFilterMode.Off;
             return criteria;

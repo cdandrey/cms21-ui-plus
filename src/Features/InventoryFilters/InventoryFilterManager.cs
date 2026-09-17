@@ -44,6 +44,48 @@ namespace Cms21UiPlus
         NonRepairableOnly = 2,
     }
 
+    public enum RepairSpecializationQuickFilterMode
+    {
+        Off = 0,
+        RequiredOnly = 1,
+        ExcludedOnly = 2,
+    }
+
+    internal sealed class RepairSpecializationFilterState
+    {
+        internal int RequiredMask;
+        internal int ExcludedMask;
+
+        internal bool HasAny {
+            get { return RequiredMask != 0 || ExcludedMask != 0; }
+        }
+
+        internal RepairSpecializationQuickFilterMode GetMode(int bit)
+        {
+            if ((RequiredMask & bit) != 0)
+                return RepairSpecializationQuickFilterMode.RequiredOnly;
+            if ((ExcludedMask & bit) != 0)
+                return RepairSpecializationQuickFilterMode.ExcludedOnly;
+            return RepairSpecializationQuickFilterMode.Off;
+        }
+
+        internal void SetMode(int bit, RepairSpecializationQuickFilterMode mode)
+        {
+            RequiredMask &= ~bit;
+            ExcludedMask &= ~bit;
+            if (mode == RepairSpecializationQuickFilterMode.RequiredOnly)
+                RequiredMask |= bit;
+            else if (mode == RepairSpecializationQuickFilterMode.ExcludedOnly)
+                ExcludedMask |= bit;
+        }
+
+        internal void Reset()
+        {
+            RequiredMask = 0;
+            ExcludedMask = 0;
+        }
+    }
+
     public enum RestorationAvailabilityQuickFilterMode
     {
         Off = 0,
@@ -85,6 +127,12 @@ namespace Cms21UiPlus
             RepairabilityQuickFilterMode.Off;
         private static RepairabilityQuickFilterMode garageRepairabilityFilterMode =
             RepairabilityQuickFilterMode.Off;
+        private static readonly RepairSpecializationFilterState
+            junkyardRepairSpecializationFilter =
+                new RepairSpecializationFilterState();
+        private static readonly RepairSpecializationFilterState
+            garageRepairSpecializationFilter =
+                new RepairSpecializationFilterState();
         private static QualityQuickFilterMode junkyardQualityFilterMode =
             QualityQuickFilterMode.Off;
         private static QualityQuickFilterMode garageQualityFilterMode =
@@ -126,6 +174,8 @@ namespace Cms21UiPlus
             garageConditionFilterMode = GarageConditionFilterMode.Off;
             junkyardRepairabilityFilterMode = RepairabilityQuickFilterMode.Off;
             garageRepairabilityFilterMode = RepairabilityQuickFilterMode.Off;
+            junkyardRepairSpecializationFilter.Reset();
+            garageRepairSpecializationFilter.Reset();
             junkyardQualityFilterMode = QualityQuickFilterMode.Off;
             garageQualityFilterMode = QualityQuickFilterMode.Off;
             ownedFilterMode = OwnedQuickFilterMode.Off;
@@ -144,6 +194,7 @@ namespace Cms21UiPlus
                 Main.SettingsEntry.Value.resetInventoryQuickFiltersOnExit) {
                 garageConditionFilterMode = GarageConditionFilterMode.Off;
                 garageRepairabilityFilterMode = RepairabilityQuickFilterMode.Off;
+                garageRepairSpecializationFilter.Reset();
                 garageQualityFilterMode = QualityQuickFilterMode.Off;
                 packageFilterMode = PackageQuickFilterMode.Off;
             }

@@ -95,7 +95,7 @@ namespace Cms21UiPlus
         private static bool IsEnabled {
             get {
                 return Main.SettingsEntry != null &&
-                    Main.SettingsEntry.Value.addShoppingListSorting;
+                    Main.SettingsEntry.Value.addImprovedShoppingList;
             }
         }
 
@@ -472,8 +472,10 @@ namespace Cms21UiPlus
             ShopType shopType, int buttonIndex)
         {
             if (buttonIndex >= 0 && buttonIndex < FilterSprites.Length) {
-                if (FilterSprites[buttonIndex] != null)
-                    return FilterSprites[buttonIndex];
+                Sprite cached = FilterSprites[buttonIndex];
+                if (cached != null && cached.texture != null)
+                    return cached;
+                FilterSprites[buttonIndex] = null;
 
                 string fileName = GetFilterIconFileName(shopType);
                 if (!string.IsNullOrEmpty(fileName)) {
@@ -491,7 +493,8 @@ namespace Cms21UiPlus
                     }
                 }
 
-                if (FilterSprites[buttonIndex] != null)
+                if (FilterSprites[buttonIndex] != null &&
+                    FilterSprites[buttonIndex].texture != null)
                     return FilterSprites[buttonIndex];
             }
 

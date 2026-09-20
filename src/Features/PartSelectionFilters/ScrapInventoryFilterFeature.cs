@@ -752,15 +752,17 @@ namespace Cms21UiPlus
 
         private static PartFilterCriteria CreateCriteria()
         {
+            bool useRepairSpecializations =
+                GameplayRepairSkillBridge.RepairSpecializationsEnabled;
             PartFilterCriteria criteria = new PartFilterCriteria();
             criteria.Context = PartFilterContext.Garage;
             criteria.SearchText = searchText;
             criteria.GarageConditionMode = conditionMode;
             criteria.RepairabilityMode = repairabilityMode;
-            criteria.RequiredRepairSpecializationMask =
-                repairSpecializationFilter.RequiredMask;
-            criteria.ExcludedRepairSpecializationMask =
-                repairSpecializationFilter.ExcludedMask;
+            criteria.RequiredRepairSpecializationMask = useRepairSpecializations
+                ? repairSpecializationFilter.RequiredMask : 0;
+            criteria.ExcludedRepairSpecializationMask = useRepairSpecializations
+                ? repairSpecializationFilter.ExcludedMask : 0;
             criteria.QualityMode = qualityMode;
             criteria.OwnedMode = OwnedQuickFilterMode.Off;
             return criteria;

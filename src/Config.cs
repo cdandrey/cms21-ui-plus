@@ -20,7 +20,7 @@ namespace Cms21UiPlus
         [Tomlet.Attributes.TomlInlineComment("Prefill purchase amount and wheel dimensions from the shopping list")]
         public bool wheelShopListPurchaseHelper = true;
         [Tomlet.Attributes.TomlInlineComment("Enable the improved shopping list with shop filters, compact card grid, quantity controls, indicators, sorting and bulk purchase")]
-        public bool addShoppingListSorting = true;
+        public bool addImprovedShoppingList = true;
         [Tomlet.Attributes.TomlInlineComment("Filter the shopping list to the current specialized shop when it opens")]
         public bool filterShoppingListByCurrentShopOnOpen = true;
         [Tomlet.Attributes.TomlInlineComment("Quickly switch between matching mount and unmount modes")]
@@ -35,8 +35,8 @@ namespace Cms21UiPlus
         public bool rememberInventorySorting = true;
         [Tomlet.Attributes.TomlInlineComment("Show normalized livery file names instead of bare numbers")]
         public bool showLiveryFileNames = true;
-        [Tomlet.Attributes.TomlInlineComment("Show vehicle condition and licence plate on map and parking screens")]
-        public bool showCarConditionOnMap = true;
+        [Tomlet.Attributes.TomlInlineComment("Show vehicle condition and rear licence plate on parking cards")]
+        public bool showParkingCarConditionAndLicensePlate = true;
         [Tomlet.Attributes.TomlInlineComment("Physically rearrange cars across all unlocked parking alleys")]
         public bool addParkingSorting = true;
         [Tomlet.Attributes.TomlInlineComment("Automatically accept the redundant dyno-start confirmation")]
@@ -93,7 +93,7 @@ namespace Cms21UiPlus
 
     public static class Types
     {
-        public enum LoggingLevels { Normal, NormalClean, Debug, PlayerLog, Warning, Error }
+        public enum LoggingLevels { NormalClean, Warning, Error }
 
         public sealed class ProfileMemoryData
         {

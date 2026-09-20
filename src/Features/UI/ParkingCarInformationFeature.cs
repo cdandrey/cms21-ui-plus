@@ -7,98 +7,27 @@ using Il2Cpp;
 using Il2CppCMS;
 using Il2CppCMS.UI.Controls;
 using Il2CppCMS.UI.Logic;
-using Il2CppCMS.UI.Logic.CarInfo;
 using Il2CppCMS.UI.Logic.Map.Info;
 using Il2CppCMS.UI.Logic.Parking;
-using Il2CppCMS.UI.Logic.Tabs.CarInfo;
-using Il2CppCMS.UI.Windows;
 #else
 using CMS;
 using CMS.UI.Controls;
 using CMS.UI.Logic;
-using CMS.UI.Logic.CarInfo;
 using CMS.UI.Logic.Map.Info;
 using CMS.UI.Logic.Parking;
-using CMS.UI.Logic.Tabs.CarInfo;
-using CMS.UI.Windows;
 #endif
 
 namespace Cms21UiPlus
 {
-    /// <summary>Adds condition and licence-plate information to map and parking car cards.</summary>
+    /// <summary>Adds condition and licence-plate information to parking car cards.</summary>
     [HarmonyPatch]
-    public static class MapCarInformationFeature
+    public static class ParkingCarInformationFeature
     {
-        private static bool IsEnabled {
+        private static bool ParkingInformationEnabled {
             get {
                 return Main.SettingsEntry != null &&
-                    Main.SettingsEntry.Value.showCarConditionOnMap;
+                    Main.SettingsEntry.Value.showParkingCarConditionAndLicensePlate;
             }
-        }
-
-        [HarmonyPatch(typeof(ShowroomCarItem), nameof(ShowroomCarItem.SetupForCarConfigData))]
-        [HarmonyPostfix]
-        public static void SetupForCarConfigDataPostfix(CarConfigData data,
-            ShowroomCarItem __instance)
-        {
-            if (!IsEnabled || __instance == null || data == null ||
-                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Showroom_2")
-                return;
-
-            CarRibbon ribbon = __instance.GetComponentInChildren<CarRibbon>();
-            if (ribbon == null)
-                return;
-
-            Transform versionRibbon = FindChildByNameFragment(
-                ribbon.transform, "config", "version");
-            if (versionRibbon == null && ribbon.transform.childCount > 2)
-                versionRibbon = ribbon.transform.GetChild(2);
-            if (versionRibbon == null)
-                return;
-            versionRibbon.gameObject.SetActive(false);
-            if (__instance.VersionsCount > 1) {
-                Text text = versionRibbon.GetComponentInChildren<Text>();
-                if (text != null)
-                    text.text = "<size=8>" +
-                        ModLocalization.Get("LOC_ConfigsLabel") + " " +
-                        __instance.VersionsCount + "</size>";
-                versionRibbon.gameObject.SetActive(true);
-            }
-
-            Transform dlcRibbon = FindChildByNameFragment(ribbon.transform, "dlc");
-            if (dlcRibbon == null && ribbon.transform.childCount > 0)
-                dlcRibbon = ribbon.transform.GetChild(0);
-            if (dlcRibbon != null) {
-                Text dlcText = dlcRibbon.GetComponentInChildren<Text>();
-                if (dlcText != null) {
-                    bool installed = data.DLC > 0 && GlobalState.GameManager != null &&
-                        GlobalState.GameManager.PlatformManager.IsDLCInstalled(data.DLC - 1);
-                    dlcText.text = ModLocalization.Get("LOC_DlcLabel") +
-                        (installed ? " *" : string.Empty);
-                }
-            }
-        }
-
-        [HarmonyPatch(typeof(ShowroomCarItem), nameof(ShowroomCarItem.SetupForCarLoader))]
-        [HarmonyPostfix]
-        public static void SetupForCarLoaderPostfix(CarLoader carLoader,
-            ShowroomCarItem __instance)
-        {
-            if (!IsEnabled || !GlobalState.IsGarageSceneActive ||
-                carLoader == null || __instance == null)
-                return;
-
-            float totalCondition = (
-                Helper.RoundCondition(carLoader.GetPanelsGlobalCondition()) +
-                Helper.RoundCondition(carLoader.GetPartsGlobalCondition()) +
-                Helper.RoundCondition(carLoader.GetBodyCondition()) +
-                Helper.RoundCondition(carLoader.GetInteriorCondition())) / 400f;
-
-            SetupConditionRibbon(__instance.carRibbon, totalCondition);
-            string plate = carLoader.LicensePlatesData != null
-                ? carLoader.LicensePlatesData.LicensePlateNumberRear
-                : null;
-            SetupPlateRibbon(__instance, plate);
         }
 
         [HarmonyPatch(typeof(ParkingCarPanel), nameof(ParkingCarPanel.PrepareForCar))]
@@ -106,7 +35,7 @@ namespace Cms21UiPlus
         public static void PrepareForCarPostfix(int saveIndex,
             ParkingCarPanel __instance)
         {
-            if (!IsEnabled || !GlobalState.IsGarageSceneActive ||
+            if (!ParkingInformationEnabled || !GlobalState.IsGarageSceneActive ||
                 __instance == null || GlobalState.GameManager == null)
                 return;
 

@@ -103,23 +103,29 @@ namespace Cms21UiPlus
             BaseInventory inventory)
         {
             bool junkyardContext = IsBarnOrJunkyardScene();
+            bool expandedPackage = !junkyardContext &&
+                IsExpandedInventoryPackage(inventory);
             PartFilterCriteria criteria = new PartFilterCriteria();
             criteria.Context = junkyardContext
                 ? PartFilterContext.Junkyard
                 : PartFilterContext.Garage;
             criteria.GarageConditionMode = garageConditionFilterMode;
             criteria.JunkyardConditionMode = junkyardConditionFilterMode;
-            criteria.RepairabilityMode = junkyardContext
-                ? junkyardRepairabilityFilterMode
-                : garageRepairabilityFilterMode;
+            criteria.RepairabilityMode = expandedPackage
+                ? RepairabilityQuickFilterMode.Off
+                : junkyardContext
+                    ? junkyardRepairabilityFilterMode
+                    : garageRepairabilityFilterMode;
             RepairSpecializationFilterState repairSpecializations =
                 junkyardContext
                     ? junkyardRepairSpecializationFilter
                     : garageRepairSpecializationFilter;
-            criteria.RequiredRepairSpecializationMask =
-                repairSpecializations.RequiredMask;
-            criteria.ExcludedRepairSpecializationMask =
-                repairSpecializations.ExcludedMask;
+            bool useRepairSpecializations = !expandedPackage &&
+                GameplayRepairSkillBridge.RepairSpecializationsEnabled;
+            criteria.RequiredRepairSpecializationMask = useRepairSpecializations
+                ? repairSpecializations.RequiredMask : 0;
+            criteria.ExcludedRepairSpecializationMask = useRepairSpecializations
+                ? repairSpecializations.ExcludedMask : 0;
             criteria.QualityMode = junkyardContext
                 ? junkyardQualityFilterMode
                 : garageQualityFilterMode;

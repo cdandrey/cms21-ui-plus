@@ -149,6 +149,7 @@ namespace Cms21UiPlus
             activeFilteredInventory = null;
             ResetTravelCollectedSearch();
             PartRowIndicators.ResetRowBaseItems();
+            RestoreAllExpandedPackageSearchFields();
             GroupingStates.Clear();
             PackageRows.Clear();
             GroupingListTriggers.Clear();

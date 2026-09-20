@@ -55,7 +55,7 @@ namespace Cms21UiPlus
             get {
                 return GlobalState.IsGarageSceneActive &&
                     Main.SettingsEntry != null &&
-                    Main.SettingsEntry.Value.addShoppingListSorting;
+                    Main.SettingsEntry.Value.addImprovedShoppingList;
             }
         }
 

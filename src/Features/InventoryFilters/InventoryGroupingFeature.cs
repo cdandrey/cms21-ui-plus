@@ -43,6 +43,8 @@ namespace Cms21UiPlus
         {
             public BaseInventory Inventory;
             public string ExpandedKey;
+            public InputField HiddenSearchField;
+            public string HiddenSearchText;
             public readonly Dictionary<string, InventoryPackageInfo> Packages =
                 new Dictionary<string, InventoryPackageInfo>(StringComparer.Ordinal);
         }
@@ -381,6 +383,7 @@ namespace Cms21UiPlus
 
             state.ExpandedKey = key;
             state.Packages.Clear();
+            HideExpandedPackageSearch(inventory, state);
             ForceRestoreSnapshot(inventory);
             ResetCurrentPage(inventory);
             inventory.RedrawCurrentPage();
@@ -485,6 +488,7 @@ namespace Cms21UiPlus
 
             state.ExpandedKey = null;
             state.Packages.Clear();
+            RestoreExpandedPackageSearch(state);
             RemovePackageRows(inventory.GetInstanceID());
             ForceRestoreSnapshot(inventory);
             ResetCurrentPage(inventory);
@@ -502,7 +506,55 @@ namespace Cms21UiPlus
 
             state.ExpandedKey = null;
             state.Packages.Clear();
+            RestoreExpandedPackageSearch(state);
             RemovePackageRows(inventory.GetInstanceID());
+        }
+
+        private static void HideExpandedPackageSearch(BaseInventory inventory,
+            InventoryGroupingState state)
+        {
+            if (inventory == null || state == null ||
+                state.HiddenSearchField != null)
+                return;
+
+            InputField searchField = FindSearchField(inventory, true);
+            if (searchField == null)
+                return;
+
+            state.HiddenSearchField = searchField;
+            state.HiddenSearchText = searchField.text ?? string.Empty;
+            if (!string.IsNullOrEmpty(state.HiddenSearchText)) {
+                searchField.text = string.Empty;
+                searchField.SendOnSubmit();
+            }
+            searchField.gameObject.SetActive(false);
+        }
+
+        private static void RestoreExpandedPackageSearch(
+            InventoryGroupingState state)
+        {
+            if (state == null || state.HiddenSearchField == null)
+                return;
+
+            InputField searchField = state.HiddenSearchField;
+            string searchText = state.HiddenSearchText ?? string.Empty;
+            state.HiddenSearchField = null;
+            state.HiddenSearchText = null;
+            if (searchField.gameObject == null)
+                return;
+
+            searchField.gameObject.SetActive(true);
+            if (!string.Equals(searchField.text, searchText,
+                    StringComparison.Ordinal)) {
+                searchField.text = searchText;
+                searchField.SendOnSubmit();
+            }
+        }
+
+        private static void RestoreAllExpandedPackageSearchFields()
+        {
+            foreach (InventoryGroupingState state in GroupingStates.Values)
+                RestoreExpandedPackageSearch(state);
         }
 
         internal static bool ShouldSuppressInventoryRowRightClick(
@@ -755,6 +807,8 @@ namespace Cms21UiPlus
                 return;
 
             int instanceId = inventory.GetInstanceID();
+            InventoryGroupingState state = GetGroupingState(inventory, false);
+            RestoreExpandedPackageSearch(state);
             GroupingStates.Remove(instanceId);
             RemovePackageRows(instanceId);
             RemoveGroupingListTriggers(inventory);

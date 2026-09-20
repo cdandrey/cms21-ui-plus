@@ -14,7 +14,6 @@ namespace Cms21UiPlus
 {
     internal static class RepairSkillIndicator
     {
-        private const string LegacyIndicatorName = "RepairSkill";
         private const string IndicatorNamePrefix = "RepairSkillIcon";
         private const string LevelName = "RepairSkillLevel";
         private const int MaximumIndicators = 6;
@@ -58,10 +57,6 @@ namespace Cms21UiPlus
         private static void UpdateSkillIcons(Transform parent,
             string[] paths, float repairSize)
         {
-            Transform legacy = parent.Find(LegacyIndicatorName);
-            if (legacy != null)
-                legacy.gameObject.SetActive(false);
-
             int visibleCount = paths != null
                 ? Mathf.Min(paths.Length, MaximumIndicators) : 0;
             for (int index = 0; index < MaximumIndicators; index++) {

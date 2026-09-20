@@ -192,7 +192,7 @@ namespace Cms21UiPlus
                 if (Main.SettingsEntry == null || Main.SettingsEntry.Value == null)
                     return false;
                 Settings settings = Main.SettingsEntry.Value;
-                return settings.addShoppingListSorting ||
+                return settings.addImprovedShoppingList ||
                     settings.wheelShopListPurchaseHelper ||
                     settings.removePartsFromShoppingList;
             }

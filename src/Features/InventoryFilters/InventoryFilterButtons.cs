@@ -385,9 +385,14 @@ namespace Cms21UiPlus
             EnsureTravelCollectedSearch(inventory);
             Transform buttonRoot = GetButtonRoot(inventory);
             bool junkyardContext = IsBarnOrJunkyardScene();
-            bool packageContext = !junkyardContext &&
-                IsInventoryGroupingEnabled() && SupportsInventoryGrouping(inventory) &&
-                !IsExpandedInventoryPackage(inventory);
+            bool groupingContext = !junkyardContext &&
+                IsInventoryGroupingEnabled() && SupportsInventoryGrouping(inventory);
+            bool expandedPackage = groupingContext &&
+                IsExpandedInventoryPackage(inventory);
+            bool packageContext = groupingContext && !expandedPackage;
+            if (expandedPackage)
+                HideExpandedPackageSearch(inventory,
+                    GetGroupingState(inventory, false));
             Transform conditionButton = FindSingleButton(buttonRoot, ConditionButtonName);
             Transform repairButton = FindSingleButton(buttonRoot, RepairButtonName);
             Transform qualityButton = FindSingleButton(buttonRoot, QualityButtonName);
@@ -397,9 +402,11 @@ namespace Cms21UiPlus
             if (conditionButton == null)
                 conditionButton = CreateButton(inventory, buttonRoot,
                     ConditionButtonName, QuickFilterButtonKind.Condition);
-            if (repairButton == null)
+            if (!expandedPackage && repairButton == null)
                 repairButton = CreateButton(inventory, buttonRoot,
                     RepairButtonName, QuickFilterButtonKind.Repairability);
+            if (repairButton != null)
+                repairButton.gameObject.SetActive(!expandedPackage);
             if (qualityButton == null)
                 qualityButton = CreateButton(inventory, buttonRoot,
                     QualityButtonName, QuickFilterButtonKind.Quality);
@@ -429,7 +436,9 @@ namespace Cms21UiPlus
             }
 
             ConfigureButton(conditionButton, inventory, QuickFilterButtonKind.Condition);
-            ConfigureButton(repairButton, inventory, QuickFilterButtonKind.Repairability);
+            if (!expandedPackage)
+                ConfigureButton(repairButton, inventory,
+                    QuickFilterButtonKind.Repairability);
             ConfigureButton(qualityButton, inventory, QuickFilterButtonKind.Quality);
             if (junkyardContext)
                 ConfigureButton(ownedButton, inventory, QuickFilterButtonKind.Owned);
@@ -438,7 +447,7 @@ namespace Cms21UiPlus
 
             ApplyButtonLayout(inventory, conditionButton, repairButton,
                 qualityButton, ownedButton, packageButton, junkyardContext,
-                packageContext);
+                packageContext, expandedPackage);
             UpdateButtonVisuals(conditionButton, repairButton, qualityButton,
                 ownedButton, packageButton, junkyardContext, packageContext);
         }
@@ -599,10 +608,10 @@ namespace Cms21UiPlus
         private static void ApplyButtonLayout(BaseInventory inventory,
             Transform conditionButton, Transform repairButton,
             Transform qualityButton, Transform ownedButton,
-            Transform packageButton, bool junkyardContext, bool packageContext)
+            Transform packageButton, bool junkyardContext, bool packageContext,
+            bool expandedPackage)
         {
-            if (conditionButton == null || repairButton == null ||
-                qualityButton == null)
+            if (conditionButton == null || qualityButton == null)
                 return;
 
             InputField searchField = FindSearchField(inventory, false);
@@ -620,6 +629,18 @@ namespace Cms21UiPlus
                 if (parentWarehouse != null) {
                     Transform parent = parentWarehouse.transform;
                     float centerY = searchRect.rect.center.y + SearchRowYOffset;
+                    if (expandedPackage) {
+                        float expandedQualityOffset = 18f;
+                        Vector3 expandedQualityWorld = searchRect.TransformPoint(new Vector3(
+                            searchRect.rect.xMin - expandedQualityOffset, centerY, 0f));
+                        Vector3 expandedConditionWorld = searchRect.TransformPoint(new Vector3(
+                            searchRect.rect.xMin - expandedQualityOffset - ButtonSpacing,
+                            centerY, 0f));
+                        SetButtonWorldPosition(conditionButton, parent,
+                            expandedConditionWorld);
+                        SetButtonWorldPosition(qualityButton, parent, expandedQualityWorld);
+                        return;
+                    }
                     float packageOffset = 18f;
                     float qualityOffset = packageContext
                         ? packageOffset + ButtonSpacing : packageOffset;
@@ -676,7 +697,12 @@ namespace Cms21UiPlus
                 float rightButtonX = searchLeftX - 18f;
                 float y = searchRect.anchoredPosition.y + SearchRowYOffset;
 
-                if (junkyardContext) {
+                if (expandedPackage) {
+                    SetButtonPosition(conditionButton, normalParent, searchRect,
+                        rightButtonX - ButtonSpacing, y);
+                    SetButtonPosition(qualityButton, normalParent, searchRect,
+                        rightButtonX, y);
+                } else if (junkyardContext) {
                     SetButtonPosition(conditionButton, normalParent, searchRect,
                         rightButtonX - (ButtonSpacing * 3f), y);
                     SetButtonPosition(repairButton, normalParent, searchRect,
@@ -706,9 +732,10 @@ namespace Cms21UiPlus
             }
 
             SetFallbackPosition(conditionButton, inventory.transform,
-                FallbackConditionX, FallbackY);
-            SetFallbackPosition(repairButton, inventory.transform,
-                FallbackRepairX, FallbackY);
+                expandedPackage ? FallbackRepairX : FallbackConditionX, FallbackY);
+            if (!expandedPackage)
+                SetFallbackPosition(repairButton, inventory.transform,
+                    FallbackRepairX, FallbackY);
             SetFallbackPosition(qualityButton, inventory.transform,
                 FallbackQualityX, FallbackY);
             if (junkyardContext)
@@ -1258,7 +1285,7 @@ namespace Cms21UiPlus
             if (select == null)
                 return null;
 
-            if (!GameplayRepairSkillBridge.SupportsRepairSpecializations ||
+            if (!GameplayRepairSkillBridge.RepairSpecializationsEnabled ||
                 specializationState == null) {
                 return new[] {
                     new QuickFilterMenuOption(
@@ -2208,9 +2235,11 @@ namespace Cms21UiPlus
                             break;
                         default:
                             repairImage.sprite = InventoryIconProvider.GetWhiteRepairWrenchIcon();
-                            repairImage.color = specializations.HasAny
-                                ? ActiveButtonColor
-                                : DisabledButtonColor;
+                            repairImage.color =
+                                GameplayRepairSkillBridge.RepairSpecializationsEnabled &&
+                                specializations.HasAny
+                                    ? ActiveButtonColor
+                                    : DisabledButtonColor;
                             break;
                     }
                 }

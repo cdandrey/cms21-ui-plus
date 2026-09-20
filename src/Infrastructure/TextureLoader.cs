@@ -19,11 +19,6 @@ namespace Cms21UiPlus
                 highQualityCompression);
         }
 
-        public static Sprite LoadSpriteFromBytes(byte[] imageData)
-        {
-            return LoadSpriteFromBytes(imageData, null, true);
-        }
-
         private static Sprite LoadSpriteFromBytes(byte[] imageData,
             string textureName, bool highQualityCompression)
         {

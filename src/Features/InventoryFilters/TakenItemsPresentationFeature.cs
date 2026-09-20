@@ -1042,15 +1042,17 @@ namespace Cms21UiPlus
 
         private static void ApplyFilters()
         {
+            bool useRepairSpecializations =
+                GameplayRepairSkillBridge.RepairSpecializationsEnabled;
             PartFilterCriteria criteria = new PartFilterCriteria {
                 Context = PartFilterContext.Junkyard,
                 SearchText = searchText,
                 JunkyardConditionMode = conditionMode,
                 RepairabilityMode = repairabilityMode,
-                RequiredRepairSpecializationMask =
-                    repairSpecializationFilter.RequiredMask,
-                ExcludedRepairSpecializationMask =
-                    repairSpecializationFilter.ExcludedMask,
+                RequiredRepairSpecializationMask = useRepairSpecializations
+                    ? repairSpecializationFilter.RequiredMask : 0,
+                ExcludedRepairSpecializationMask = useRepairSpecializations
+                    ? repairSpecializationFilter.ExcludedMask : 0,
                 QualityMode = qualityMode,
                 OwnedMode = ownedMode,
             };

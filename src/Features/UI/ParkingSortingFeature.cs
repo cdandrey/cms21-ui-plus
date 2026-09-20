@@ -396,7 +396,7 @@ namespace Cms21UiPlus
                     ArrivalKey = GetArrivalKey(car),
                     DisplayName = needsName ? GetDisplayName(car) : string.Empty,
                     Condition = needsCondition
-                        ? MapCarInformationFeature.CalculateTotalCondition(car) : 0f,
+                        ? ParkingCarInformationFeature.CalculateTotalCondition(car) : 0f,
                 };
                 entries.Add(entry);
             }

@@ -83,7 +83,7 @@ namespace Cms21UiPlus
         private static bool IsEnabled {
             get {
                 return Main.SettingsEntry != null &&
-                    Main.SettingsEntry.Value.addShoppingListSorting;
+                    Main.SettingsEntry.Value.addImprovedShoppingList;
             }
         }
 

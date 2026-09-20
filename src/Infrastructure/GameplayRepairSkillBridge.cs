@@ -10,6 +10,8 @@ namespace Cms21UiPlus
 
         private delegate bool TryGetRepairDisplayDataDelegate(string itemId,
             out string[] indicatorPaths, out bool restorationAvailable);
+        private delegate int GetRepairRequirementsMaskDelegate(string itemId);
+        private delegate bool GetRepairSpecializationsEnabledDelegate();
         private delegate string GetRepairAvailabilityIndicatorPathDelegate(
             bool available);
 
@@ -22,43 +24,74 @@ namespace Cms21UiPlus
             @"Mods\CMS21GameplayPlus\SkillIndicators\SI_SkillWelder.png",
         };
 
+        private static readonly int[] GameplaySpecializationMasks = {
+            1 << 11,
+            1 << 9,
+            1 << 12,
+            1 << 10,
+            1 << 13,
+            1 << 8,
+        };
+
         private static readonly Type RulesType =
             Type.GetType(RulesTypeName, false);
         private static readonly TryGetRepairDisplayDataDelegate
             RepairDisplayDataResolver = ResolveRepairDisplayDataResolver();
+        private static readonly GetRepairRequirementsMaskDelegate
+            RepairRequirementsMaskResolver =
+                ResolveRepairRequirementsMaskResolver();
+        private static readonly GetRepairSpecializationsEnabledDelegate
+            RepairSpecializationsEnabledResolver =
+                ResolveRepairSpecializationsEnabledResolver();
         private static readonly GetRepairAvailabilityIndicatorPathDelegate
             RepairAvailabilityIndicatorPathResolver =
                 ResolveRepairAvailabilityIndicatorPathResolver();
 
         internal static bool SupportsRepairSpecializations {
-            get { return RepairDisplayDataResolver != null; }
+            get {
+                return RepairRequirementsMaskResolver != null &&
+                    RepairSpecializationsEnabledResolver != null;
+            }
+        }
+
+        internal static bool RepairSpecializationsEnabled {
+            get {
+                if (!SupportsRepairSpecializations)
+                    return false;
+                try {
+                    return RepairSpecializationsEnabledResolver();
+                } catch (Exception exception) {
+                    ModLogger.Log("[RepairSkillIndicator] Gameplay+ repair " +
+                        "specialization state query failed." +
+                        Environment.NewLine + exception,
+                        Types.LoggingLevels.Error);
+                    return false;
+                }
+            }
         }
 
         internal static int GetRepairSpecializationMask(string itemId)
         {
-            string[] indicatorPaths;
-            bool restorationAvailable;
-            if (!TryGetRepairDisplayData(itemId, out indicatorPaths,
-                    out restorationAvailable) || indicatorPaths == null)
+            if (string.IsNullOrEmpty(itemId) ||
+                RepairRequirementsMaskResolver == null)
                 return 0;
 
-            int mask = 0;
-            for (int pathIndex = 0; pathIndex < indicatorPaths.Length; pathIndex++) {
-                string path = indicatorPaths[pathIndex];
-                if (string.IsNullOrEmpty(path))
-                    continue;
-                for (int specializationIndex = 0;
-                        specializationIndex < RepairSpecializationIndicatorPaths.Length;
-                        specializationIndex++) {
-                    if (string.Equals(path,
-                            RepairSpecializationIndicatorPaths[specializationIndex],
-                            StringComparison.OrdinalIgnoreCase)) {
-                        mask |= 1 << specializationIndex;
-                        break;
-                    }
+            try {
+                int requirementsMask = RepairRequirementsMaskResolver(itemId);
+                int result = 0;
+                for (int index = 0;
+                        index < GameplaySpecializationMasks.Length; index++) {
+                    if ((requirementsMask &
+                            GameplaySpecializationMasks[index]) != 0)
+                        result |= 1 << index;
                 }
+                return result;
+            } catch (Exception exception) {
+                ModLogger.Log("[RepairSkillIndicator] Gameplay+ repair " +
+                    "requirements query failed." + Environment.NewLine + exception,
+                    Types.LoggingLevels.Error);
+                return 0;
             }
-            return mask;
         }
 
         public static bool TryGetRepairDisplayData(string itemId,
@@ -108,6 +141,42 @@ namespace Cms21UiPlus
                 ? (TryGetRepairDisplayDataDelegate)Delegate.CreateDelegate(
                     typeof(TryGetRepairDisplayDataDelegate), method)
                 : null;
+        }
+
+        private static GetRepairRequirementsMaskDelegate
+            ResolveRepairRequirementsMaskResolver()
+        {
+            MethodInfo method = ResolveMethod("GetRepairRequirementsMask",
+                typeof(int), typeof(string));
+            return method != null
+                ? (GetRepairRequirementsMaskDelegate)Delegate.CreateDelegate(
+                    typeof(GetRepairRequirementsMaskDelegate), method)
+                : null;
+        }
+
+        private static GetRepairSpecializationsEnabledDelegate
+            ResolveRepairSpecializationsEnabledResolver()
+        {
+            try {
+                if (RulesType == null)
+                    return null;
+
+                PropertyInfo property = RulesType.GetProperty("IsEnabled",
+                    BindingFlags.Public | BindingFlags.Static);
+                MethodInfo getter = property != null
+                    ? property.GetGetMethod() : null;
+                return getter != null && getter.ReturnType == typeof(bool)
+                    ? (GetRepairSpecializationsEnabledDelegate)
+                        Delegate.CreateDelegate(
+                            typeof(GetRepairSpecializationsEnabledDelegate),
+                            getter)
+                    : null;
+            } catch (Exception exception) {
+                ModLogger.Log("[RepairSkillIndicator] Gameplay+ integration " +
+                    "initialization failed." + Environment.NewLine + exception,
+                    Types.LoggingLevels.Error);
+                return null;
+            }
         }
 
         private static GetRepairAvailabilityIndicatorPathDelegate

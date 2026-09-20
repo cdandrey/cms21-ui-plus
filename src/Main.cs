@@ -47,12 +47,9 @@ namespace Cms21UiPlus
             GlobalState.GameManager = Singleton<GameManager>.Instance;
             GlobalState.IsMenuSceneActive =
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Menu";
-            bool melonDebug = Environment.GetCommandLineArgs().Contains("--melonloader.debug");
-
             LoadSettings();
             LoadProfileMemory();
             KeyBindingsConfig.Load(GlobalConfig.cfgKeyBindings);
-            ModLogger.ConfigureUnityLogForwarding(melonDebug);
             ApplyHarmonyPatches();
             initialized = true;
         }
@@ -62,7 +59,6 @@ namespace Cms21UiPlus
             if (!initialized)
                 return;
             SaveProfileMemory();
-            ModLogger.Shutdown();
         }
 
         public override void OnSceneWasUnloaded(int buildIndex, string sceneName)

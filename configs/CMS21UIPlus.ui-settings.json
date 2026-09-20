@@ -90,7 +90,7 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 20,
+      "order": 10,
       "nameKey": "LOC_SettingAddQuickFiltersName",
       "descriptionKey": "LOC_SettingAddQuickFiltersDescription"
     },
@@ -112,7 +112,7 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 20,
+      "order": 30,
       "nameKey": "LOC_SettingResetInventoryQuickFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -123,7 +123,7 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 21,
+      "order": 40,
       "nameKey": "LOC_SettingResetScrapInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -134,7 +134,7 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 22,
+      "order": 50,
       "nameKey": "LOC_SettingResetRepairInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -145,7 +145,7 @@
       "type": "boolean",
       "default": false,
       "applyMode": "immediate",
-      "order": 23,
+      "order": 60,
       "nameKey": "LOC_SettingResetSpringClampInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -156,7 +156,7 @@
       "type": "boolean",
       "default": false,
       "applyMode": "immediate",
-      "order": 24,
+      "order": 70,
       "nameKey": "LOC_SettingResetTireChangerInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -167,7 +167,7 @@
       "type": "boolean",
       "default": false,
       "applyMode": "immediate",
-      "order": 25,
+      "order": 80,
       "nameKey": "LOC_SettingResetWheelBalancerInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -178,7 +178,7 @@
       "type": "boolean",
       "default": false,
       "applyMode": "immediate",
-      "order": 26,
+      "order": 90,
       "nameKey": "LOC_SettingResetBrakeLatheInventoryFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -189,7 +189,7 @@
       "type": "boolean",
       "default": false,
       "applyMode": "immediate",
-      "order": 27,
+      "order": 100,
       "nameKey": "LOC_SettingResetMountPartSelectionFiltersOnExitName",
       "descriptionKey": "LOC_SettingResetQuickFiltersOnExitDescription"
     },
@@ -227,13 +227,35 @@
       "descriptionKey": "LOC_SettingRememberInventorySortingDescription"
     },
     {
+      "id": "FID_AddImprovedShoppingList",
+      "key": "addImprovedShoppingList",
+      "group": "shopping",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 10,
+      "nameKey": "LOC_SettingAddImprovedShoppingListName",
+      "descriptionKey": "LOC_SettingAddImprovedShoppingListDescription"
+    },
+    {
+      "id": "FID_FilterShoppingListByCurrentShopOnOpen",
+      "key": "filterShoppingListByCurrentShopOnOpen",
+      "group": "shopping",
+      "type": "boolean",
+      "default": true,
+      "applyMode": "immediate",
+      "order": 20,
+      "nameKey": "LOC_SettingFilterShoppingListByCurrentShopOnOpenName",
+      "descriptionKey": "LOC_SettingFilterShoppingListByCurrentShopOnOpenDescription"
+    },
+    {
       "id": "FID_RemovePartsFromShoppingList",
       "key": "removePartsFromShoppingList",
       "group": "shopping",
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 10,
+      "order": 30,
       "nameKey": "LOC_SettingRemovePartsFromShoppingListName",
       "descriptionKey": "LOC_SettingRemovePartsFromShoppingListDescription"
     },
@@ -244,31 +266,9 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 20,
+      "order": 40,
       "nameKey": "LOC_SettingWheelShopListPurchaseHelperName",
       "descriptionKey": "LOC_SettingWheelShopListPurchaseHelperDescription"
-    },
-    {
-      "id": "FID_AddShoppingListSorting",
-      "key": "addShoppingListSorting",
-      "group": "shopping",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 30,
-      "nameKey": "LOC_SettingAddShoppingListSortingName",
-      "descriptionKey": "LOC_SettingAddShoppingListSortingDescription"
-    },
-    {
-      "id": "FID_FilterShoppingListByCurrentShopOnOpen",
-      "key": "filterShoppingListByCurrentShopOnOpen",
-      "group": "shopping",
-      "type": "boolean",
-      "default": true,
-      "applyMode": "immediate",
-      "order": 30,
-      "nameKey": "LOC_SettingFilterShoppingListByCurrentShopOnOpenName",
-      "descriptionKey": "LOC_SettingFilterShoppingListByCurrentShopOnOpenDescription"
     },
     {
       "id": "FID_UnmarkFinishedParts",
@@ -315,15 +315,15 @@
       "descriptionKey": "LOC_SettingShowLiveryFileNamesDescription"
     },
     {
-      "id": "FID_ShowCarConditionOnMap",
-      "key": "showCarConditionOnMap",
+      "id": "FID_ShowParkingCarConditionAndLicensePlate",
+      "key": "showParkingCarConditionAndLicensePlate",
       "group": "interface",
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
       "order": 30,
-      "nameKey": "LOC_SettingShowCarConditionOnMapName",
-      "descriptionKey": "LOC_SettingShowCarConditionOnMapDescription"
+      "nameKey": "LOC_SettingShowParkingCarConditionAndLicensePlateName",
+      "descriptionKey": "LOC_SettingShowParkingCarConditionAndLicensePlateDescription"
     },
     {
       "id": "FID_AddParkingSorting",
@@ -332,7 +332,7 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 35,
+      "order": 10,
       "nameKey": "LOC_SettingAddParkingSortingName",
       "descriptionKey": "LOC_SettingAddParkingSortingDescription"
     },
@@ -343,7 +343,7 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 40,
+      "order": 50,
       "nameKey": "LOC_SettingAutoConfirmDynoStartName",
       "descriptionKey": "LOC_SettingAutoConfirmDynoStartDescription"
     },
@@ -354,7 +354,7 @@
       "type": "boolean",
       "default": true,
       "applyMode": "immediate",
-      "order": 50,
+      "order": 60,
       "nameKey": "LOC_SettingAddExitGameToGaragePauseMenuName",
       "descriptionKey": "LOC_SettingAddExitGameToGaragePauseMenuDescription"
     },

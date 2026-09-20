@@ -23,8 +23,8 @@ removed feature lists are summarized in [QoLmod origin](#qolmod-origin).
 
 All switches below are stored under `[CMS21UIPlus.Settings]` in
 `CMS21UIPlus.cfg`. Displayed names and apply modes are taken from the in-game settings
-manifest. Indicator and quick-filter switches currently use `immediate`; the remaining listed
-switches use `restartGame`.
+manifest. All listed switches use `immediate` except `skipStartupVideosTotally` and
+`autoContinueStartupPrompt`, which use `restartGame`.
 
 ### Inventory
 
@@ -41,6 +41,7 @@ switches use `restartGame`.
 | In-game setting | Config flag | Default | Detailed behavior |
 |---|---|---:|---|
 | **Quick filters** | `addQuickFilters` | `true` | Enables quick filters in every supported window: garage inventory and warehouse, barn/junkyard, the improved Return to Garage window, scrap and repair, spring clamp, tire changer, wheel balancer, brake lathe and mount-part selection. Each window exposes only the filter types applicable to it. |
+| **Improved Return to Garage window** | `addTakenItemsPresentation` | `true` | Shows barn and junkyard finds as compact part cards instead of the native list. Quick filters and text search in this window are controlled by `addQuickFilters`. |
 | **Reset inventory quick filters on exit** | `resetInventoryQuickFiltersOnExit` | `true` | Restores the existing garage inventory/warehouse behavior by clearing their quick-filter state when the window closes. Disabling it keeps those filter modes for the next opening in the same scene. |
 | **Move filtered parts** | `moveFilteredPartsBetweenInventoryAndWarehouse` | `true` | In the warehouse window, moves every loose part and complete assembly remaining after the active warehouse tab, category, native search and quick filters. The bulk action uses the configured modifier with Enter or a modified left click, replaces per-item movement popups with one summary popup containing the moved quantity and refreshes the window once after the transaction. The feature is independent from `addQuickFilters`: when quick filters are disabled, it still moves the result produced by the native tab, category and search controls. |
 | **Reset scrap filters on exit** | `resetScrapInventoryFiltersOnExit` | `true` | Clears scrap condition, repairability, quality and search state when the scrap window closes. Disabling it keeps the state for the next opening in the same scene. |
@@ -87,10 +88,10 @@ Whenever a numeric owned-count badge is shown, a white total is displayed above 
 
 | In-game setting | Config flag | Default | Detailed behavior |
 |---|---|---:|---|
+| **Improved shopping list** | `addImprovedShoppingList` | `true` | Enables shop-category filters, a compact inventory-style card grid, `-` / `+` quantity controls, repairability and warehouse-availability badges, persistent sorting menu and hold-`Space` bulk purchase for the current shop. Sorting supports name, warehouse availability, unit price and repairability in both directions. |
+| **Filter by current shop on open** | `filterShoppingListByCurrentShopOnOpen` | `true` | When the shopping list opens inside a specialized shop, enables only that shop category. Disabling it opens the list with all shop categories enabled. |
 | **Auto-remove purchased parts from list** | `removePartsFromShoppingList` | `true` | After a shop purchase actually reduces player money, subtracts the bought quantity from the shopping-list entry currently linked to the single shop search result. The entry is removed when the remaining amount reaches zero. Licence plates keep their exact plate-name matching path. |
 | **Autofill tire/rim/part purchase window** | `wheelShopListPurchaseHelper` | `true` | When the current parts-shop search contains exactly one item that matches a shopping-list entry, prefills that entry's requested quantity within the shop's allowed range. Tires also receive width/profile/size, rims receive size/ET, and tire controls are presented in Width/Profile/Size order while preserving selected values during option changes. |
-| **Improved shopping list** | `addShoppingListSorting` | `true` | Enables shop-category filters, a compact inventory-style card grid, `-` / `+` quantity controls, repairability and warehouse-availability badges, persistent sorting menu and hold-`Space` bulk purchase for the current shop. Sorting supports name, warehouse availability, unit price and repairability in both directions. |
-| **Filter by current shop on open** | `filterShoppingListByCurrentShopOnOpen` | `true` | When the shopping list opens inside a specialized shop, enables only that shop category. Disabling it opens the list with all shop categories enabled. |
 
 With **Improved shopping list** enabled, twelve compact shop-category icons filter the list by Main, Body, Rims, Tires, Interior, Licence Plates, Gearbox, Tuning, Body Tuning, Electronics, Community and Addons; enabled categories are white and disabled categories are grey. The icons reuse the native shop-selection sprites. A single left-click toggles one category. Double left-click leaves only that category enabled when it was disabled or shared the active set; when it was the only enabled category, double left-click disables it and enables all others. With `filterShoppingListByCurrentShopOnOpen` enabled, opening the list inside a specific parts shop enables only that shop category; otherwise the list opens with all categories enabled, as it does from inventory or the shop hub. Pressing `Alt` toggles all categories on or off. The shopping list is presented as a compact inventory-style card grid sized to 75% of the native inventory card. The number of columns is calculated from the available list width with a 2-pixel gap between cards and equal leftover margins on the left and right; when the whole list fits on one row, cards start from the left with the same 2-pixel edge gap. Each card shows the part thumbnail and localized name without a condition bar; tire and rim parameters are displayed directly on the card. Quantity, `-` / `+` controls and the native delete action are placed directly below the card; `-` is disabled when only one item remains. The same quantity changes are available from the `-` / `+` keyboard keys while a shopping-list card is selected; holding `X` keeps the native clear-all shopping-list action. Inside a specific parts shop, holding `Space` opens a native confirmation for buying every compatible shopping-list entry sold by that shop and reports the matching part count and discounted cost before purchase. The action is hidden on the shop hub; tire and rim dimensions are preserved, tuning shops buy available tuning variants, and successfully purchased quantities are removed from the list. Repairability and warehouse indicators are drawn in the upper-left and upper-right corners of each card; with CMS21 Gameplay+ installed, all required specialization icons are shown below the wrench and the required Restorer level is shown to its right. Owned quantities are always shown vertically below the warehouse icon as total, 100%, 50–99%, 15–49% and below-15% counts, omitting empty condition groups; missing parts keep only the red warehouse icon.
 
@@ -119,13 +120,13 @@ Values use `UnityEngine.KeyCode` names. `None` disables a binding. Invalid value
 reported and replaced by the safe default. The filtered-transfer modifier also applies to
 left mouse clicks, and the warehouse footer shows the active bulk-transfer shortcut.
 
-### Interface and state
+### Interface
 
 | In-game setting | Config flag | Default | Detailed behavior |
 |---|---|---:|---|
-| **Livery file names** | `showLiveryFileNames` | `true` | Replaces bare numeric livery entries with normalized livery filenames in the supported livery selection interface, making similarly numbered variants identifiable without changing the selected texture. |
-| **Vehicle information on map** | `showCarConditionOnMap` | `true` | Adds total vehicle condition and rear licence-plate information to supported map vehicle cards and parking panels. Condition is calculated from body panels, mechanical parts, body and interior data while ignoring non-car/dummy elements handled by the game. |
 | **Parking sorting** | `addParkingSorting` | `true` | Adds the native rearrangement command and sorting window to the garage parking browser. The selected mode physically compacts and rearranges all cars across every unlocked parking alley, so the new slot order persists in the game save. Arrival order is preserved per profile even while a known car is temporarily outside parking. Name sorting groups identical names by condition from best to worst; condition sorting uses the current vehicle data. |
+| **Livery file names** | `showLiveryFileNames` | `true` | Replaces bare numeric livery entries with normalized livery filenames in the supported livery selection interface, making similarly numbered variants identifiable without changing the selected texture. |
+| **Vehicle condition and licence plate on parking cards** | `showParkingCarConditionAndLicensePlate` | `true` | Adds total vehicle condition and rear licence-plate information to vehicle cards in the parking window. Condition is calculated from body panels, mechanical parts, body and interior data while ignoring non-car/dummy elements handled by the game. |
 | **Confirm dyno start automatically** | `autoConfirmDynoStart` | `true` | Automatically accepts only the localized redundant dyno-start confirmation, with its confirmation sound disabled. Other confirmation windows are not affected. The dyno window blur is controlled separately by CMS21 Immersion+. |
 | **Exit game in garage menu** | `addExitGameToGaragePauseMenu` | `true` | Enables the reserved Exit Game action in the normal garage pause menu and routes it through the game's own exit confirmation instead of adding a separate custom shutdown path. |
 
@@ -334,10 +335,13 @@ CMS21 UI+ retains the following feature concepts from QoLmod by **Meitzi**:
 - startup video skipping and automatic prompt continuation: `skipStartupVideosTotally`,
   `autoContinueStartupPrompt`;
 - inventory sorting persistence: `rememberInventorySorting`;
-- livery filenames and map vehicle information: `showLiveryFileNames`,
-  `showCarConditionOnMap`;
+- livery filenames: `showLiveryFileNames`;
 - automatic acceptance of the redundant dyno-start confirmation, split from the former
   streamlined dyno feature: `autoConfirmDynoStart`.
+
+Removed QoLmod feature concepts:
+
+- the original map/showroom vehicle-information feature, including showroom configuration/DLC ribbons and generic map-card condition/licence-plate handling. CMS21 UI+ keeps only its parking-window card presentation under `showParkingCarConditionAndLicensePlate`.
 
 ## Repository layout
 

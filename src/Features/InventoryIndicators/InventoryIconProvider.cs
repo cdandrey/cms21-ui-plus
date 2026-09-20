@@ -39,27 +39,27 @@ namespace Cms21UiPlus
 
         public static Sprite GetRedRepairWrenchIcon()
         {
-            return Load(ref redRepairWrenchIcon, "RepairabilityRed.png", "repair-red");
+            return Load(ref redRepairWrenchIcon, "II_RepairabilityRed.png", "repair-red");
         }
 
         public static Sprite GetOrangeRepairWrenchIcon()
         {
-            return Load(ref orangeRepairWrenchIcon, "RepairabilityOrange.png", "repair-orange");
+            return Load(ref orangeRepairWrenchIcon, "II_RepairabilityOrange.png", "repair-orange");
         }
 
         public static Sprite GetYellowRepairWrenchIcon()
         {
-            return Load(ref yellowRepairWrenchIcon, "RepairabilityYellow.png", "repair-yellow");
+            return Load(ref yellowRepairWrenchIcon, "II_RepairabilityYellow.png", "repair-yellow");
         }
 
         public static Sprite GetGreenRepairWrenchIcon()
         {
-            return Load(ref greenRepairWrenchIcon, "RepairabilityGreen.png", "repair-green");
+            return Load(ref greenRepairWrenchIcon, "II_RepairabilityGreen.png", "repair-green");
         }
 
         public static Sprite GetWhiteRepairWrenchIcon()
         {
-            return Load(ref whiteRepairWrenchIcon, "RepairabilityWhite.png", "repair-white");
+            return Load(ref whiteRepairWrenchIcon, "II_RepairabilityWhite.png", "repair-white");
         }
 
         public static Sprite GetRepairWrenchIconForCondition(float condition)
@@ -75,69 +75,69 @@ namespace Cms21UiPlus
 
         public static Sprite GetRedWarehouseIcon()
         {
-            return Load(ref redWarehouseIcon, "OwnershipRed.png", "warehouse-red");
+            return Load(ref redWarehouseIcon, "II_OwnershipRed.png", "warehouse-red");
         }
 
         public static Sprite GetWhiteWarehouseIcon()
         {
-            return Load(ref whiteWarehouseIcon, "OwnershipWhite.png", "warehouse-white");
+            return Load(ref whiteWarehouseIcon, "II_OwnershipWhite.png", "warehouse-white");
         }
 
 
         public static Sprite GetWhiteConditionIcon()
         {
-            return Load(ref whiteConditionIcon, "ConditionWhite.png", "condition-white");
+            return Load(ref whiteConditionIcon, "II_ConditionWhite.png", "condition-white");
         }
 
         public static Sprite GetOrangeConditionIcon()
         {
-            return Load(ref orangeConditionIcon, "ConditionOrange.png", "condition-orange");
+            return Load(ref orangeConditionIcon, "II_ConditionOrange.png", "condition-orange");
         }
 
         public static Sprite GetYellowConditionIcon()
         {
-            return Load(ref yellowConditionIcon, "ConditionYellow.png", "condition-yellow");
+            return Load(ref yellowConditionIcon, "II_ConditionYellow.png", "condition-yellow");
         }
 
         public static Sprite GetGreenConditionIcon()
         {
-            return Load(ref greenConditionIcon, "ConditionGreen.png", "condition-green");
+            return Load(ref greenConditionIcon, "II_ConditionGreen.png", "condition-green");
         }
 
         public static Sprite GetGreenRingConditionIcon()
         {
-            return Load(ref greenRingConditionIcon, "ConditionGreenRing.png",
+            return Load(ref greenRingConditionIcon, "II_ConditionGreenRing.png",
                 "condition-green-ring");
         }
 
         public static Sprite GetRedConditionIcon()
         {
-            return Load(ref redConditionIcon, "ConditionRed.png", "condition-red");
+            return Load(ref redConditionIcon, "II_ConditionRed.png", "condition-red");
         }
 
         public static Sprite GetQualityIcon()
         {
-            return Load(ref qualityIcon, "Quality.png", "quality");
+            return Load(ref qualityIcon, "II_Quality.png", "quality");
         }
 
         public static Sprite GetQuality1Icon()
         {
-            return Load(ref quality1Icon, "Quality1.png", "quality-1");
+            return Load(ref quality1Icon, "II_Quality1.png", "quality-1");
         }
 
         public static Sprite GetQuality2Icon()
         {
-            return Load(ref quality2Icon, "Quality2.png", "quality-2");
+            return Load(ref quality2Icon, "II_Quality2.png", "quality-2");
         }
 
         public static Sprite GetQuality3Icon()
         {
-            return Load(ref quality3Icon, "Quality3.png", "quality-3");
+            return Load(ref quality3Icon, "II_Quality3.png", "quality-3");
         }
 
         public static Sprite GetQualityNonIcon()
         {
-            return Load(ref qualityNonIcon, "QualityNon.png", "quality-none");
+            return Load(ref qualityNonIcon, "II_QualityNon.png", "quality-none");
         }
 
         public static Sprite GetExternalIcon(string filePath)
@@ -146,8 +146,11 @@ namespace Cms21UiPlus
                 return null;
 
             Sprite cached;
-            if (ExternalIcons.TryGetValue(filePath, out cached))
-                return cached;
+            if (ExternalIcons.TryGetValue(filePath, out cached)) {
+                if (cached != null && cached.texture != null)
+                    return cached;
+                ExternalIcons.Remove(filePath);
+            }
 
             string logKey = "external|" + filePath;
             if (!System.IO.File.Exists(filePath)) {
@@ -180,8 +183,9 @@ namespace Cms21UiPlus
 
         private static Sprite Load(ref Sprite cache, string fileName, string logicalName)
         {
-            if (cache != null)
+            if (cache != null && cache.texture != null)
                 return cache;
+            cache = null;
 
             string filePath = GlobalConfig.directoryInventoryIndicators + fileName;
             string logKey = logicalName + "|" + filePath;

@@ -917,7 +917,6 @@ namespace Cms21UiPlus
                 return;
 
             travelCollectedSearchText = value ?? string.Empty;
-            ClearSelectedButton();
             RedrawInventory(inventory);
         }
 
@@ -1804,8 +1803,10 @@ namespace Cms21UiPlus
                 int optionIndex = i;
                 Action selectAction = delegate () {
                     if (matrixLayout) {
-                        if (IsQuickFilterOptionSelected(sourceButton, option))
+                        if (IsQuickFilterOptionSelected(sourceButton, option)) {
+                            CloseQuickFilterMenu();
                             return;
+                        }
                         if (option.Select != null)
                             option.Select();
                         UpdateQuickFilterMenuSelection(optionBackgrounds,

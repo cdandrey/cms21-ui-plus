@@ -31,6 +31,7 @@ namespace Cms21UiPlus
         public QualityQuickFilterMode QualityMode = QualityQuickFilterMode.Off;
         public OwnedQuickFilterMode OwnedMode = OwnedQuickFilterMode.Off;
         public bool UseJunkyardConditionModes;
+        public bool PreserveSpecialInventoryItems;
 
         public bool UsesConditionFilter {
             get {
@@ -87,10 +88,13 @@ namespace Cms21UiPlus
             if (baseItem == null || criteria == null)
                 return false;
 
+            Item item = baseItem.TryCast<Item>();
+            if (IsSpecialInventoryItem(item))
+                return criteria.PreserveSpecialInventoryItems;
+
             if (!MatchesSearch(baseItem, criteria.SearchText))
                 return false;
 
-            Item item = baseItem.TryCast<Item>();
             if (item != null)
                 return MatchesItem(item, criteria);
 
@@ -151,13 +155,6 @@ namespace Cms21UiPlus
         {
             if (item == null)
                 return false;
-
-            if (IsSpecialInventoryItem(item)) {
-                // Barn and junkyard map/case entries remain visible. In garage-style
-                // lists they disappear whenever any filter is active.
-                return criteria.Context == PartFilterContext.Junkyard ||
-                    !criteria.HasAnyFilter;
-            }
 
             if (criteria.UsesConditionFilter &&
                 !MatchesCondition(item.ConditionToShow, criteria))

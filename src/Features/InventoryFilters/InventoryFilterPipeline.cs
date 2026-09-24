@@ -1,10 +1,18 @@
 using System;
+using System.Collections.Generic;
+using UnityEngine.UI;
 
 #if NET6_0_OR_GREATER
+using Il2Cpp;
 using Il2CppCMS.Containers;
+using Il2CppCMS.UI.Logic.Warehouse;
+using Il2CppCMS.UI.Windows;
 using Il2CppCMS.UI.Windows.Base;
 #else
+using CMS;
 using CMS.Containers;
+using CMS.UI.Logic.Warehouse;
+using CMS.UI.Windows;
 using CMS.UI.Windows.Base;
 #endif
 
@@ -12,6 +20,9 @@ namespace Cms21UiPlus
 {
     public static partial class InventoryFilterManager
     {
+        private static readonly Dictionary<int, List<BaseItem>> NativeSearchFullOrder =
+            new Dictionary<int, List<BaseItem>>();
+
         public static void PrepareForRedraw(BaseInventory inventory)
         {
             BeginFilterScope(inventory);
@@ -72,15 +83,20 @@ namespace Cms21UiPlus
                 SupportsInventoryGrouping(inventory);
             if (!groupingEnabled && GetGroupingState(inventory, false) != null)
                 ResetInventoryGrouping(inventory);
-            if (!groupingEnabled && (criteria == null || !criteria.HasAnyFilter)) {
+
+            Il2CppSystem.Collections.Generic.List<BaseItem> source =
+                IncludeSpecialItemsExcludedByNativeSearch(inventory, original);
+            bool nativeSearchOverride = source != original;
+            if (!groupingEnabled && !nativeSearchOverride &&
+                (criteria == null || !criteria.HasAnyFilter)) {
                 UpdatePaginationCount(inventory, original.Count);
                 return;
             }
 
             Il2CppSystem.Collections.Generic.List<BaseItem> filtered =
                 groupingEnabled
-                    ? BuildGroupedDisplay(inventory, original, criteria)
-                    : FilterCopy(original, criteria);
+                    ? BuildGroupedDisplay(inventory, source, criteria)
+                    : FilterCopy(source, criteria);
 
             DrawSnapshot snapshot = new DrawSnapshot();
             snapshot.Inventory = inventory;
@@ -99,6 +115,137 @@ namespace Cms21UiPlus
             }
         }
 
+        private static Il2CppSystem.Collections.Generic.List<BaseItem>
+            IncludeSpecialItemsExcludedByNativeSearch(BaseInventory inventory,
+                Il2CppSystem.Collections.Generic.List<BaseItem> source)
+        {
+            if (inventory == null || source == null || IsBarnOrJunkyardScene())
+                return source;
+
+            InputField searchField = FindSearchField(inventory, true);
+            if (searchField == null)
+                return source;
+
+            int instanceId = inventory.GetInstanceID();
+            if (string.IsNullOrWhiteSpace(searchField.text)) {
+                List<BaseItem> fullOrder = new List<BaseItem>(source.Count);
+                foreach (BaseItem baseItem in source)
+                    fullOrder.Add(baseItem);
+                NativeSearchFullOrder[instanceId] = fullOrder;
+                return source;
+            }
+
+            List<BaseItem> cachedOrder;
+            if (!NativeSearchFullOrder.TryGetValue(instanceId, out cachedOrder))
+                return source;
+
+            Il2CppSystem.Collections.Generic.List<Item> inventoryItems = null;
+            if (inventory.TryCast<WarehouseTab>() != null) {
+                var warehouse = GlobalState.GameManager != null
+                    ? GlobalState.GameManager.Warehouse : null;
+                int index = warehouse != null ? warehouse.SelectedOption : -1;
+                if (warehouse != null && warehouse.warehouseList != null &&
+                    index >= 0 && index < warehouse.warehouseList.Count)
+                    inventoryItems = warehouse.warehouseList[index];
+            } else if (inventory.TryCast<InventoryWindow>() != null ||
+                inventory.TryCast<WarehouseInventoryTab>() != null) {
+                Inventory playerInventory = Singleton<Inventory>.Instance;
+                if (playerInventory != null)
+                    inventoryItems = playerInventory.items;
+            }
+
+            if (inventoryItems == null)
+                return source;
+
+            Dictionary<long, BaseItem> visibleItems =
+                new Dictionary<long, BaseItem>();
+            Dictionary<long, BaseItem> visibleGroups =
+                new Dictionary<long, BaseItem>();
+            foreach (BaseItem baseItem in source) {
+                Item item = baseItem != null ? baseItem.TryCast<Item>() : null;
+                if (item != null) {
+                    visibleItems[item.UID] = baseItem;
+                    continue;
+                }
+
+                GroupItem group = baseItem != null
+                    ? baseItem.TryCast<GroupItem>() : null;
+                if (group != null)
+                    visibleGroups[group.UID] = baseItem;
+            }
+
+            Dictionary<long, Item> specialItems = new Dictionary<long, Item>();
+            foreach (Item item in inventoryItems) {
+                if (PartFilterRules.IsSpecialInventoryItem(item))
+                    specialItems[item.UID] = item;
+            }
+
+            bool hasExcludedSpecialItem = false;
+            foreach (long uid in specialItems.Keys) {
+                if (!visibleItems.ContainsKey(uid)) {
+                    hasExcludedSpecialItem = true;
+                    break;
+                }
+            }
+            if (!hasExcludedSpecialItem)
+                return source;
+
+            Il2CppSystem.Collections.Generic.List<BaseItem> result =
+                new Il2CppSystem.Collections.Generic.List<BaseItem>(
+                    source.Count + specialItems.Count);
+            HashSet<long> addedItems = new HashSet<long>();
+            HashSet<long> addedGroups = new HashSet<long>();
+
+            foreach (BaseItem baseItem in cachedOrder) {
+                Item item = baseItem != null ? baseItem.TryCast<Item>() : null;
+                if (item != null) {
+                    BaseItem visibleItem;
+                    if (visibleItems.TryGetValue(item.UID, out visibleItem)) {
+                        result.Add(visibleItem);
+                        addedItems.Add(item.UID);
+                        continue;
+                    }
+
+                    Item specialItem;
+                    if (specialItems.TryGetValue(item.UID, out specialItem)) {
+                        result.Add(specialItem);
+                        addedItems.Add(item.UID);
+                    }
+                    continue;
+                }
+
+                GroupItem group = baseItem != null
+                    ? baseItem.TryCast<GroupItem>() : null;
+                BaseItem visibleGroup;
+                if (group != null &&
+                    visibleGroups.TryGetValue(group.UID, out visibleGroup)) {
+                    result.Add(visibleGroup);
+                    addedGroups.Add(group.UID);
+                }
+            }
+
+            foreach (BaseItem baseItem in source) {
+                Item item = baseItem != null ? baseItem.TryCast<Item>() : null;
+                if (item != null) {
+                    if (addedItems.Add(item.UID))
+                        result.Add(baseItem);
+                    continue;
+                }
+
+                GroupItem group = baseItem != null
+                    ? baseItem.TryCast<GroupItem>() : null;
+                if (group == null || addedGroups.Add(group.UID))
+                    result.Add(baseItem);
+            }
+
+            foreach (Item item in specialItems.Values) {
+                if (addedItems.Add(item.UID))
+                    result.Add(item);
+            }
+
+            return result;
+        }
+
         private static PartFilterCriteria CreateCurrentCriteria(
             BaseInventory inventory)
         {
@@ -106,6 +253,7 @@ namespace Cms21UiPlus
             bool expandedPackage = !junkyardContext &&
                 IsExpandedInventoryPackage(inventory);
             PartFilterCriteria criteria = new PartFilterCriteria();
+            criteria.PreserveSpecialInventoryItems = true;
             criteria.Context = junkyardContext
                 ? PartFilterContext.Junkyard
                 : PartFilterContext.Garage;
@@ -213,6 +361,7 @@ namespace Cms21UiPlus
                     binding.Get(inventory);
                 if (items == null)
                     return 0;
+                items = IncludeSpecialItemsExcludedByNativeSearch(inventory, items);
                 PartFilterCriteria criteria = IsFeatureEnabled()
                     ? CreateCurrentCriteria(inventory) : null;
                 if (IsInventoryGroupingEnabled() &&

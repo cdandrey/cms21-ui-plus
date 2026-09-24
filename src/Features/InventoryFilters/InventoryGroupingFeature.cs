@@ -186,7 +186,11 @@ namespace Cms21UiPlus
                 new Il2CppSystem.Collections.Generic.List<BaseItem>(order.Count);
             for (int i = 0; i < order.Count; i++) {
                 PackageAccumulator package = order[i];
-                if (package.MatchedCount <= 0 || package.Representative == null ||
+                if (package.MatchedCount <= 0 || package.Representative == null)
+                    continue;
+
+                Item representativeItem = package.Representative.TryCast<Item>();
+                if (!PartFilterRules.IsSpecialInventoryItem(representativeItem) &&
                     !MatchesPackageQuickFilter(package.MatchedCount))
                     continue;
 

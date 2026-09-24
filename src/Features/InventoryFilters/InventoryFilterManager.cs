@@ -169,6 +169,7 @@ namespace Cms21UiPlus
             }
 
             DrawSnapshots.Clear();
+            NativeSearchFullOrder.Clear();
             ItemsBindings.Clear();
             MissingItemsBindings.Clear();
             junkyardConditionFilterMode = JunkyardConditionFilterMode.Off;
@@ -199,6 +200,7 @@ namespace Cms21UiPlus
                 garageQualityFilterMode = QualityQuickFilterMode.Off;
                 packageFilterMode = PackageQuickFilterMode.Off;
             }
+            NativeSearchFullOrder.Clear();
             ClearSelectedButton();
         }
 

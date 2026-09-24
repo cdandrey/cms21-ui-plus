@@ -1045,6 +1045,7 @@ namespace Cms21UiPlus
             bool useRepairSpecializations =
                 GameplayRepairSkillBridge.RepairSpecializationsEnabled;
             PartFilterCriteria criteria = new PartFilterCriteria {
+                PreserveSpecialInventoryItems = true,
                 Context = PartFilterContext.Junkyard,
                 SearchText = searchText,
                 JunkyardConditionMode = conditionMode,
@@ -1059,7 +1060,10 @@ namespace Cms21UiPlus
             for (int index = 0; index < Cards.Count; index++) {
                 CardEntry entry = Cards[index];
                 if (entry.Cell != null) {
-                    bool inPriceRange = entry.Price >= minimumPrice &&
+                    bool specialItem = PartFilterRules.IsSpecialInventoryItem(
+                        entry.Item.TryCast<Item>());
+                    bool inPriceRange = specialItem ||
+                        entry.Price >= minimumPrice &&
                         entry.Price <= maximumPrice;
                     entry.Cell.SetActive(inPriceRange &&
                         PartFilterRules.Matches(entry.Item, criteria));

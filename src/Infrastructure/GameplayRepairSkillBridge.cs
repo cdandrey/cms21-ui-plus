@@ -33,8 +33,7 @@ namespace Cms21UiPlus
             1 << 8,
         };
 
-        private static readonly Type RulesType =
-            Type.GetType(RulesTypeName, false);
+        private static readonly Type RulesType = ResolveRulesType();
         private static readonly TryGetRepairDisplayDataDelegate
             RepairDisplayDataResolver = ResolveRepairDisplayDataResolver();
         private static readonly GetRepairRequirementsMaskDelegate
@@ -126,6 +125,18 @@ namespace Cms21UiPlus
             } catch (Exception exception) {
                 ModLogger.Log("[RepairSkillIndicator] Gameplay+ availability " +
                     "indicator query failed." + Environment.NewLine + exception,
+                    Types.LoggingLevels.Error);
+                return null;
+            }
+        }
+
+        private static Type ResolveRulesType()
+        {
+            try {
+                return Type.GetType(RulesTypeName, false);
+            } catch (Exception exception) {
+                ModLogger.Log("[RepairSkillIndicator] Gameplay+ integration " +
+                    "initialization failed." + Environment.NewLine + exception,
                     Types.LoggingLevels.Error);
                 return null;
             }

@@ -82,6 +82,26 @@ namespace Cms21UiPlus
 
             PartProperty property = part.partProperty;
             string itemId = property != null ? property.ID : string.Empty;
+            UpdateIndicators(root, itemId);
+        }
+
+        public static void UpdateExternalIndicators(Transform inspectorRoot,
+            string itemId)
+        {
+            if (!IsEnabled || !IsSupportedMode(GetCurrentMode()) ||
+                string.IsNullOrEmpty(itemId)) {
+                HideIndicators(inspectorRoot);
+                return;
+            }
+
+            UpdateIndicators(inspectorRoot, itemId);
+        }
+
+        private static void UpdateIndicators(Transform root, string itemId)
+        {
+            if (root == null)
+                return;
+
             Settings settings = Main.SettingsEntry.Value;
             if (settings.showPartRepairabilityIndicators) {
                 bool repairable = PartRepairabilityRules.IsRepairable(itemId);
@@ -343,7 +363,11 @@ namespace Cms21UiPlus
 
         private static void HideIndicators(PartInspectorWindow inspector)
         {
-            Transform root = GetInspectorRoot(inspector);
+            HideIndicators(GetInspectorRoot(inspector));
+        }
+
+        private static void HideIndicators(Transform root)
+        {
             if (root == null)
                 return;
 
@@ -365,7 +389,12 @@ namespace Cms21UiPlus
         private static bool IsSupportedMode(gameMode mode)
         {
             return mode == gameMode.PartSelect ||
-                mode == gameMode.PartSelectMount;
+                mode == gameMode.PartSelectMount ||
+                mode == gameMode.GarageAssemble ||
+                mode == gameMode.GarageDisassemble ||
+                mode == gameMode.ExamineGarage ||
+                mode == gameMode.InteriorDisassemble ||
+                mode == gameMode.BonusDisassemble;
         }
     }
 }

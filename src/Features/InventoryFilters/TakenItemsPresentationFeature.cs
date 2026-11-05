@@ -257,7 +257,9 @@ namespace Cms21UiPlus
             grid.spacing = new Vector2(Spacing, Spacing);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = columns;
-            grid.childAlignment = TextAnchor.UpperCenter;
+            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+            grid.childAlignment = TextAnchor.UpperLeft;
         }
 
         private static GameObject CreateCell(TakenItemsWindow window,

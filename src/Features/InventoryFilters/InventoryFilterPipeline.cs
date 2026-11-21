@@ -277,6 +277,7 @@ namespace Cms21UiPlus
             criteria.QualityMode = junkyardContext
                 ? junkyardQualityFilterMode
                 : garageQualityFilterMode;
+            criteria.TuningMode = inventoryTuningFilterMode;
             criteria.OwnedMode = junkyardContext
                 ? ownedFilterMode
                 : OwnedQuickFilterMode.Off;

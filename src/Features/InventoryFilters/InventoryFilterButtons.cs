@@ -54,6 +54,7 @@ namespace Cms21UiPlus
         private const string QualityButtonName = "QInventoryQuickFilterQuality";
         private const string OwnedButtonName = "QInventoryQuickFilterOwned";
         private const string PackageButtonName = "QInventoryQuickFilterPackage";
+        private const string TuningButtonName = "QInventoryQuickFilterTuning";
         private const string ResetHintName = "Hint_ResetInventoryFilters";
         private const string SelectFilterHintName =
             "Hint_SelectInventoryFilter";
@@ -112,6 +113,7 @@ namespace Cms21UiPlus
             Quality,
             Owned,
             Package,
+            Tuning,
         }
 
         public static void EnsureButtons(BaseInventory inventory)
@@ -192,6 +194,7 @@ namespace Cms21UiPlus
                 junkyardRepairSpecializationFilter.Reset();
                 junkyardQualityFilterMode = QualityQuickFilterMode.Off;
                 ownedFilterMode = OwnedQuickFilterMode.Off;
+                inventoryTuningFilterMode = TuningQuickFilterMode.Off;
             } else {
                 garageConditionFilterMode = GarageConditionFilterMode.Off;
                 garageRepairabilityFilterMode =
@@ -199,6 +202,7 @@ namespace Cms21UiPlus
                 garageRepairSpecializationFilter.Reset();
                 garageQualityFilterMode = QualityQuickFilterMode.Off;
                 packageFilterMode = PackageQuickFilterMode.Off;
+                inventoryTuningFilterMode = TuningQuickFilterMode.Off;
             }
 
             InputField searchField = FindSearchField(inventory, true);
@@ -398,6 +402,7 @@ namespace Cms21UiPlus
             Transform qualityButton = FindSingleButton(buttonRoot, QualityButtonName);
             Transform ownedButton = FindSingleButton(buttonRoot, OwnedButtonName);
             Transform packageButton = FindSingleButton(buttonRoot, PackageButtonName);
+            Transform tuningButton = FindSingleButton(buttonRoot, TuningButtonName);
 
             if (conditionButton == null)
                 conditionButton = CreateButton(inventory, buttonRoot,
@@ -410,6 +415,9 @@ namespace Cms21UiPlus
             if (qualityButton == null)
                 qualityButton = CreateButton(inventory, buttonRoot,
                     QualityButtonName, QuickFilterButtonKind.Quality);
+            if (tuningButton == null)
+                tuningButton = CreateButton(inventory, buttonRoot,
+                    TuningButtonName, QuickFilterButtonKind.Tuning);
 
             if (packageContext) {
                 if (packageButton == null)
@@ -440,6 +448,7 @@ namespace Cms21UiPlus
                 ConfigureButton(repairButton, inventory,
                     QuickFilterButtonKind.Repairability);
             ConfigureButton(qualityButton, inventory, QuickFilterButtonKind.Quality);
+            ConfigureButton(tuningButton, inventory, QuickFilterButtonKind.Tuning);
             if (junkyardContext)
                 ConfigureButton(ownedButton, inventory, QuickFilterButtonKind.Owned);
             if (packageContext)
@@ -448,14 +457,18 @@ namespace Cms21UiPlus
             ApplyButtonLayout(inventory, conditionButton, repairButton,
                 qualityButton, ownedButton, packageButton, junkyardContext,
                 packageContext, expandedPackage);
+            PositionTuningButton(conditionButton, tuningButton);
             UpdateButtonVisuals(conditionButton, repairButton, qualityButton,
                 ownedButton, packageButton, junkyardContext, packageContext);
+            UpdateTuningButtonVisual(tuningButton);
         }
 
         private static Transform CreateButton(BaseInventory inventory,
             Transform buttonRoot, string name, QuickFilterButtonKind kind)
         {
-            Sprite initialSprite = GetInitialSprite(kind);
+            Sprite initialSprite = kind == QuickFilterButtonKind.Tuning
+                ? InventoryIconProvider.GetNativeTuningIcon(buttonRoot)
+                : GetInitialSprite(kind);
             if (initialSprite == null) {
                 ModLogger.Log("[InventoryFilter] Sprite for '" + name + "' was not found.",
                     Types.LoggingLevels.Warning);
@@ -591,6 +604,11 @@ namespace Cms21UiPlus
                         SelectQualityFilter(
                             ResolveActiveInventory(inventory), mode);
                     });
+            } else if (kind == QuickFilterButtonKind.Tuning) {
+                menuOptions = CreateTuningQuickFilterMenu(
+                    delegate (TuningQuickFilterMode mode) {
+                        SelectTuningFilter(ResolveActiveInventory(inventory), mode);
+                    }, InventoryIconProvider.GetNativeTuningIcon(inventory.transform));
             } else if (kind == QuickFilterButtonKind.Owned) {
                 menuOptions = CreateOwnedQuickFilterMenu(
                     delegate (OwnedQuickFilterMode mode) {
@@ -603,6 +621,66 @@ namespace Cms21UiPlus
                     });
             }
             RegisterQuickFilterMenu(button, menuOptions);
+        }
+
+        private static void PositionTuningButton(Transform conditionButton,
+            Transform tuningButton)
+        {
+            if (conditionButton == null || tuningButton == null)
+                return;
+            RectTransform source = conditionButton.GetComponent<RectTransform>();
+            RectTransform rect = tuningButton.GetComponent<RectTransform>();
+            if (source == null || rect == null)
+                return;
+            rect.SetParent(source.parent, false);
+            rect.anchorMin = source.anchorMin;
+            rect.anchorMax = source.anchorMax;
+            rect.pivot = source.pivot;
+            rect.sizeDelta = new Vector2(ButtonSize, ButtonSize);
+            rect.anchoredPosition = source.anchoredPosition +
+                Vector2.left * ButtonSpacing;
+            rect.localScale = new Vector3(1.1f, 1.1f, 1f);
+        }
+
+        internal static QuickFilterMenuOption[] CreateTuningQuickFilterMenu(
+            Action<TuningQuickFilterMode> select, Sprite sprite)
+        {
+            if (select == null)
+                return null;
+            return new[] {
+                new QuickFilterMenuOption(sprite, DisabledButtonColor,
+                    delegate () { select(TuningQuickFilterMode.Off); }),
+                new QuickFilterMenuOption(sprite, ActiveButtonColor,
+                    delegate () { select(TuningQuickFilterMode.TunedOnly); }),
+                new QuickFilterMenuOption(sprite, Color.red,
+                    delegate () { select(TuningQuickFilterMode.StandardOnly); }),
+            };
+        }
+
+        private static void SelectTuningFilter(BaseInventory inventory,
+            TuningQuickFilterMode mode)
+        {
+            if (inventory == null || inventoryTuningFilterMode == mode)
+                return;
+            inventoryTuningFilterMode = mode;
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        private static void UpdateTuningButtonVisual(Transform tuningButton)
+        {
+            if (tuningButton == null)
+                return;
+            Image image = tuningButton.GetComponent<Image>();
+            if (image == null)
+                return;
+            image.sprite = InventoryIconProvider.GetNativeTuningIcon(
+                tuningButton.root);
+            tuningButton.localScale = new Vector3(1.1f, 1.1f, 1f);
+            image.color = inventoryTuningFilterMode == TuningQuickFilterMode.Off
+                ? DisabledButtonColor
+                : inventoryTuningFilterMode == TuningQuickFilterMode.StandardOnly
+                    ? new Color32(255, 0, 0, 255) : ActiveButtonColor;
         }
 
         private static void ApplyButtonLayout(BaseInventory inventory,
@@ -2118,6 +2196,8 @@ namespace Cms21UiPlus
                     IsBarnOrJunkyardScene(),
                     IsInventoryGroupingEnabled() &&
                         SupportsInventoryGrouping(inventory));
+                UpdateTuningButtonVisual(
+                    FindDeepChild(buttonRoot, TuningButtonName));
 
                 InputField activeSearchField = FindSearchField(inventory, true);
                 if (activeSearchField != null && !IsBarnOrJunkyardScene()) {

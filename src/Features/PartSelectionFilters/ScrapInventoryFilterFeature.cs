@@ -137,11 +137,16 @@ namespace Cms21UiPlus
             activeWindow = window;
             ResolveScrapWindow();
             ResolveScrapProduction();
-            bool enteringUpgrade = upgradeTabTransitionPending;
+            bool isTuningSelection = !upgradeTabTransitionPending &&
+                !IsScrapUpgradeMode() && IsTuningSelectionActive();
+            bool enteringUpgrade = upgradeTabTransitionPending ||
+                isTuningSelection;
             upgradeTabTransitionPending = false;
             productionSelectionActive = !enteringUpgrade;
             bool includeConditionFilter = !enteringUpgrade &&
                 !IsScrapUpgradeMode();
+            if (isTuningSelection)
+                conditionMode = GarageConditionFilterMode.Off;
             bool preFilteredUpgrade = IsPreFilteredUpgradeList(itemsToShow);
             if (!preFilteredUpgrade)
                 CaptureNativeItems(itemsToShow);
@@ -166,7 +171,7 @@ namespace Cms21UiPlus
                         repairSpecializationFilter,
                         RepairSpecializationFilterChanged),
                     InventoryFilterManager.CreateQualityQuickFilterMenu(
-                        SelectQualityFilter))) {
+                        SelectQualityFilter), !isTuningSelection)) {
                     Panel.SetSearchText(searchText);
                     Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
                 repairSpecializationFilter.HasAny);
@@ -319,6 +324,7 @@ namespace Cms21UiPlus
             repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             searchText = string.Empty;
+            Panel.ResetTuningFilter();
             Panel.ResetSearch();
             Panel.UpdateVisuals(conditionMode, repairabilityMode, qualityMode,
                 repairSpecializationFilter.HasAny);
@@ -764,6 +770,7 @@ namespace Cms21UiPlus
             criteria.ExcludedRepairSpecializationMask = useRepairSpecializations
                 ? repairSpecializationFilter.ExcludedMask : 0;
             criteria.QualityMode = qualityMode;
+            criteria.TuningMode = Panel.TuningMode;
             criteria.OwnedMode = OwnedQuickFilterMode.Off;
             return criteria;
         }
@@ -1272,6 +1279,16 @@ namespace Cms21UiPlus
                 activeScrapProduction.gameObject.activeInHierarchy;
         }
 
+        private static bool IsTuningSelectionActive()
+        {
+            ResolveScrapWindow();
+            Transform marker = activeScrapWindow != null
+                ? activeScrapWindow.transform.Find("CMS21GPPartTuningActive")
+                : null;
+            return GameplayRepairSkillBridge.RepairSpecializationsEnabled &&
+                marker != null && marker.gameObject.activeInHierarchy;
+        }
+
         private static bool IsScrapUpgradeMode()
         {
             ResolveScrapWindow();
@@ -1295,7 +1312,8 @@ namespace Cms21UiPlus
         private static WindowFooterHintController.NativeFooterProfile
             GetScrapFooterProfile(bool isEmpty)
         {
-            if (!productionSelectionActive && IsScrapUpgradeMode())
+            if (!productionSelectionActive &&
+                (IsScrapUpgradeMode() || IsTuningSelectionActive()))
                 return isEmpty
                     ? WindowFooterHintController.NativeFooterProfile
                         .ScrapUpgradeEmpty

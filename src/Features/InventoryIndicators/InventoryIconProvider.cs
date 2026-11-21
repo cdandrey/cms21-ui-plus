@@ -7,6 +7,13 @@ using CMS;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+
+#if NET6_0_OR_GREATER
+using Il2CppCMS.UI;
+#else
+using CMS.UI;
+#endif
 
 namespace Cms21UiPlus
 {
@@ -31,6 +38,7 @@ namespace Cms21UiPlus
         private static Sprite quality2Icon;
         private static Sprite quality3Icon;
         private static Sprite qualityNonIcon;
+        private static Sprite nativeTuningIcon;
 
         private static readonly HashSet<string> LoggedIcons =
             new HashSet<string>(StringComparer.Ordinal);
@@ -138,6 +146,27 @@ namespace Cms21UiPlus
         public static Sprite GetQualityNonIcon()
         {
             return Load(ref qualityNonIcon, "II_QualityNon.png", "quality-none");
+        }
+
+        public static Sprite GetNativeTuningIcon(Transform context)
+        {
+            if (nativeTuningIcon != null)
+                return nativeTuningIcon;
+            if (context != null) {
+                foreach (InventoryItem row in
+                        context.GetComponentsInChildren<InventoryItem>(true)) {
+                    if (row == null || row.tuningIcon == null)
+                        continue;
+                    Transform icon = row.tuningIcon.transform.Find("SpritePower");
+                    Image graphic = icon != null ? icon.GetComponent<Image>() : null;
+                    if (graphic != null && graphic.sprite != null) {
+                        nativeTuningIcon = graphic.sprite;
+                        return nativeTuningIcon;
+                    }
+                }
+            }
+            return GetExternalIcon(System.IO.Path.Combine("Mods",
+                "CMS21GameplayPlus", "SkillIndicators", "SI_SkillTuning.png"));
         }
 
         public static Sprite GetExternalIcon(string filePath)

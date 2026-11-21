@@ -24,6 +24,7 @@ namespace Cms21UiPlus
             Condition,
             Repairability,
             Quality,
+            Tuning,
         }
 
         private readonly string buttonPrefix;
@@ -31,6 +32,8 @@ namespace Cms21UiPlus
         private Transform conditionButton;
         private Transform repairButton;
         private Transform qualityButton;
+        private Transform tuningButton;
+        private TuningQuickFilterMode tuningMode = TuningQuickFilterMode.Off;
         private bool searchFieldOriginalActive;
         private bool searchFieldPositionCaptured;
         private Vector2 searchFieldOriginalPosition;
@@ -51,6 +54,10 @@ namespace Cms21UiPlus
 
         public InputField SearchField {
             get { return searchField; }
+        }
+
+        public TuningQuickFilterMode TuningMode {
+            get { return tuningMode; }
         }
 
         public string SearchText {
@@ -88,7 +95,8 @@ namespace Cms21UiPlus
             bool includeCondition, bool includeRepairability,
             bool includeQuality, QuickFilterMenuOption[] onConditionMenuOptions,
             QuickFilterMenuOption[] onRepairabilityMenuOptions,
-            QuickFilterMenuOption[] onQualityMenuOptions)
+            QuickFilterMenuOption[] onQualityMenuOptions,
+            bool includeTuning = true)
         {
             if (windowRoot == null)
                 return false;
@@ -121,6 +129,8 @@ namespace Cms21UiPlus
                 onRepairabilityMenuOptions : null;
             qualityMenuOptions = includeQuality ? onQualityMenuOptions : null;
             searchChanged = onSearchChanged;
+            if (!includeTuning)
+                tuningMode = TuningQuickFilterMode.Off;
             lastSearchText = string.Empty;
 
             searchField.gameObject.SetActive(true);
@@ -154,8 +164,18 @@ namespace Cms21UiPlus
                 DestroyButton(qualityButton);
                 qualityButton = null;
             }
+            if (includeTuning) {
+                tuningButton = EnsureButton(root,
+                    buttonPrefix + "Tuning", FilterButtonKind.Tuning,
+                    tuningButton);
+            } else {
+                DestroyButton(tuningButton);
+                tuningButton = null;
+            }
             PositionButtons();
-            return (!includeCondition || conditionButton != null) &&
+            UpdateTuningVisual();
+            return (!includeTuning || tuningButton != null) &&
+                (!includeCondition || conditionButton != null) &&
                 (!includeRepairability || repairButton != null) &&
                 (!includeQuality || qualityButton != null);
         }
@@ -169,9 +189,12 @@ namespace Cms21UiPlus
             DestroyButton(conditionButton);
             DestroyButton(repairButton);
             DestroyButton(qualityButton);
+            DestroyButton(tuningButton);
             conditionButton = null;
             repairButton = null;
             qualityButton = null;
+            tuningButton = null;
+            tuningMode = TuningQuickFilterMode.Off;
             searchField = null;
             searchFieldPositionCaptured = false;
             verticalOffset = 0f;
@@ -203,6 +226,12 @@ namespace Cms21UiPlus
             return true;
         }
 
+        public void ResetTuningFilter()
+        {
+            tuningMode = TuningQuickFilterMode.Off;
+            UpdateTuningVisual();
+        }
+
         public void ResetSearch()
         {
             SetSearchText(string.Empty);
@@ -231,7 +260,8 @@ namespace Cms21UiPlus
                     searchField != null ? searchField.transform : null) ||
                 IsTransformUnder(root, conditionButton) ||
                 IsTransformUnder(root, repairButton) ||
-                IsTransformUnder(root, qualityButton);
+                IsTransformUnder(root, qualityButton) ||
+                IsTransformUnder(root, tuningButton);
         }
 
         private static bool IsTransformUnder(Transform root, Transform target)
@@ -254,6 +284,7 @@ namespace Cms21UiPlus
             UpdateConditionVisual(conditionMode);
             UpdateRepairabilityVisual(repairabilityMode);
             UpdateQualityVisual(qualityMode);
+            UpdateTuningVisual();
         }
 
         public void UpdateVisuals(GarageConditionFilterMode conditionMode,
@@ -264,6 +295,7 @@ namespace Cms21UiPlus
             UpdateRepairabilityVisual(repairabilityMode,
                 specializationFilterActive);
             UpdateQualityVisual(qualityMode);
+            UpdateTuningVisual();
         }
 
         public void UpdateVisuals(GarageConditionFilterMode conditionMode,
@@ -273,6 +305,7 @@ namespace Cms21UiPlus
             UpdateConditionVisual(conditionMode);
             UpdateRestorationAvailabilityVisual(availabilityMode);
             UpdateQualityVisual(qualityMode);
+            UpdateTuningVisual();
         }
 
         public void UpdateVisuals(JunkyardConditionFilterMode conditionMode,
@@ -289,6 +322,7 @@ namespace Cms21UiPlus
             UpdateConditionVisual(conditionMode);
             UpdateRepairabilityVisual(repairabilityMode);
             UpdateQualityVisual(qualityMode);
+            UpdateTuningVisual();
         }
 
         private void UpdateConditionVisual(GarageConditionFilterMode conditionMode)
@@ -474,6 +508,34 @@ namespace Cms21UiPlus
             }
         }
 
+        private void SelectTuningFilter(TuningQuickFilterMode mode)
+        {
+            if (tuningMode == mode)
+                return;
+            tuningMode = mode;
+            UpdateTuningVisual();
+            ClearSelectedControl();
+            Action<string> callback = searchChanged;
+            if (callback != null)
+                callback(SearchText);
+        }
+
+        private void UpdateTuningVisual()
+        {
+            if (tuningButton == null)
+                return;
+            Image image = tuningButton.GetComponent<Image>();
+            if (image == null)
+                return;
+            image.sprite = InventoryIconProvider.GetNativeTuningIcon(
+                searchField != null ? searchField.transform.root : null);
+            tuningButton.localScale = new Vector3(1.1f, 1.1f, 1f);
+            image.color = tuningMode == TuningQuickFilterMode.Off
+                ? DisabledButtonColor
+                : tuningMode == TuningQuickFilterMode.StandardOnly
+                    ? new Color32(255, 0, 0, 255) : ActiveButtonColor;
+        }
+
         private Transform EnsureButton(Transform root, string name,
             FilterButtonKind kind, Transform existing)
         {
@@ -528,8 +590,12 @@ namespace Cms21UiPlus
                 button = buttonTransform.gameObject.AddComponent<Button>();
 
             Image image = buttonTransform.GetComponent<Image>();
-            if (image != null)
+            if (image != null) {
                 button.targetGraphic = image;
+                if (kind == FilterButtonKind.Tuning)
+                    image.sprite = InventoryIconProvider.GetNativeTuningIcon(
+                        searchField != null ? searchField.transform.root : null);
+            }
 
             button.transition = Selectable.Transition.None;
             Navigation navigation = button.navigation;
@@ -537,10 +603,15 @@ namespace Cms21UiPlus
             button.navigation = navigation;
             UnityEventUtility.RemoveAllListeners(button);
 
-            QuickFilterMenuOption[] menuOptions = kind == FilterButtonKind.Condition
-                ? conditionMenuOptions
-                : kind == FilterButtonKind.Repairability
-                    ? repairabilityMenuOptions : qualityMenuOptions;
+            QuickFilterMenuOption[] menuOptions = kind == FilterButtonKind.Tuning
+                ? InventoryFilterManager.CreateTuningQuickFilterMenu(
+                    SelectTuningFilter,
+                    InventoryIconProvider.GetNativeTuningIcon(
+                        searchField != null ? searchField.transform.root : null))
+                : kind == FilterButtonKind.Condition
+                    ? conditionMenuOptions
+                    : kind == FilterButtonKind.Repairability
+                        ? repairabilityMenuOptions : qualityMenuOptions;
             if (menuOptions != null && menuOptions.Length > 0) {
                 InventoryFilterManager.RegisterQuickFilterMenu(button, menuOptions);
                 return;
@@ -604,8 +675,12 @@ namespace Cms21UiPlus
                 PositionButton(repairButton, searchRect, x, y);
                 x -= ButtonSpacing;
             }
-            if (conditionButton != null)
+            if (conditionButton != null) {
                 PositionButton(conditionButton, searchRect, x, y);
+                x -= ButtonSpacing;
+            }
+            if (tuningButton != null)
+                PositionButton(tuningButton, searchRect, x, y);
         }
 
         private static void PositionButton(Transform buttonTransform,

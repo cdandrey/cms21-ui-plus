@@ -119,6 +119,8 @@ namespace Cms21UiPlus
 
     public static partial class InventoryFilterManager
     {
+        private static TuningQuickFilterMode inventoryTuningFilterMode =
+            TuningQuickFilterMode.Off;
         private static JunkyardConditionFilterMode junkyardConditionFilterMode =
             JunkyardConditionFilterMode.Off;
         private static GarageConditionFilterMode garageConditionFilterMode =
@@ -182,6 +184,7 @@ namespace Cms21UiPlus
             garageQualityFilterMode = QualityQuickFilterMode.Off;
             ownedFilterMode = OwnedQuickFilterMode.Off;
             packageFilterMode = PackageQuickFilterMode.Off;
+            inventoryTuningFilterMode = TuningQuickFilterMode.Off;
         }
 
         internal static void ResetGarageFiltersOnWindowClose()
@@ -199,6 +202,7 @@ namespace Cms21UiPlus
                 garageRepairSpecializationFilter.Reset();
                 garageQualityFilterMode = QualityQuickFilterMode.Off;
                 packageFilterMode = PackageQuickFilterMode.Off;
+                inventoryTuningFilterMode = TuningQuickFilterMode.Off;
             }
             NativeSearchFullOrder.Clear();
             ClearSelectedButton();

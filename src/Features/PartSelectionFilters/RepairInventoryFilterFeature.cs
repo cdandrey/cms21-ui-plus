@@ -378,6 +378,7 @@ namespace Cms21UiPlus
         private static void ResetFilters()
         {
             ResetFilterState();
+            Panel.ResetTuningFilter();
             Panel.ResetSearch();
             Panel.UpdateVisuals(conditionMode,
                 availabilityMode, qualityMode);
@@ -439,6 +440,7 @@ namespace Cms21UiPlus
             criteria.GarageConditionMode = conditionMode;
             criteria.RepairabilityMode = RepairabilityQuickFilterMode.Off;
             criteria.QualityMode = qualityMode;
+            criteria.TuningMode = Panel.TuningMode;
             criteria.OwnedMode = OwnedQuickFilterMode.Off;
             return criteria;
         }
@@ -489,7 +491,8 @@ namespace Cms21UiPlus
                 qualityMode != QualityQuickFilterMode.Off ||
                 availabilityMode !=
                     RestorationAvailabilityQuickFilterMode.Off ||
-                !string.IsNullOrEmpty(searchText);
+                !string.IsNullOrEmpty(searchText) ||
+                Panel.TuningMode != TuningQuickFilterMode.Off;
         }
 
         private static void ApplyCurrentFilters(bool resetPage)

@@ -993,7 +993,17 @@ namespace Cms21UiPlus
             iconRect.anchorMin = new Vector2(1f, 1f);
             iconRect.anchorMax = new Vector2(1f, 1f);
             iconRect.pivot = new Vector2(0.5f, 0.5f);
-            iconRect.anchoredPosition = new Vector2(-10f, -10f);
+            float tuningHeight = 0f;
+            if (row.tuningIcon != null &&
+                row.tuningIcon.gameObject.activeInHierarchy) {
+                RectTransform tuningRect =
+                    row.tuningIcon.GetComponent<RectTransform>();
+                if (tuningRect != null)
+                    tuningHeight = tuningRect.rect.height *
+                        Mathf.Abs(tuningRect.localScale.y);
+            }
+            iconRect.anchoredPosition = new Vector2(-10f,
+                -10f - tuningHeight);
             iconRect.localScale = Vector3.one;
             iconRect.sizeDelta = new Vector2(15f, 15f);
 

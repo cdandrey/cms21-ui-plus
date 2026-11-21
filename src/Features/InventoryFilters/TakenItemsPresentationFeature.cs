@@ -57,10 +57,12 @@ namespace Cms21UiPlus
             repairSpecializationFilter = new RepairSpecializationFilterState();
         private static QualityQuickFilterMode qualityMode;
         private static OwnedQuickFilterMode ownedMode;
+        private static TuningQuickFilterMode tuningMode;
         private static Image conditionButton;
         private static Image repairButton;
         private static Image qualityButton;
         private static Image ownedButton;
+        private static Image tuningButton;
         private static Text priceButtonLabel;
         private static TakenItemsWindow activeWindow;
         private static InputField searchField;
@@ -122,6 +124,7 @@ namespace Cms21UiPlus
             repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             ownedMode = OwnedQuickFilterMode.Off;
+            tuningMode = TuningQuickFilterMode.Off;
             searchText = string.Empty;
             minimumPrice = 0;
             maximumPrice = 0;
@@ -446,6 +449,7 @@ namespace Cms21UiPlus
             repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             ownedMode = OwnedQuickFilterMode.Off;
+            tuningMode = TuningQuickFilterMode.Off;
             searchText = string.Empty;
             minimumPrice = 0;
             maximumPrice = maximumAvailablePrice;
@@ -491,7 +495,7 @@ namespace Cms21UiPlus
             root.anchorMin = new Vector2(0.5f, 0.5f);
             root.anchorMax = new Vector2(0.5f, 0.5f);
             root.pivot = new Vector2(0f, 0.5f);
-            root.sizeDelta = new Vector2(ButtonSpacing * 4f + ButtonSize,
+            root.sizeDelta = new Vector2(ButtonSpacing * 5f + ButtonSize,
                 ButtonSize);
             root.localScale = Vector3.one;
 
@@ -523,7 +527,12 @@ namespace Cms21UiPlus
             ownedButton = EnsureFilterButton(root, "Owned", 3,
                 InventoryIconProvider.GetWhiteWarehouseIcon(),
                 InventoryFilterManager.CreateOwnedQuickFilterMenu(SelectOwned));
-            EnsurePriceRangeButton(root, 4);
+            tuningButton = EnsureFilterButton(root, "Tuning", 4,
+                InventoryIconProvider.GetNativeTuningIcon(window.transform),
+                InventoryFilterManager.CreateTuningQuickFilterMenu(
+                    SelectTuning, InventoryIconProvider.GetNativeTuningIcon(
+                        window.transform)));
+            EnsurePriceRangeButton(root, 5);
             UpdateFilterVisuals();
             root.gameObject.SetActive(true);
         }
@@ -1035,6 +1044,13 @@ namespace Cms21UiPlus
             ApplyFilters();
         }
 
+        private static void SelectTuning(TuningQuickFilterMode mode)
+        {
+            tuningMode = mode;
+            UpdateFilterVisuals();
+            ApplyFilters();
+        }
+
         private static void SelectOwned(OwnedQuickFilterMode mode)
         {
             ownedMode = mode;
@@ -1058,6 +1074,7 @@ namespace Cms21UiPlus
                     ? repairSpecializationFilter.ExcludedMask : 0,
                 QualityMode = qualityMode,
                 OwnedMode = ownedMode,
+                TuningMode = tuningMode,
             };
             for (int index = 0; index < Cards.Count; index++) {
                 CardEntry entry = Cards[index];
@@ -1160,6 +1177,15 @@ namespace Cms21UiPlus
                     : InventoryIconProvider.GetWhiteWarehouseIcon();
                 ownedButton.color = ownedMode == OwnedQuickFilterMode.Off
                     ? DisabledButtonColor : ActiveButtonColor;
+            }
+            if (tuningButton != null) {
+                tuningButton.sprite = InventoryIconProvider.GetNativeTuningIcon(
+                    activeWindow != null ? activeWindow.transform : null);
+                tuningButton.transform.localScale = new Vector3(1.1f, 1.1f, 1f);
+                tuningButton.color = tuningMode == TuningQuickFilterMode.Off
+                    ? DisabledButtonColor
+                    : tuningMode == TuningQuickFilterMode.StandardOnly
+                        ? new Color32(255, 0, 0, 255) : ActiveButtonColor;
             }
             UpdatePriceRangeControls();
         }

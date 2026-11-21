@@ -16,6 +16,13 @@ namespace Cms21UiPlus
         Junkyard = 1,
     }
 
+    public enum TuningQuickFilterMode
+    {
+        Off = 0,
+        TunedOnly = 1,
+        StandardOnly = 2,
+    }
+
     public sealed class PartFilterCriteria
     {
         public PartFilterContext Context = PartFilterContext.Garage;
@@ -30,6 +37,7 @@ namespace Cms21UiPlus
         public int ExcludedRepairSpecializationMask;
         public QualityQuickFilterMode QualityMode = QualityQuickFilterMode.Off;
         public OwnedQuickFilterMode OwnedMode = OwnedQuickFilterMode.Off;
+        public TuningQuickFilterMode TuningMode = TuningQuickFilterMode.Off;
         public bool UseJunkyardConditionModes;
         public bool PreserveSpecialInventoryItems;
 
@@ -59,6 +67,10 @@ namespace Cms21UiPlus
             get { return QualityMode != QualityQuickFilterMode.Off; }
         }
 
+        public bool UsesTuningFilter {
+            get { return TuningMode != TuningQuickFilterMode.Off; }
+        }
+
         public bool UsesOwnedFilter {
             get { return OwnedMode != OwnedQuickFilterMode.Off; }
         }
@@ -71,7 +83,7 @@ namespace Cms21UiPlus
             get {
                 return UsesSearch || UsesConditionFilter || UsesRepairabilityFilter ||
                     UsesRepairSpecializationFilter || UsesQualityFilter ||
-                    UsesOwnedFilter;
+                    UsesOwnedFilter || UsesTuningFilter;
             }
         }
     }
@@ -128,8 +140,15 @@ namespace Cms21UiPlus
                 // aggregate condition but no repairability or quality value of their own.
                 if (criteria.UsesRepairabilityFilter ||
                     criteria.UsesRepairSpecializationFilter ||
-                    criteria.UsesQualityFilter)
+                    criteria.UsesQualityFilter || criteria.UsesTuningFilter) {
+                    if (!criteria.UsesTuningFilter || group.ItemList == null)
+                        return false;
+                    foreach (Item groupItem in group.ItemList) {
+                        if (MatchesItem(groupItem, criteria, false))
+                            return true;
+                    }
                     return false;
+                }
 
                 return !criteria.UsesConditionFilter ||
                     MatchesCondition(group.GetCondition(), criteria);
@@ -137,7 +156,7 @@ namespace Cms21UiPlus
 
             if (!criteria.UsesConditionFilter &&
                 !criteria.UsesRepairabilityFilter &&
-                !criteria.UsesQualityFilter)
+                !criteria.UsesQualityFilter && !criteria.UsesTuningFilter)
                 return true;
             if (group.ItemList == null)
                 return false;
@@ -178,8 +197,39 @@ namespace Cms21UiPlus
                 !MatchesQuality(item.Quality, criteria.QualityMode))
                 return false;
 
+            if (criteria.UsesTuningFilter &&
+                (IsTuned(item) !=
+                    (criteria.TuningMode == TuningQuickFilterMode.TunedOnly)))
+                return false;
+
             return !includeOwnedFilter || !criteria.UsesOwnedFilter ||
                 MatchesOwned(OwnedPartCache.Has(item), criteria.OwnedMode);
+        }
+
+        internal static bool IsTuned(Item item)
+        {
+            if (item == null || string.IsNullOrEmpty(item.ID))
+                return false;
+            if (item.ID.StartsWith("t_", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            switch (item.ID) {
+                case "tarczaWentylowana_2":
+                case "tarczaWentylowana_2B":
+                case "tarczaWentylowana_3":
+                case "tarczaWentylowana_3B":
+                case "tarczaWentylowana_4":
+                case "tarczaWentylowana_4B":
+                case "tarczaWentylowana_5":
+                    return true;
+            }
+            GameInventory catalog = Singleton<GameInventory>.Instance;
+            if (catalog == null)
+                return false;
+            var tuning = catalog.GetTuningProperty(item.ID);
+            var property = catalog.GetItemProperty(item.ID);
+            return (tuning != null && tuning.Power > 0f) ||
+                (property != null && property.TuningValue > 0f);
         }
 
         private static bool MatchesCondition(float condition,

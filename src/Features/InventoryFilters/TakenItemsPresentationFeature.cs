@@ -524,10 +524,10 @@ namespace Cms21UiPlus
                 InventoryIconProvider.GetQualityIcon(),
                 InventoryFilterManager.CreateQualityQuickFilterMenu(
                     SelectQuality));
-            ownedButton = EnsureFilterButton(root, "Owned", 3,
+            ownedButton = EnsureFilterButton(root, "Owned", 4,
                 InventoryIconProvider.GetWhiteWarehouseIcon(),
                 InventoryFilterManager.CreateOwnedQuickFilterMenu(SelectOwned));
-            tuningButton = EnsureFilterButton(root, "Tuning", 4,
+            tuningButton = EnsureFilterButton(root, "Tuning", 3,
                 InventoryIconProvider.GetNativeTuningIcon(window.transform),
                 InventoryFilterManager.CreateTuningQuickFilterMenu(
                     SelectTuning, InventoryIconProvider.GetNativeTuningIcon(

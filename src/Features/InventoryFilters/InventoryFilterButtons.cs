@@ -457,7 +457,8 @@ namespace Cms21UiPlus
             ApplyButtonLayout(inventory, conditionButton, repairButton,
                 qualityButton, ownedButton, packageButton, junkyardContext,
                 packageContext, expandedPackage);
-            PositionTuningButton(conditionButton, tuningButton);
+            PositionTuningButton(conditionButton, repairButton, qualityButton,
+                tuningButton);
             UpdateButtonVisuals(conditionButton, repairButton, qualityButton,
                 ownedButton, packageButton, junkyardContext, packageContext);
             UpdateTuningButtonVisual(tuningButton);
@@ -624,11 +625,13 @@ namespace Cms21UiPlus
         }
 
         private static void PositionTuningButton(Transform conditionButton,
+            Transform repairButton, Transform qualityButton,
             Transform tuningButton)
         {
-            if (conditionButton == null || tuningButton == null)
+            if (conditionButton == null || qualityButton == null ||
+                tuningButton == null)
                 return;
-            RectTransform source = conditionButton.GetComponent<RectTransform>();
+            RectTransform source = qualityButton.GetComponent<RectTransform>();
             RectTransform rect = tuningButton.GetComponent<RectTransform>();
             if (source == null || rect == null)
                 return;
@@ -637,8 +640,13 @@ namespace Cms21UiPlus
             rect.anchorMax = source.anchorMax;
             rect.pivot = source.pivot;
             rect.sizeDelta = new Vector2(ButtonSize, ButtonSize);
-            rect.anchoredPosition = source.anchoredPosition +
+            rect.anchoredPosition = source.anchoredPosition;
+            conditionButton.GetComponent<RectTransform>().anchoredPosition +=
                 Vector2.left * ButtonSpacing;
+            if (repairButton != null)
+                repairButton.GetComponent<RectTransform>().anchoredPosition +=
+                    Vector2.left * ButtonSpacing;
+            source.anchoredPosition += Vector2.left * ButtonSpacing;
             rect.localScale = new Vector3(1.1f, 1.1f, 1f);
         }
 

@@ -667,6 +667,10 @@ namespace Cms21UiPlus
             float y = searchRect.anchoredPosition.y;
             float x = left - RightButtonOffset;
 
+            if (tuningButton != null) {
+                PositionButton(tuningButton, searchRect, x, y);
+                x -= ButtonSpacing;
+            }
             if (qualityButton != null) {
                 PositionButton(qualityButton, searchRect, x, y);
                 x -= ButtonSpacing;
@@ -675,12 +679,8 @@ namespace Cms21UiPlus
                 PositionButton(repairButton, searchRect, x, y);
                 x -= ButtonSpacing;
             }
-            if (conditionButton != null) {
+            if (conditionButton != null)
                 PositionButton(conditionButton, searchRect, x, y);
-                x -= ButtonSpacing;
-            }
-            if (tuningButton != null)
-                PositionButton(tuningButton, searchRect, x, y);
         }
 
         private static void PositionButton(Transform buttonTransform,

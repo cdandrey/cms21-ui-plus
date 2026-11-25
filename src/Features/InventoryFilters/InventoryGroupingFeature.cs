@@ -91,8 +91,6 @@ namespace Cms21UiPlus
             "Hint_InventoryGroupingOpen";
         private const string GroupingCloseHintName =
             "Hint_InventoryGroupingClose";
-        private const string WarehouseGroupingClickSurfaceName =
-            "QInventoryGroupingClickSurface";
         private const float PackageDoubleClickDelay = 0.35f;
         private static BaseInventory groupingHintInventory;
         private static string groupingHintWindowId;
@@ -390,6 +388,8 @@ namespace Cms21UiPlus
             HideExpandedPackageSearch(inventory, state);
             ForceRestoreSnapshot(inventory);
             ResetCurrentPage(inventory);
+            if (inventory.GetComponentInParent<WarehouseWindow>() != null)
+                EnsureGroupingListTrigger(inventory, row);
             inventory.RedrawCurrentPage();
             EnsureInventoryGroupingHint(inventory);
             return true;
@@ -712,14 +712,21 @@ namespace Cms21UiPlus
             }
 
             ScrollRect scrollRect = row.GetComponentInParent<ScrollRect>();
-            Transform target = inventory.GetComponentInParent<WarehouseWindow>() != null
-                ? EnsureWarehouseGroupingClickSurface(inventory, row)
-                : scrollRect != null && scrollRect.viewport != null
-                    ? scrollRect.viewport
-                    : row.transform.parent;
+            Transform target = scrollRect != null && scrollRect.viewport != null
+                ? scrollRect.viewport
+                : row.transform.parent;
             if (target == null)
                 return;
 
+            RegisterGroupingListTrigger(inventory, target);
+            if (inventory.GetComponentInParent<WarehouseWindow>() != null &&
+                target != inventory.transform)
+                RegisterGroupingListTrigger(inventory, inventory.transform);
+        }
+
+        private static void RegisterGroupingListTrigger(BaseInventory inventory,
+            Transform target)
+        {
             Graphic targetGraphic = target.GetComponent<Graphic>();
             if (targetGraphic == null) {
                 Image targetImage = target.gameObject.AddComponent<Image>();
@@ -733,64 +740,6 @@ namespace Cms21UiPlus
             if (trigger == null)
                 trigger = target.gameObject.AddComponent<EventTrigger>();
             GroupingListTriggers[trigger.GetInstanceID()] = inventory;
-        }
-
-        private static Transform EnsureWarehouseGroupingClickSurface(
-            BaseInventory inventory, InventoryItem row)
-        {
-            if (inventory == null || row == null || row.transform.parent == null)
-                return null;
-
-            Transform inventoryRoot = inventory.transform;
-            Transform contentRoot = row.transform.parent;
-            while (contentRoot.parent != null &&
-                contentRoot.parent != inventoryRoot)
-                contentRoot = contentRoot.parent;
-            if (contentRoot.parent != inventoryRoot)
-                return null;
-
-            Transform existing = inventoryRoot.Find(
-                WarehouseGroupingClickSurfaceName);
-            if (existing != null)
-                return existing;
-
-#if NET6_0_OR_GREATER
-            GameObject surfaceObject = new GameObject(
-                WarehouseGroupingClickSurfaceName, typeof(RectTransform));
-#else
-            UnhollowerBaseLib.Il2CppReferenceArray<Il2CppSystem.Type> componentTypes =
-                new UnhollowerBaseLib.Il2CppReferenceArray<Il2CppSystem.Type>(1);
-            componentTypes[0] =
-                UnhollowerRuntimeLib.Il2CppType.Of<RectTransform>();
-            GameObject surfaceObject = new GameObject(
-                WarehouseGroupingClickSurfaceName, componentTypes);
-#endif
-            surfaceObject.transform.SetParent(inventoryRoot, false);
-            surfaceObject.layer = inventory.gameObject.layer;
-            surfaceObject.transform.SetSiblingIndex(contentRoot.GetSiblingIndex());
-
-            RectTransform sourceRect = contentRoot.GetComponent<RectTransform>();
-            RectTransform surfaceRect =
-                surfaceObject.GetComponent<RectTransform>();
-            if (sourceRect == null || surfaceRect == null) {
-                UnityEngine.Object.Destroy(surfaceObject);
-                return null;
-            }
-
-            surfaceRect.anchorMin = sourceRect.anchorMin;
-            surfaceRect.anchorMax = sourceRect.anchorMax;
-            surfaceRect.pivot = sourceRect.pivot;
-            surfaceRect.anchoredPosition = sourceRect.anchoredPosition;
-            surfaceRect.sizeDelta = sourceRect.sizeDelta;
-            surfaceRect.localScale = sourceRect.localScale;
-            surfaceRect.localRotation = sourceRect.localRotation;
-
-            LayoutElement layoutElement = surfaceObject.AddComponent<LayoutElement>();
-            layoutElement.ignoreLayout = true;
-            Image image = surfaceObject.AddComponent<Image>();
-            image.color = Color.clear;
-            image.raycastTarget = true;
-            return surfaceObject.transform;
         }
 
         private static bool MatchesPackageQuickFilter(int matchedCount)
@@ -838,18 +787,15 @@ namespace Cms21UiPlus
             if (inventory == null || GroupingListTriggers.Count == 0)
                 return;
 
-            int triggerId = 0;
-            bool found = false;
+            List<int> triggerIds = new List<int>();
             foreach (KeyValuePair<int, BaseInventory> pair in
                 GroupingListTriggers) {
                 if (pair.Value != inventory)
                     continue;
-                triggerId = pair.Key;
-                found = true;
-                break;
+                triggerIds.Add(pair.Key);
             }
 
-            if (found)
+            foreach (int triggerId in triggerIds)
                 GroupingListTriggers.Remove(triggerId);
         }
 

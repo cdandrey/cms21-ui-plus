@@ -58,6 +58,7 @@ manifest. All listed switches use `immediate` except `skipStartupVideosTotally` 
 - Condition wherever this quick filter is available: off → **white** (15–100%) → red (0–14%) → orange (15–49%) → yellow (50–79%) → green ring (80–99%) → green (100%). Upgrade has no condition quick filter.
 - Repairability in every window that exposes this control: off → repairable only → non-repairable only.
 - Quality in every window that exposes this control: off → upgraded (1–3 stars) → 1 star → 2 stars → 3 stars → not upgraded (0 stars).
+- Barn and junkyard shopping list: off (grey) → listed parts only (white) → unlisted parts only (red). The shopping-list icon is immediately before the ownership filter, including in the improved Return to Garage window. Matching uses the current profile’s shopping list, including tire and rim dimensions. An assembly counts as listed if at least one component is listed.
 - Barn and junkyard ownership: off → owned → missing. A matching copy at 50% condition or better counts as owned for this filter.
 - Garage inventory and warehouse package state: off → packages only → single positions only. The package state is calculated after the other active quick filters, so a name with one remaining matching copy is treated as a single position.
 

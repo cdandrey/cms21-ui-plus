@@ -52,6 +52,7 @@ namespace Cms21UiPlus
         private const string ConditionButtonName = "QInventoryQuickFilterCondition";
         private const string RepairButtonName = "QInventoryQuickFilterRepair";
         private const string QualityButtonName = "QInventoryQuickFilterQuality";
+        private const string ShoppingListButtonName = "QInventoryQuickFilterShoppingList";
         private const string OwnedButtonName = "QInventoryQuickFilterOwned";
         private const string PackageButtonName = "QInventoryQuickFilterPackage";
         private const string TuningButtonName = "QInventoryQuickFilterTuning";
@@ -114,6 +115,7 @@ namespace Cms21UiPlus
             Owned,
             Package,
             Tuning,
+            ShoppingList,
         }
 
         public static void EnsureButtons(BaseInventory inventory)
@@ -194,6 +196,7 @@ namespace Cms21UiPlus
                 junkyardRepairSpecializationFilter.Reset();
                 junkyardQualityFilterMode = QualityQuickFilterMode.Off;
                 ownedFilterMode = OwnedQuickFilterMode.Off;
+                shoppingListFilterMode = ShoppingListQuickFilterMode.Off;
                 inventoryTuningFilterMode = TuningQuickFilterMode.Off;
             } else {
                 garageConditionFilterMode = GarageConditionFilterMode.Off;
@@ -401,6 +404,7 @@ namespace Cms21UiPlus
             Transform repairButton = FindSingleButton(buttonRoot, RepairButtonName);
             Transform qualityButton = FindSingleButton(buttonRoot, QualityButtonName);
             Transform ownedButton = FindSingleButton(buttonRoot, OwnedButtonName);
+            Transform shoppingListButton = FindSingleButton(buttonRoot, ShoppingListButtonName);
             Transform packageButton = FindSingleButton(buttonRoot, PackageButtonName);
             Transform tuningButton = FindSingleButton(buttonRoot, TuningButtonName);
 
@@ -443,6 +447,19 @@ namespace Cms21UiPlus
                 ownedButton = null;
             }
 
+            if (junkyardContext) {
+                if (shoppingListButton == null)
+                    shoppingListButton = CreateButton(inventory, buttonRoot,
+                        ShoppingListButtonName, QuickFilterButtonKind.ShoppingList);
+                ConfigureButton(shoppingListButton, inventory,
+                    QuickFilterButtonKind.ShoppingList);
+            } else if (shoppingListButton != null) {
+                UnregisterQuickFilterMenu(shoppingListButton.GetComponent<Button>());
+                shoppingListButton.gameObject.SetActive(false);
+                UnityEngine.Object.Destroy(shoppingListButton.gameObject);
+                shoppingListButton = null;
+            }
+
             ConfigureButton(conditionButton, inventory, QuickFilterButtonKind.Condition);
             if (!expandedPackage)
                 ConfigureButton(repairButton, inventory,
@@ -462,6 +479,11 @@ namespace Cms21UiPlus
             UpdateButtonVisuals(conditionButton, repairButton, qualityButton,
                 ownedButton, packageButton, junkyardContext, packageContext);
             UpdateTuningButtonVisual(tuningButton);
+            if (junkyardContext) {
+                PositionShoppingListButton(conditionButton, repairButton,
+                    qualityButton, tuningButton, shoppingListButton);
+                UpdateShoppingListButtonVisual(shoppingListButton);
+            }
         }
 
         private static Transform CreateButton(BaseInventory inventory,
@@ -521,6 +543,8 @@ namespace Cms21UiPlus
                     return InventoryIconProvider.GetWhiteConditionIcon();
                 case QuickFilterButtonKind.Quality:
                     return InventoryIconProvider.GetQualityIcon();
+                case QuickFilterButtonKind.ShoppingList:
+                    return InventoryIconProvider.GetNativeShoppingListIcon();
                 case QuickFilterButtonKind.Owned:
                 case QuickFilterButtonKind.Package:
                     return InventoryIconProvider.GetWhiteWarehouseIcon();
@@ -610,6 +634,11 @@ namespace Cms21UiPlus
                     delegate (TuningQuickFilterMode mode) {
                         SelectTuningFilter(ResolveActiveInventory(inventory), mode);
                     }, InventoryIconProvider.GetNativeTuningIcon(inventory.transform));
+            } else if (kind == QuickFilterButtonKind.ShoppingList) {
+                menuOptions = CreateShoppingListQuickFilterMenu(
+                    delegate (ShoppingListQuickFilterMode mode) {
+                        SelectShoppingListFilter(ResolveActiveInventory(inventory), mode);
+                    }, InventoryIconProvider.GetNativeShoppingListIcon());
             } else if (kind == QuickFilterButtonKind.Owned) {
                 menuOptions = CreateOwnedQuickFilterMenu(
                     delegate (OwnedQuickFilterMode mode) {
@@ -648,6 +677,73 @@ namespace Cms21UiPlus
                     Vector2.left * ButtonSpacing;
             source.anchoredPosition += Vector2.left * ButtonSpacing;
             rect.localScale = new Vector3(1.1f, 1.1f, 1f);
+        }
+
+        private static void PositionShoppingListButton(Transform conditionButton,
+            Transform repairButton, Transform qualityButton, Transform tuningButton,
+            Transform shoppingListButton)
+        {
+            if (shoppingListButton == null || tuningButton == null)
+                return;
+            RectTransform source = tuningButton.GetComponent<RectTransform>();
+            RectTransform rect = shoppingListButton.GetComponent<RectTransform>();
+            if (source == null || rect == null)
+                return;
+
+            rect.SetParent(source.parent, false);
+            rect.anchorMin = source.anchorMin;
+            rect.anchorMax = source.anchorMax;
+            rect.pivot = source.pivot;
+            rect.sizeDelta = new Vector2(ButtonSize, ButtonSize);
+            rect.anchoredPosition = source.anchoredPosition;
+            foreach (Transform button in new[] { conditionButton, repairButton,
+                    qualityButton, tuningButton }) {
+                if (button != null)
+                    button.GetComponent<RectTransform>().anchoredPosition +=
+                        Vector2.left * ButtonSpacing;
+            }
+        }
+
+        internal static QuickFilterMenuOption[] CreateShoppingListQuickFilterMenu(
+            Action<ShoppingListQuickFilterMode> select, Sprite sprite)
+        {
+            if (select == null || sprite == null)
+                return null;
+            return new[] {
+                new QuickFilterMenuOption(sprite, DisabledButtonColor,
+                    delegate () { select(ShoppingListQuickFilterMode.Off); }),
+                new QuickFilterMenuOption(sprite, ActiveButtonColor,
+                    delegate () { select(ShoppingListQuickFilterMode.ListedOnly); }),
+                new QuickFilterMenuOption(sprite, Color.red,
+                    delegate () { select(ShoppingListQuickFilterMode.UnlistedOnly); }),
+            };
+        }
+
+        internal static Color ShoppingListFilterColor(ShoppingListQuickFilterMode mode)
+        {
+            return mode == ShoppingListQuickFilterMode.Off
+                ? DisabledButtonColor
+                : mode == ShoppingListQuickFilterMode.UnlistedOnly
+                    ? new Color32(255, 0, 0, 255) : ActiveButtonColor;
+        }
+
+        private static void SelectShoppingListFilter(BaseInventory inventory,
+            ShoppingListQuickFilterMode mode)
+        {
+            if (!SupportsOwnedFilter(inventory) || shoppingListFilterMode == mode)
+                return;
+            shoppingListFilterMode = mode;
+            ClearSelectedButton();
+            RedrawInventory(inventory);
+        }
+
+        private static void UpdateShoppingListButtonVisual(Transform button)
+        {
+            if (button == null)
+                return;
+            Image image = button.GetComponent<Image>();
+            if (image != null)
+                image.color = ShoppingListFilterColor(shoppingListFilterMode);
         }
 
         internal static QuickFilterMenuOption[] CreateTuningQuickFilterMenu(
@@ -2206,6 +2302,8 @@ namespace Cms21UiPlus
                         SupportsInventoryGrouping(inventory));
                 UpdateTuningButtonVisual(
                     FindDeepChild(buttonRoot, TuningButtonName));
+                UpdateShoppingListButtonVisual(
+                    FindDeepChild(buttonRoot, ShoppingListButtonName));
 
                 InputField activeSearchField = FindSearchField(inventory, true);
                 if (activeSearchField != null && !IsBarnOrJunkyardScene()) {

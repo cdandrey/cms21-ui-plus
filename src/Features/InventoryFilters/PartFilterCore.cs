@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 #if NET6_0_OR_GREATER
 using Il2Cpp;
@@ -23,6 +24,13 @@ namespace Cms21UiPlus
         StandardOnly = 2,
     }
 
+    public enum ShoppingListQuickFilterMode
+    {
+        Off = 0,
+        ListedOnly = 1,
+        UnlistedOnly = 2,
+    }
+
     public sealed class PartFilterCriteria
     {
         public PartFilterContext Context = PartFilterContext.Garage;
@@ -38,6 +46,8 @@ namespace Cms21UiPlus
         public QualityQuickFilterMode QualityMode = QualityQuickFilterMode.Off;
         public OwnedQuickFilterMode OwnedMode = OwnedQuickFilterMode.Off;
         public TuningQuickFilterMode TuningMode = TuningQuickFilterMode.Off;
+        internal ShoppingListQuickFilterMode ShoppingListMode;
+        internal HashSet<string> ShoppingListKeys;
         public bool UseJunkyardConditionModes;
         public bool PreserveSpecialInventoryItems;
 
@@ -75,6 +85,42 @@ namespace Cms21UiPlus
             get { return OwnedMode != OwnedQuickFilterMode.Off; }
         }
 
+        internal bool UsesShoppingListFilter {
+            get { return ShoppingListMode != ShoppingListQuickFilterMode.Off; }
+        }
+
+        internal void SetShoppingListFilter(ShoppingListQuickFilterMode mode)
+        {
+            ShoppingListMode = mode;
+            ShoppingListKeys = null;
+            if (!UsesShoppingListFilter)
+                return;
+
+            ShoppingListKeys = new HashSet<string>(StringComparer.Ordinal);
+            if (GlobalState.GameManager == null ||
+                GlobalState.GameManager.GameDataManager == null ||
+                GlobalState.GameManager.GameDataManager.CurrentProfileData == null)
+                return;
+
+            var entries = GlobalState.GameManager.GameDataManager
+                .CurrentProfileData.ShopListItemsData;
+            if (entries == null)
+                return;
+
+            foreach (var entry in entries) {
+                if (entry == null || entry.Amount <= 0 ||
+                    string.IsNullOrEmpty(entry.ID))
+                    continue;
+                var data = entry.AdditionalData;
+                string key = data != null && (data.Tire || data.Rim)
+                    ? PartIdentityComparer.GetKey(entry.ID,
+                        data.Rim ? data.ET : 0, data.Tire ? data.Profile : 0,
+                        data.Size, data.Tire ? data.Width : 0)
+                    : entry.ID;
+                ShoppingListKeys.Add(key);
+            }
+        }
+
         public bool UsesSearch {
             get { return !string.IsNullOrWhiteSpace(SearchText); }
         }
@@ -83,7 +129,7 @@ namespace Cms21UiPlus
             get {
                 return UsesSearch || UsesConditionFilter || UsesRepairabilityFilter ||
                     UsesRepairSpecializationFilter || UsesQualityFilter ||
-                    UsesOwnedFilter || UsesTuningFilter;
+                    UsesOwnedFilter || UsesTuningFilter || UsesShoppingListFilter;
             }
         }
     }
@@ -107,14 +153,46 @@ namespace Cms21UiPlus
             if (!MatchesSearch(baseItem, criteria.SearchText))
                 return false;
 
-            if (item != null)
+            if (item != null) {
+                if (criteria.UsesShoppingListFilter &&
+                    !MatchesShoppingList(IsListed(item, criteria), criteria))
+                    return false;
                 return MatchesItem(item, criteria);
+            }
 
             GroupItem group = baseItem.TryCast<GroupItem>();
             if (group == null)
                 return false;
 
+            if (criteria.UsesShoppingListFilter) {
+                bool listed = false;
+                if (group.ItemList != null) {
+                    foreach (Item component in group.ItemList) {
+                        if (IsListed(component, criteria)) {
+                            listed = true;
+                            break;
+                        }
+                    }
+                }
+                if (!MatchesShoppingList(listed, criteria))
+                    return false;
+            }
+
             return MatchesGroup(group, criteria);
+        }
+
+        private static bool IsListed(Item item, PartFilterCriteria criteria)
+        {
+            if (item == null || criteria.ShoppingListKeys == null)
+                return false;
+            return criteria.ShoppingListKeys.Contains(item.ID) ||
+                criteria.ShoppingListKeys.Contains(PartIdentityComparer.GetKey(item));
+        }
+
+        private static bool MatchesShoppingList(bool listed, PartFilterCriteria criteria)
+        {
+            return listed ==
+                (criteria.ShoppingListMode == ShoppingListQuickFilterMode.ListedOnly);
         }
 
         public static bool MatchesSearch(BaseItem baseItem, string searchText)

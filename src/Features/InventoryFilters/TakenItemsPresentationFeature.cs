@@ -57,11 +57,13 @@ namespace Cms21UiPlus
             repairSpecializationFilter = new RepairSpecializationFilterState();
         private static QualityQuickFilterMode qualityMode;
         private static OwnedQuickFilterMode ownedMode;
+        private static ShoppingListQuickFilterMode shoppingListMode;
         private static TuningQuickFilterMode tuningMode;
         private static Image conditionButton;
         private static Image repairButton;
         private static Image qualityButton;
         private static Image ownedButton;
+        private static Image shoppingListButton;
         private static Image tuningButton;
         private static Text priceButtonLabel;
         private static TakenItemsWindow activeWindow;
@@ -124,6 +126,7 @@ namespace Cms21UiPlus
             repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             ownedMode = OwnedQuickFilterMode.Off;
+            shoppingListMode = ShoppingListQuickFilterMode.Off;
             tuningMode = TuningQuickFilterMode.Off;
             searchText = string.Empty;
             minimumPrice = 0;
@@ -137,6 +140,7 @@ namespace Cms21UiPlus
             repairButton = null;
             qualityButton = null;
             ownedButton = null;
+            shoppingListButton = null;
             priceButtonLabel = null;
             activeWindow = null;
         }
@@ -449,6 +453,7 @@ namespace Cms21UiPlus
             repairSpecializationFilter.Reset();
             qualityMode = QualityQuickFilterMode.Off;
             ownedMode = OwnedQuickFilterMode.Off;
+            shoppingListMode = ShoppingListQuickFilterMode.Off;
             tuningMode = TuningQuickFilterMode.Off;
             searchText = string.Empty;
             minimumPrice = 0;
@@ -495,7 +500,10 @@ namespace Cms21UiPlus
             root.anchorMin = new Vector2(0.5f, 0.5f);
             root.anchorMax = new Vector2(0.5f, 0.5f);
             root.pivot = new Vector2(0f, 0.5f);
-            root.sizeDelta = new Vector2(ButtonSpacing * 5f + ButtonSize,
+            Sprite shoppingListIcon = InventoryIconProvider.GetNativeShoppingListIcon();
+            bool showShoppingList = shoppingListIcon != null;
+            root.sizeDelta = new Vector2(ButtonSpacing *
+                (showShoppingList ? 6f : 5f) + ButtonSize,
                 ButtonSize);
             root.localScale = Vector3.one;
 
@@ -524,7 +532,13 @@ namespace Cms21UiPlus
                 InventoryIconProvider.GetQualityIcon(),
                 InventoryFilterManager.CreateQualityQuickFilterMenu(
                     SelectQuality));
-            ownedButton = EnsureFilterButton(root, "Owned", 4,
+            if (showShoppingList) {
+                shoppingListButton = EnsureFilterButton(root, "ShoppingList", 4,
+                    shoppingListIcon,
+                    InventoryFilterManager.CreateShoppingListQuickFilterMenu(
+                        SelectShoppingList, shoppingListIcon));
+            }
+            ownedButton = EnsureFilterButton(root, "Owned", showShoppingList ? 5 : 4,
                 InventoryIconProvider.GetWhiteWarehouseIcon(),
                 InventoryFilterManager.CreateOwnedQuickFilterMenu(SelectOwned));
             tuningButton = EnsureFilterButton(root, "Tuning", 3,
@@ -532,7 +546,7 @@ namespace Cms21UiPlus
                 InventoryFilterManager.CreateTuningQuickFilterMenu(
                     SelectTuning, InventoryIconProvider.GetNativeTuningIcon(
                         window.transform)));
-            EnsurePriceRangeButton(root, 5);
+            EnsurePriceRangeButton(root, showShoppingList ? 6 : 5);
             UpdateFilterVisuals();
             root.gameObject.SetActive(true);
         }
@@ -1051,6 +1065,13 @@ namespace Cms21UiPlus
             ApplyFilters();
         }
 
+        private static void SelectShoppingList(ShoppingListQuickFilterMode mode)
+        {
+            shoppingListMode = mode;
+            UpdateFilterVisuals();
+            ApplyFilters();
+        }
+
         private static void SelectOwned(OwnedQuickFilterMode mode)
         {
             ownedMode = mode;
@@ -1076,6 +1097,7 @@ namespace Cms21UiPlus
                 OwnedMode = ownedMode,
                 TuningMode = tuningMode,
             };
+            criteria.SetShoppingListFilter(shoppingListMode);
             for (int index = 0; index < Cards.Count; index++) {
                 CardEntry entry = Cards[index];
                 if (entry.Cell != null) {
@@ -1171,6 +1193,9 @@ namespace Cms21UiPlus
                 qualityButton.color = qualityMode == QualityQuickFilterMode.Off
                     ? DisabledButtonColor : ActiveButtonColor;
             }
+            if (shoppingListButton != null)
+                shoppingListButton.color = InventoryFilterManager
+                    .ShoppingListFilterColor(shoppingListMode);
             if (ownedButton != null) {
                 ownedButton.sprite = ownedMode == OwnedQuickFilterMode.Missing
                     ? InventoryIconProvider.GetRedWarehouseIcon()

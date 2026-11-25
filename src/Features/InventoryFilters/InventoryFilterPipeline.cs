@@ -281,6 +281,8 @@ namespace Cms21UiPlus
             criteria.OwnedMode = junkyardContext
                 ? ownedFilterMode
                 : OwnedQuickFilterMode.Off;
+            criteria.SetShoppingListFilter(junkyardContext
+                ? shoppingListFilterMode : ShoppingListQuickFilterMode.Off);
             if (junkyardContext)
                 criteria.SearchText = GetTravelCollectedSearchText(inventory);
             else {

@@ -139,6 +139,8 @@ namespace Cms21UiPlus
             QualityQuickFilterMode.Off;
         private static QualityQuickFilterMode garageQualityFilterMode =
             QualityQuickFilterMode.Off;
+        private static ShoppingListQuickFilterMode shoppingListFilterMode =
+            ShoppingListQuickFilterMode.Off;
         private static OwnedQuickFilterMode ownedFilterMode = OwnedQuickFilterMode.Off;
         private static PackageQuickFilterMode packageFilterMode =
             PackageQuickFilterMode.Off;
@@ -183,6 +185,7 @@ namespace Cms21UiPlus
             junkyardQualityFilterMode = QualityQuickFilterMode.Off;
             garageQualityFilterMode = QualityQuickFilterMode.Off;
             ownedFilterMode = OwnedQuickFilterMode.Off;
+            shoppingListFilterMode = ShoppingListQuickFilterMode.Off;
             packageFilterMode = PackageQuickFilterMode.Off;
             inventoryTuningFilterMode = TuningQuickFilterMode.Off;
         }

@@ -1,7 +1,9 @@
 #if NET6_0_OR_GREATER
 using Il2Cpp;
+using Il2CppInterop.Runtime;
 #else
 using CMS;
+using UnhollowerRuntimeLib;
 #endif
 
 using System;
@@ -39,6 +41,7 @@ namespace Cms21UiPlus
         private static Sprite quality3Icon;
         private static Sprite qualityNonIcon;
         private static Sprite nativeTuningIcon;
+        private static Sprite nativeShoppingListIcon;
 
         private static readonly HashSet<string> LoggedIcons =
             new HashSet<string>(StringComparer.Ordinal);
@@ -167,6 +170,17 @@ namespace Cms21UiPlus
             }
             return GetExternalIcon(System.IO.Path.Combine("Mods",
                 "CMS21GameplayPlus", "SkillIndicators", "SI_SkillTuning.png"));
+        }
+
+        public static Sprite GetNativeShoppingListIcon()
+        {
+            if (nativeShoppingListIcon == null) {
+                UnityEngine.Object resource = Resources.Load(
+                    "Sprites/PieMenu/list_open", Il2CppType.Of<Sprite>());
+                if (resource != null)
+                    nativeShoppingListIcon = resource.TryCast<Sprite>();
+            }
+            return nativeShoppingListIcon;
         }
 
         public static Sprite GetExternalIcon(string filePath)
